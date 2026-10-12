@@ -28,3 +28,5 @@ Utiliser la légende ✅ constaté / 📄 documenté / ⚠️ à vérifier / �
 - Branche de travail courante : `claude/busy-cerf-cd22ke` ; ne pas créer de PR sans demande ; ne pas pousser sur `main` sans accord.
 - Commits : messages clairs au format conventionnel (`feat:`, `fix:`, `docs:`, `refactor:`).
 - Qualité visée (demande du fondateur) : application **très esthétique, épurée, fluide et simple**, digne d'une grande entreprise ; maquettes validées par le fondateur avant de coder un écran ; tests de bout en bout sur écran de téléphone.
+- Commandes (à la racine, npm workspaces) : `npm run dev` (HailandX, port 3000), `npm run dev:flotte`, `npm run build`, `npm run lint`, `npm test` (règles métier + banc SQL sur Postgres embarqué). Lancer `lint` et `test` avant de pousser.
+- Migrations SQL : écrites dans `supabase/proposed/`, **testées** par `supabase/tests/` (RLS comprise), **jamais appliquées** sans accord explicite du fondateur.

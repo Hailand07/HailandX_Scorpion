@@ -1,0 +1,35 @@
+/* Système de design HailandX / Flotte — validé par le fondateur (maquettes du 2026-10-12).
+   Même famille que NavigationX : Sora (titres, prix), Manrope (texte), encre, bleu Hailand. Accent citron pour les moments forts. */
+@theme {
+  --font-display: 'Sora', 'Manrope', system-ui, sans-serif;
+  --font-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+
+  --color-ink: #12141c;
+  --color-muted: #5f6372;
+  --color-bg: #f6f4ef;
+  --color-card: #ffffff;
+  --color-line: #e6e2d8;
+  --color-line-soft: #ece8de;
+  --color-sand: #f2f0ea;
+  --color-blue: #3346f0;
+  --color-blue-ink: #2533b8;
+  --color-blue-soft: #e8ebff;
+  --color-lime: #c8f25a;
+  --color-ok: #0d6b47;
+  --color-ok-soft: #e3f6e9;
+  --color-amber: #f5cf6b;
+  --color-amber-soft: #fff4dc;
+  --color-night: #0f1424;
+  --color-night-card: #151a2e;
+  --color-night-line: #2a3150;
+  --color-night-text: #f3f4f8;
+  --color-night-muted: #9aa1b8;
+
+  --radius-card: 20px;
+  --radius-sheet: 24px;
+}
+
+html { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+body { margin: 0; overscroll-behavior: none; }
+input, textarea, select { font-size: 16px; } /* évite le zoom automatique sur iPhone */
+:focus-visible { outline: 2px solid var(--color-blue); outline-offset: 2px; }
