@@ -1,7 +1,7 @@
 # HAILANDX.md — HailandX, Flotte Hailand et Scorpion (Hailand07/HailandX_Scorpion)
 
 > Fiche du projet HailandX. À lire avec [`ECOSYSTEME_HAILAND.md`](./ECOSYSTEME_HAILAND.md) (vision, base partagée, règles) et [`CLAUDE.md`](./CLAUDE.md) (règles de travail).
-> **État (2026-10-12) : cadrage. Rien n'est codé, aucune table de commerce n'existe en base.**
+> **État (2026-10-12) : phase 0 — maquettes à valider (§11.1). Rien n'est codé, aucune table de commerce n'existe en base.**
 > Légende : ✅ constaté · 📄 demandé ou décidé par le fondateur · ⚠️ à vérifier · 💡 proposé (pas encore décidé).
 
 ## Guide de lecture
@@ -338,18 +338,33 @@ Chaque phase se termine par une **validation du fondateur** avant la suivante.
 
 ---
 
-## 11. Décisions à prendre par le fondateur
+## 11. Décisions du fondateur ✅ (2026-10-12)
 
-1. **Nom et domaine** : « HailandX » et un lien court (ex. `hx.gn`) ? ⚠️ Disponibilité du domaine à vérifier.
-2. **Fiche produit commune + offres** (§3.1) : d'accord ?
-3. **Remise** : scan par l'acheteur **avec repli par code à 4 chiffres** (§3.5) : d'accord ?
-4. **Vendeur** : préparer sa boutique avant la certification, vente ouverte au niveau 3 (§3.8) : d'accord ?
-5. **Flotte** : application séparée dans ce dépôt (§5) : d'accord ?
-6. **Next.js** pour HailandX (§7) : d'accord ?
-7. **Fournisseur de SMS** : je compare les options et les coûts en Guinée ?
-8. **Paiement bloqué jusqu'à la remise** : se renseigner auprès d'Orange Guinée et de la BCRG (ou d'un partenaire agréé) avant la phase 6.
-9. **Zone pilote** et premiers vendeurs et livreurs.
-10. **Partage de Scorpion avec NavigationX** (§6) : paquet publié, ou regrouper NavigationX dans ce dépôt plus tard ?
+| # | Sujet | Décision |
+|---|---|---|
+| 1 | Nom et domaine | **Laissé à Claude** → application **HailandX**, application des livreurs **Hailand Flotte**, localisation **Scorpion** ; liens courts proposés **`hx.gn/p/…`** (produit), **`hx.gn/s/…`** (sélection), **`hx.gn/b/…`** (boutique). ⚠️ Disponibilité de `hx.gn` à vérifier ; repli : `hailandx.com`. |
+| 2 | Fiche produit commune + offres (§3.1) | **D'accord** |
+| 3 | Remise : scan par l'acheteur, repli par code à 4 chiffres (§3.5) | **D'accord** |
+| 4 | Vendeur : boutique préparée avant la certification, vente ouverte au niveau 3 (§3.8) | **D'accord** |
+| 5 | Flotte = application séparée dans ce dépôt (§5) | **D'accord** |
+| 6 | Next.js pour HailandX (§7) | **D'accord** |
+| 7 | Fournisseur de SMS : comparaison des options et des coûts | **D'accord** (à faire avant la phase 1) |
+| 8 | Paiement bloqué jusqu'à la remise : se renseigner (Orange Guinée, BCRG, partenaire agréé) | À faire avant la phase 6 |
+| 9 | Zone pilote, premiers vendeurs et livreurs | **Plus tard** |
+| 10 | Partage de Scorpion avec NavigationX (§6) | À trancher en phase 1 |
+
+**Demande du fondateur (2026-10-12)** : voir **toute l'architecture, les interfaces, le flux et le design** dans des artefacts qu'il peut consulter, modifier et valider **avant toute exécution**.
+
+### 11.1 Phase 0 — maquettes à valider 📄 (2026-10-12)
+Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3jubhEEo7S (privé ; le fondateur peut le partager depuis le menu « Partager »). Contenu :
+- **Acheteur, application** (7 écrans) : 1 Accueil « la rue commerçante » (adresse de livraison, recherche, catégories, boutiques à proximité, échantillons avec badge et délai) · 2 Recherche (filtres, résultats « proposé par N vendeurs ») · 3 Fiche produit et offres (offre recommandée, badges, avis vérifiés par la Flotte) · 4 Boutique (indicateurs de confiance, Suivre, WhatsApp, rayons) · 5 Panier (un colis par vendeur, frais de livraison par colis) · 6 Commande (adresse Scorpion niveau 3, téléphone vérifié, paiement à la livraison ou Orange Money bloqué) · 7 Suivi (carte, étapes, scan du QR ou code de remise à 4 chiffres).
+- **Acheteur, depuis un lien social** (2 écrans) : 8 page d'un lien TikTok/WhatsApp (avertissement « ouvrir dans Safari », produit mis en avant, reste de la boutique, « Acheter maintenant ») · 9 « Où livrer ? » avec Scorpion (adresse Hailand existante, me localiser, toucher ma maison sur la carte).
+- **Vendeur** (3 écrans) : 10 tableau de bord (état de certification — réglage « en attente / certifié », colis à préparer, ventes, indice de confiance, sources des ventes) · 11 ajouter un produit (rejoindre une fiche existante ou en créer une, prix, stock, variantes) · 12 colis à préparer (QR du colis, étiquette, liens à partager).
+- **Flotte** (2 écrans, thème sombre) : 13 missions (disponibilité, gains, espèces à reverser, missions avec niveau d'adresse) · 14 retrait et remise (réglage « retrait / remise » : viseur QR et photo ; code de remise à 4 chiffres et montant à encaisser).
+- **Pages** : A Architecture (applications, modules partagés, serveur, base) · B Flux d'une commande (8 étapes, règles de la Flotte) · C Système de design (couleurs, polices, composants, principes, nom et liens).
+- **Identité visuelle proposée** : même famille que NavigationX (Sora pour les titres et les prix, encre `#12141C`, fond `#F6F4EF`, bleu Hailand `#3346F0`), texte en Manrope, accent citron `#C8F25A` réservé aux moments forts et à la Flotte (fond nuit `#0F1424`).
+- Les produits, prix, boutiques et délais affichés sont **des exemples** ; les photos sont des emplacements.
+- **Prochaine étape** : le fondateur commente ou modifie le canevas ; Claude reprend les commentaires, puis passe à la phase 1 après validation.
 
 ---
 
@@ -368,5 +383,6 @@ Chaque phase se termine par une **validation du fondateur** avant la suivante.
 
 | Date | Changement |
 |---|---|
+| 2026-10-12 | Décisions du fondateur (§11) : tout accepté ; nom et domaine laissés à Claude (HailandX, Hailand Flotte, Scorpion, liens `hx.gn`) ; zone pilote plus tard. Phase 0 : canevas de maquettes (14 écrans téléphone + architecture, flux, design) à valider avant d'exécuter (§11.1). |
 | 2026-10-12 | Rectification du fondateur : le modèle de référence est **Shopify** (boutique en ligne propre à chaque vendeur, diffusée sur ses réseaux), et non Spotify. |
 | 2026-10-12 | Création : vision détaillée du fondateur (vitrine globale « la rue », liens sociaux, Flotte Hailand avec QR, Scorpion, niveaux requis), propositions (fiche commune et offres, indice de confiance, avis vérifiés par la flotte, double preuve de remise, paiement bloqué, panier multi-vendeurs), parcours, place de la flotte, architecture, schéma proposé, design, plan en 8 phases, décisions à prendre. Rien n'est codé. |
