@@ -1,0 +1,9 @@
+{
+  "name": "@hailandx/commerce",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": { "@hailandx/scorpion": "*" },
+  "types": "src/index.ts"
+}
