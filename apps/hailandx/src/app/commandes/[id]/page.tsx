@@ -6,7 +6,7 @@ import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
-interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; created_at: string }
+interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
 interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; quantity: number; price_gnf_snapshot: number }[] }
 
 const STEPS = [
@@ -30,7 +30,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   const load = useCallback(async () => {
     if (!sb) return;
-    const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,created_at').eq('id', id).maybeSingle();
+    const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,payment_status,created_at').eq('id', id).maybeSingle();
     if (!o.data) { setMissing(true); return; }
     setOrder(o.data as Order);
     const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,shops(name,slug),order_items(id,name_snapshot,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
@@ -63,6 +63,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><Link href="/commandes" className="text-[13px] font-bold text-blue-ink">Mes commandes</Link></div>
       <h1 className="font-display text-[22px] font-semibold tracking-tight">Suivi de commande</h1>
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
+      {order && order.payment_method === 'orange_money' && <PaymentBox order={order} onDone={() => load()} />}
       {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
       {!order ? <p className="text-[14px] font-medium text-muted">Chargement…</p> : (
         <>
@@ -148,5 +149,33 @@ function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelSta
       {err && <p role="alert" className="text-[12.5px] font-semibold text-[#8a2a1c]">{err}</p>}
       <div className="flex gap-2"><button type="submit" className="h-11 flex-1 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Envoyer</button><button type="button" onClick={() => setOpen(false)} className="h-11 rounded-2xl border border-line px-4 text-[13.5px] font-bold">Annuler</button></div>
     </form>
+  );
+}
+
+const PAY_LABEL: Record<string, string> = { bloque: 'Payée : l’argent est bloqué jusqu’à la remise.', libere: 'Payée et versée au vendeur.', rembourse: 'Remboursée.' };
+
+/** Paiement Orange Money : à payer, bloqué (séquestre), versé ou remboursé. */
+function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
+  const sb = browserClient();
+  const [state, setState] = useState<{ provider: string; admin: boolean } | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (order.payment_status !== 'en_attente') return;
+    (async () => { const a = await sb!.rpc('is_admin'); const m = await sb!.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(); setState({ provider: (m.data as { value: string } | null)?.value ?? 'simulation', admin: a.data === true }); })();
+  }, [sb, order.payment_status]);
+  if (order.payment_status !== 'en_attente') return <p className="rounded-2xl bg-ok-soft px-4 py-3 text-[13px] font-bold text-ok">{PAY_LABEL[order.payment_status] ?? ''}</p>;
+  return (
+    <div className="flex flex-col gap-2 rounded-2xl bg-amber-soft px-4 py-3">
+      <span className="text-[13.5px] font-extrabold">Paiement en attente : {formatGnf(order.total_gnf)}</span>
+      <span className="text-[12.5px] font-medium">Le vendeur prépare votre colis dès que vous avez payé. L’argent est bloqué par Hailand jusqu’à la remise.</span>
+      {state?.provider === 'orange_money' ? (
+        <button type="button" onClick={async () => { setMsg(null); const r = await sb!.rpc('fn_pay_start', { p_order: order.id }); setMsg(r.error ? r.error.message.replace(/^.*?:\s*/, '') : 'Le paiement Orange Money s’ouvre bientôt : le compte marchand est en cours d’ouverture.'); }} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Payer avec Orange Money</button>
+      ) : state?.admin ? (
+        <button type="button" onClick={async () => { setMsg(null); const r = await sb!.rpc('fn_payment_confirm', { p_order: order.id, p_ref: 'SIMULATION', p_amount: order.total_gnf }); if (r.error) setMsg(r.error.message.replace(/^.*?:\s*/, '')); else onDone(); }} className="h-12 rounded-2xl bg-lime text-[14px] font-extrabold">Simuler le paiement (essai équipe)</button>
+      ) : (
+        <span className="text-[12.5px] font-bold text-muted">Le paiement en ligne n’est pas encore ouvert. Vous pouvez annuler ce colis et payer en espèces à la livraison.</span>
+      )}
+      {msg && <span role="status" className="text-[12.5px] font-semibold">{msg}</span>}
+    </div>
   );
 }

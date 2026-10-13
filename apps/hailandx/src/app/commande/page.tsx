@@ -25,12 +25,18 @@ export default function CheckoutPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [pay, setPay] = useState<'livraison' | 'orange_money'>('livraison');
+  const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
 
   useEffect(() => {
     if (!sb || !session) return;
     const uid = session.user.id;
     if (session.user.phone) setPhone(formatGnPhone(session.user.phone.startsWith('+') ? session.user.phone : `+${session.user.phone}`));
     (async () => {
+      // Orange Money : ouvert à tous en mode « orange_money » ; en mode « simulation », réservé à l'équipe (essais).
+      const [m, a] = await Promise.all([sb.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(), sb.rpc('is_admin')]);
+      const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
+      setOmAvailable({ ok: mode === 'orange_money' || a.data === true, trial: mode !== 'orange_money' });
       const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).order('created_at', { ascending: false });
       const list = (data as Decl[]) ?? [];
       const lv: Record<string, number> = {};
@@ -48,7 +54,7 @@ export default function CheckoutPage() {
     if (!decl) return setError('Choisissez une adresse de livraison.');
     setBusy(true);
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
-    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: 'livraison', p_source: currentSource() });
+    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: pay, p_source: currentSource() });
     setBusy(false);
     if (err) return setError(err.message.replace(/^.*?:\s*/, '').slice(0, 200) || 'La commande n’a pas pu être passée.');
     clearCart();
@@ -92,8 +98,12 @@ export default function CheckoutPage() {
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Paiement</h2>
-          <label className="flex items-center gap-3 rounded-2xl border-2 border-ink px-4 py-3 text-[14px] font-bold"><input type="radio" checked readOnly /> Espèces à la livraison</label>
-          <label className="flex items-center gap-3 rounded-2xl border border-line px-4 py-3 text-[14px] font-bold text-muted"><input type="radio" disabled /> Orange Money <span className="ml-auto text-[11.5px]">bientôt</span></label>
+          <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'livraison' ? 'border-2 border-ink' : 'border border-line'}`}><input type="radio" name="pay" checked={pay === 'livraison'} onChange={() => setPay('livraison')} /> Espèces à la livraison</label>
+          <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${omAvailable.ok ? (pay === 'orange_money' ? 'border-2 border-ink' : 'border border-line') : 'border border-line text-muted'}`}>
+            <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> Orange Money
+            <span className="ml-auto text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
+          </label>
+          {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez à l’étape suivante. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
         </section>
         <section className="flex flex-col gap-1 text-[13.5px] font-semibold">
           <div className="flex justify-between"><span className="text-muted">Articles</span><span>{formatGnf(cartSubtotal(lines))}</span></div>
