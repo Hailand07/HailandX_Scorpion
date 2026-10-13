@@ -417,6 +417,7 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 | 2026-10-12 | Rectification du fondateur : le modèle de référence est **Shopify** (boutique en ligne propre à chaque vendeur, diffusée sur ses réseaux), et non Spotify. |
 | 2026-10-12 | Création : vision détaillée du fondateur (vitrine globale « la rue », liens sociaux, Flotte Hailand avec QR, Scorpion, niveaux requis), propositions (fiche commune et offres, indice de confiance, avis vérifiés par la flotte, double preuve de remise, paiement bloqué, panier multi-vendeurs), parcours, place de la flotte, architecture, schéma proposé, design, plan en 8 phases, décisions à prendre. Rien n'est codé. |
 | 2026-10-13 | Migration de commerce et de Flotte **appliquée à la base de production** (14 tables, 14 fonctions, sécurité par ligne vérifiée) ; fichier déplacé dans `supabase/migrations/` ; deux correctifs (chemin de recherche `extensions`, droits des déclencheurs). |
+| 2026-10-13 | Phase 2 commencée : vitrine lue dans la base (repli sur exemples), connexion par téléphone, espace vendeur, 10 catégories de départ créées en production. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -438,3 +439,15 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 **Prochaines étapes de code** (après accord) : connexion par téléphone et lecture réelle des boutiques et produits ; Scorpion dans HailandX (adresse à la commande) ; espace vendeur (phase 2).
 
 ---
+
+## 15. Phase 2 — état (2026-10-13) ✅ code, ⚠️ connexion réelle à tester avec un vrai SMS
+
+**Fait** (`npm test` : 100 vérifications ; `npm run lint` ; `npm run build`) :
+- **Lecture réelle de la vitrine** (`apps/hailandx/src/lib/catalog.ts`) : boutiques **ouvertes** et offres actives lues dans la base avec la clé publique (visiteur) ; si aucune boutique n'est ouverte ou si la base est injoignable, **repli sur les boutiques d'exemple** (mention affichée). Pages d'accueil, boutique (`/b/<slug>`) et produit (`/p/<slug>`) rendues côté serveur, rafraîchies toutes les 60 s ; l'aperçu riche reste servi par le serveur.
+- **Connexion par téléphone** (`/connexion`) : numéro guinéen (+224, normalisé et testé) → code à 6 chiffres (`signInWithOtp` / `verifyOtp`) ; session conservée dans le navigateur. Même compte que NavigationX et HailandMap. ⚠️ L'envoi réel du SMS dépend du fournisseur (§7 bis) ; les numéros de test configurés dans Supabase fonctionnent sans SMS.
+- **Espace vendeur** (`/vendeur`) : créer sa boutique (nom → lien lisible, catégorie, adresse parmi ses adresses Scorpion), rattacher une adresse, ajouter un produit (fiche + offre + stock), copier le lien ou le partager sur WhatsApp, bouton « Ouvrir la vente » **seulement quand l'adresse est de niveau 3** (la règle est aussi appliquée par la base).
+- **Catégories de départ** (10) créées en production (`supabase/migrations/2026-10-13_hailandx_categories.sql`, ajout seulement, accord du fondateur).
+- **Vérifié sur la vraie base, sans rien laisser** (transaction annulée) : un compte connecté crée sa boutique (devenue membre propriétaire), un produit, une offre et une variante ; l'ouverture de la vente et le changement de statut sont refusés sans niveau 3 ; l'écriture directe d'une commande est refusée. Base laissée à 0 boutique et 0 produit.
+- Écran téléphone (390 px) : accueil, invite de connexion du vendeur, validation du numéro ; aucun défilement horizontal, aucune erreur.
+
+**Pas encore fait (phase 2 suite)** : photos des produits (stockage d'images), modification et suppression de produits, extraction de l'enregistrement d'adresse de NavigationX dans `packages/scorpion` (aujourd'hui l'adresse se crée dans NavigationX), liens suivis (`share_links`, clics par source), certification prioritaire demandée depuis l'espace vendeur.

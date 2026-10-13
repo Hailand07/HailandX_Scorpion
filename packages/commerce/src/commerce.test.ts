@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFeed, buyerStep, canDeliverTo, canSell, canTransition, checkHandoverCode, deliveryFeeGnf, doorPrecision, formatGnf, isFinal, MAX_HANDOVER_ATTEMPTS,
-  newHandoverCode, parseParcelQr, rankOffers, shopState, trustScore, withinHandoverRange, badgesFor, type FeedCandidate, type Offer,
+  newHandoverCode, normalizeGnPhone, formatGnPhone, slugify, parseParcelQr, rankOffers, shopState, trustScore, withinHandoverRange, badgesFor, type FeedCandidate, type Offer,
 } from './index';
 
 describe('montants', () => {
@@ -166,5 +166,28 @@ describe('offres d’une fiche commune', () => {
   it('à confiance égale, le prix et le délai départagent', () => {
     const ranked = rankOffers([o('cher', 130000, 80, 60), o('bon', 110000, 80, 45)]);
     expect(ranked[0].id).toBe('bon');
+  });
+});
+
+describe('téléphone et identifiants', () => {
+  it('normalise les numéros guinéens', () => {
+    expect(normalizeGnPhone('610 01 04 19')).toBe('+224610010419');
+    expect(normalizeGnPhone('+224 610010419')).toBe('+224610010419');
+    expect(normalizeGnPhone('00224610010419')).toBe('+224610010419');
+    expect(normalizeGnPhone('224610010419')).toBe('+224610010419');
+  });
+  it('refuse les numéros invalides', () => {
+    expect(normalizeGnPhone('')).toBeNull();
+    expect(normalizeGnPhone('12345')).toBeNull();
+    expect(normalizeGnPhone('510010419')).toBeNull();
+    expect(normalizeGnPhone('+33612345678')).toBeNull();
+  });
+  it('affiche un numéro lisible', () => {
+    expect(formatGnPhone('+224610010419')).toBe('+224 610 01 04 19');
+  });
+  it('fabrique un identifiant de lien', () => {
+    expect(slugify('Kadi Wax & Co')).toBe('kadi-wax-co');
+    expect(slugify('  Beauté Nafi  ')).toBe('beaute-nafi');
+    expect(slugify('é')).toBe('e');
   });
 });

@@ -1,12 +1,18 @@
 import Link from 'next/link';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
-import { PRODUCTS, SHOPS, productBySlug, shopBySlug, trustOf } from '@/data/sample';
+import { trustOf } from '@/data/sample';
+import { getCatalog } from '@/lib/catalog';
 
 const CATEGORIES = ['Tout', 'Mode', 'Beauté', 'Téléphones', 'Maison', 'Alimentation'];
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
-export default function Home() {
+export const revalidate = 60;
+
+export default async function Home() {
+  const { shops: SHOPS, products: PRODUCTS, source } = await getCatalog();
+  const shopBySlug = (slug: string) => SHOPS.find((s) => s.slug === slug);
+  const productBySlug = (slug: string) => PRODUCTS.find((p) => p.slug === slug);
   const candidates: FeedCandidate[] = PRODUCTS.map((p) => {
     const shop = shopBySlug(p.shopSlug)!;
     return { id: p.slug, shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustOf(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
@@ -69,7 +75,7 @@ export default function Home() {
         })}
       </section>
 
-      <p className="px-5 text-center text-[11.5px] font-semibold text-muted">Données d’exemple : la base de commerce n’existe pas encore.</p>
+      {source === 'exemple' && <p className="px-5 text-center text-[11.5px] font-semibold text-muted">Boutiques d’exemple : aucune boutique n’est encore ouverte à la vente.</p>}
     </main>
   );
 }
