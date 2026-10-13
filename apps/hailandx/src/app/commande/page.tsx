@@ -85,12 +85,13 @@ export default function CheckoutPage() {
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
           {!ready ? <p className="text-[13.5px] font-medium text-muted">Chargement de vos adresses…</p> : decls.length === 0 ? (
-            <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">Aucune adresse enregistrée. Enregistrez votre adresse dans NavigationX (niveau 1 au minimum) : c’est elle qui guide le livreur jusqu’à votre porte.</p>
+            <div className="flex flex-col gap-2"><p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">Aucune adresse enregistrée : c’est elle qui guide le livreur jusqu’à votre porte.</p><Link href="/adresse?next=/commande" className="flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Où livrer ? Enregistrer mon adresse</Link></div>
           ) : (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
               {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
             </select>
           )}
+          {ready && decls.length > 0 && <Link href="/adresse?next=/commande" className="text-[13px] font-bold text-blue-ink">+ Ajouter une autre adresse</Link>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>

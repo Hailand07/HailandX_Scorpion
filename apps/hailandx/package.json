@@ -12,6 +12,7 @@
     "@hailandx/scorpion": "*",
     "@hailandx/ui": "*",
     "@supabase/supabase-js": "^2.117.3",
+    "mapbox-gl": "^3.32.0",
     "next": "^16.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.0.1",
