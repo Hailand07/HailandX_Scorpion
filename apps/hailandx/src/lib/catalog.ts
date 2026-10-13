@@ -1,3 +1,4 @@
+import { unstable_cache } from 'next/cache';
 import { trustScore, type ShopStats } from '@hailandx/commerce';
 import { PRODUCTS as SAMPLE_PRODUCTS, SHOPS as SAMPLE_SHOPS, type SampleProduct, type SampleShop } from '@/data/sample';
 import { mediaUrl } from './media';
@@ -49,7 +50,7 @@ function shopFromRow(r: ShopRow): ShopView {
 }
 
 /** Lit la vitrine : boutiques ouvertes à la vente et leurs offres actives. Repli sur les exemples si la base est vide ou injoignable. */
-export async function getCatalog(): Promise<Catalog> {
+async function loadCatalog(): Promise<Catalog> {
   const sb = serverClient();
   if (!sb) return { shops: SAMPLE_SHOPS, products: SAMPLE_PRODUCTS, source: 'exemple' };
   try {
@@ -77,3 +78,12 @@ export async function getCatalog(): Promise<Catalog> {
     return { shops: SAMPLE_SHOPS, products: SAMPLE_PRODUCTS, source: 'exemple' };
   }
 }
+
+/** Lecture mise en cache 30 s (la vitrine reste vivante sans interroger la base à chaque visite). */
+export const getCatalog: () => Promise<Catalog> = unstable_cache(loadCatalog, ['catalog-v1'], { revalidate: 30 });
+
+/** Normalise pour la recherche : minuscules, sans accents. */
+export const norm = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/** Clé d'une offre : un même produit peut être proposé par plusieurs boutiques. */
+export const offerKey = (p: { slug: string; shopSlug: string }): string => `${p.slug}@${p.shopSlug}`;

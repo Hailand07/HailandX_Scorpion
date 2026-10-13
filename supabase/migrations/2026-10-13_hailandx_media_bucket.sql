@@ -11,3 +11,7 @@ create policy hx_media_update_own on storage.objects for update to authenticated
   with check (bucket_id = 'hx-media' and (storage.foldername(name))[1] = auth.uid()::text);
 create policy hx_media_delete_own on storage.objects for delete to authenticated
   using (bucket_id = 'hx-media' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- Ajout du 2026-10-14 (appliqué) : le propriétaire peut lister et supprimer ses propres images (l'API Storage exige la lecture pour supprimer).
+create policy hx_media_select_own on storage.objects for select to authenticated
+  using (bucket_id = 'hx-media' and (storage.foldername(name))[1] = auth.uid()::text);

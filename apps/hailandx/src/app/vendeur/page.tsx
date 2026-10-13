@@ -30,6 +30,9 @@ export default function SellerPage() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
+  const [pname, setPname] = useState('');
+  const [chosen, setChosen] = useState<{ id: string; name: string } | null>(null);
+  const [sugg, setSugg] = useState<{ id: string; name: string }[]>([]);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -58,6 +61,17 @@ export default function SellerPage() {
 
   useEffect(() => { if (session === null) setLoading(false); else if (uid) void load(); }, [session, uid, load]);
 
+  // Fiches existantes : si quelqu'un vend déjà ce produit, on y ajoute son offre (même fiche, plusieurs vendeurs).
+  useEffect(() => {
+    const term = pname.trim().replace(/[%_,()]/g, ' ').trim();
+    if (!sb || chosen || term.length < 3) { setSugg([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await sb.from('catalog_products').select('id,name').ilike('name', `%${term}%`).eq('status', 'actif').limit(5);
+      setSugg((data as { id: string; name: string }[]) ?? []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [pname, chosen, sb]);
+
   const run = async (fn: () => Promise<string | void>) => {
     setBusy(true); setMsg(null);
     try { const ok = await fn(); if (ok) setMsg({ tone: 'ok', text: ok }); await load(); }
@@ -84,13 +98,19 @@ export default function SellerPage() {
     if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
     const photo = f.get('photo');
     const photoPath = photo instanceof File && photo.size > 0 ? await uploadPhoto(sb!, uid!, photo) : null;
-    const { data: prod, error: e1 } = await sb!.from('catalog_products').insert({ slug: `${slugify(name) || 'produit'}-${rand()}`, name, category_id: String(f.get('pcat') ?? '') || shop?.category_id || null, created_by: uid }).select('id').single();
-    fail(e1);
-    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: (prod as { id: string }).id, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
+    let productId = chosen?.id;
+    if (!productId) {
+      const { data: prod, error: e1 } = await sb!.from('catalog_products').insert({ slug: `${slugify(name) || 'produit'}-${rand()}`, name, category_id: String(f.get('pcat') ?? '') || shop?.category_id || null, created_by: uid }).select('id').single();
+      fail(e1);
+      productId = (prod as { id: string }).id;
+    }
+    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: productId, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
+    if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans « Mes produits ».');
     fail(e2);
     const { error: e3 } = await sb!.from('offer_variants').insert({ offer_id: (off as { id: string }).id, label: 'Standard', stock });
     fail(e3);
-    return 'Produit ajouté.';
+    setPname(''); setChosen(null);
+    return chosen ? 'Votre offre est ajoutée à la fiche existante.' : 'Produit ajouté.';
   }
 
   async function setShopImage(kind: 'logo' | 'cover', f: FormData) {
@@ -200,7 +220,16 @@ export default function SellerPage() {
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Ajouter un produit</h2>
             <form action={(f) => run(() => addProduct(f))} className="flex flex-col gap-3">
-              <input name="pname" required placeholder="Nom du produit" className={input} />
+              <div className="flex flex-col gap-1.5">
+                <input name="pname" required placeholder="Nom du produit" value={pname} onChange={(e) => { setPname(e.target.value); setChosen(null); }} autoComplete="off" className={input} />
+                {chosen && <p className="flex items-center justify-between rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[12.5px] font-bold text-ok"><span>Fiche existante : vous ajoutez votre offre.</span><button type="button" onClick={() => setChosen(null)} className="underline">Créer une nouvelle fiche</button></p>}
+                {!chosen && sugg.length > 0 && (
+                  <div className="flex flex-col gap-1 rounded-2xl border border-line-soft bg-card p-1.5" role="listbox" aria-label="Fiches existantes">
+                    <span className="px-2 pt-1 text-[11.5px] font-bold text-muted">Ce produit est déjà vendu ? Ajoutez votre offre :</span>
+                    {sugg.map((s) => <button key={s.id} type="button" role="option" aria-selected="false" onClick={() => { setChosen(s); setPname(s.name); setSugg([]); }} className="h-11 rounded-xl px-3 text-left text-[14px] font-bold hover:bg-sand">{s.name}</button>)}
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <input name="price" required inputMode="numeric" placeholder="Prix (GNF)" className={input} />
                 <input name="stock" required inputMode="numeric" defaultValue="1" placeholder="Stock" className={input} />

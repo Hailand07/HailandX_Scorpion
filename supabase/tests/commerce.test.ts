@@ -333,3 +333,44 @@ describe('avis vérifiés', () => {
     expect(await as(db, U.acheteur, () => refused(db.query('select fn_submit_review($1, 5, $2)', [p, 'trop tôt'])))).toMatch(/après la remise/);
   });
 });
+
+describe('litiges : signalement par l’acheteur, décision de l’équipe', () => {
+  let disputeId: string; let relBefore = 0;
+  it('seul l’acheteur signale un problème, une seule fois, sur un colis en route ou remis depuis moins de 72 h', async () => {
+    expect(await as(db, U.acheteur2, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [parcelId])))).toMatch(/seul l'acheteur/);
+    expect(await as(db, U.vendeur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [parcelId])))).toMatch(/seul l'acheteur/);
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'inconnu')`, [parcelId])))).toMatch(/check|violates/);
+    relBefore = Number((await one<{ reliability: string }>('select reliability from shop_scores where shop_id = $1', [shopId])).reliability);
+    disputeId = (await as(db, U.acheteur, () => one<{ fn_open_dispute: string }>(`select fn_open_dispute($1, 'endommage', 'Le pagne est déchiré')`, [parcelId]))).fn_open_dispute;
+    expect((await one<{ status: string }>('select status from parcels where id = $1', [parcelId])).status).toBe('litige');
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'autre')`, [parcelId])))).toMatch(/déjà ouvert|n'est plus|en route ou remis/);
+  });
+
+  it('un colis remis depuis plus de 72 h ne peut plus être signalé ; un colis non livré non plus', async () => {
+    const o = await as(db, U.acheteur, async () => (await one<{ fn_place_order: string }>('select fn_place_order($1::jsonb, $2, $3, $4)', [JSON.stringify([{ offer_id: offerId, variant_id: variantId, qty: 1 }]), buyerDecl, '+224 620 00 00 00', 'livraison'])).fn_place_order);
+    const p = (await one<{ id: string }>('select id from parcels where order_id = $1', [o])).id;
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [p])))).toMatch(/en route ou remis/);
+    await db.exec(`update parcels set status = 'remis', delivered_at = now() - interval '80 hours' where id = '${p}'`);
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [p])))).toMatch(/72 h/);
+  });
+
+  it('lecture : acheteur, vendeur de la boutique et équipe voient le litige ; un autre vendeur ou acheteur non ; aucune écriture directe', async () => {
+    for (const who of [U.acheteur, U.vendeur, U.admin]) expect(await as(db, who, () => q('select id from disputes'))).toHaveLength(1);
+    for (const who of [U.acheteur2, U.vendeur2]) expect(await as(db, who, () => q('select id from disputes'))).toHaveLength(0);
+    expect(await as(db, 'anon', () => refused(db.query('select id from disputes')))).toMatch(/permission denied/);
+    expect(await as(db, U.acheteur, () => refused(db.query(`update disputes set status = 'resolu'`)))).toMatch(/permission denied/);
+  });
+
+  it('l’équipe seule tranche ; en faveur de l’acheteur le colis est annulé et la fiabilité du vendeur baisse', async () => {
+    const before = relBefore;
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_resolve_dispute($1, 'acheteur')`, [disputeId])))).toMatch(/réservé à l'équipe/);
+    expect(await as(db, U.vendeur, () => refused(db.query(`select fn_resolve_dispute($1, 'vendeur')`, [disputeId])))).toMatch(/réservé à l'équipe/);
+    expect(await as(db, U.admin, () => refused(db.query(`select fn_resolve_dispute($1, 'personne')`, [disputeId])))).toMatch(/décision inconnue/);
+    expect((await as(db, U.admin, () => one<{ fn_resolve_dispute: string }>(`select fn_resolve_dispute($1, 'acheteur', 'Photos reçues : colis abîmé')`, [disputeId]))).fn_resolve_dispute).toBe('annule');
+    expect((await one<{ status: string }>('select status from parcels where id = $1', [parcelId])).status).toBe('annule');
+    expect(await as(db, U.admin, () => refused(db.query(`select fn_resolve_dispute($1, 'vendeur')`, [disputeId])))).toMatch(/déjà tranché/);
+    const after = Number((await one<{ reliability: string }>('select reliability from shop_scores where shop_id = $1', [shopId])).reliability);
+    expect(after).toBeLessThan(before);
+    expect((await q('select kind from delivery_events where parcel_id = $1 order by id desc limit 2', [parcelId])).map((e) => e.kind)).toEqual(['annule', 'litige']);
+  });
+});
