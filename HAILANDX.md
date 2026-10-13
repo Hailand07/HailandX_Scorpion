@@ -419,6 +419,34 @@ Constat du fondateur : pas d'interface d'ouverture soignée, et aucun moyen visi
 - Adresses des autres applications : `NEXT_PUBLIC_FLOTTE_URL` et `NEXT_PUBLIC_NAVIGATIONX_URL` (facultatives, valeurs par défaut dans `src/lib/links.ts`).
 - 💡 À faire plus tard : héberger les polices soi-même, ajouter une vraie page « Mon compte », illustrations propres à HailandX.
 
+## 21. Audit des maquettes validées et du plan (2026-10-13) — ce qui est fait, ce qui reste
+
+Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10. ✅ fait et testé · 🟡 fait en partie · ❌ pas fait.
+
+| Écran / fonction demandée | État | Détail |
+|---|---|---|
+| 1 Accueil « la rue » (échantillon par boutique et catégorie, badges, délais) | ✅ | Manque : adresse de livraison en en-tête, boutiques « à proximité » (pas de calcul de distance). 🟡 |
+| 2 Recherche, « proposé par N vendeurs » | 🟡 | Recherche et catégories ✅ ; **filtres** (prix, délai, certifié) ❌ |
+| 3 Fiche produit, offres classées, avis vérifiés | ✅ | |
+| 4 Boutique (indicateurs de confiance) | 🟡 | Indice et avis ✅ ; **« Suivre » la boutique** ❌ ; bouton **WhatsApp** de la boutique ❌ ; rayons ❌ |
+| 5 Panier (un colis par vendeur, frais par colis) | ✅ | |
+| 6 Commande (adresse, téléphone, paiement) | 🟡 | Adresse choisie parmi celles de NavigationX ✅ ; **création de l'adresse dans HailandX** (« Où livrer ? » avec Scorpion : me localiser, toucher la carte) ❌ — l'acheteur doit passer par NavigationX |
+| 7 Suivi (carte, étapes, code et scan) | 🟡 | Étapes, code à 4 chiffres, scan du QR ✅ ; **carte de suivi** ❌ |
+| 8 Page d'un lien social | 🟡 | Lien suivi, source mémorisée, aperçu riche ✅ ; **avertissement « ouvrir dans Safari / Chrome »** dans le navigateur intégré ❌ |
+| 9 « Où livrer ? » avec Scorpion | ❌ | Voir ligne 6 : extraction de l'enregistrement d'adresse dans `packages/scorpion` non faite |
+| 10 Tableau de bord vendeur | 🟡 | Statut, commandes, solde, produits, liens ✅ ; **ventes par période et sources des ventes en graphique** ❌ |
+| 11 Ajouter un produit | 🟡 | Rejoindre une fiche existante ou créer ✅ ; **variantes** (taille, couleur) ❌ : une seule variante « Standard » |
+| 12 Colis à préparer (QR, étiquette, liens) | 🟡 | QR du colis ✅ ; **étiquette imprimable** ❌ |
+| 13 Flotte : missions, gains, espèces | ✅ | Guidage dans l'application ❌ (lien vers l'application de cartes) |
+| 14 Flotte : retrait et remise | ✅ | **Photo à la remise** 🟡 (non exigée) |
+| Écran d'ouverture, navigation, parcours vendeur | ✅ | Ajoutés après le test du fondateur (§20) |
+| Connexion par téléphone | 🟡 | Code envoyé avec les **numéros de test** ; **fournisseur de SMS réel** ❌ (décision du fondateur) |
+| Paiement Orange Money réel | ❌ | Comptabilité et séquestre ✅ (simulation) ; contrat marchand requis (§19) |
+| Notifications (SMS / WhatsApp) | ❌ | Fournisseur à choisir |
+| Phase 7 : abonnement, mise en avant payante, promotions, langues locales, API | ❌ | Prévue après le pilote |
+
+Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap, favoris, modération des avis, historique des messages d'un litige, domaine `hx.gn`, polices hébergées par nous.
+
 ## 13. Journal des mises à jour
 
 | Date | Changement |
@@ -438,6 +466,7 @@ Constat du fondateur : pas d'interface d'ouverture soignée, et aucun moyen visi
 | 2026-10-13 | Déploiement Vercel terminé : projets `hailandx-boutiques` (`apps/hailandx`) et `hailandx-flotte` (`apps/flotte`), production = `main`, variables publiques Supabase posées, accès public. Voir `ECOSYSTEME_HAILAND.md` §14 (révision 65 : projet renommé `hailandx-scorpion`) pour les adresses et le reste à faire. |
 | 2026-10-13 | Script `supabase/tests/nettoyage-test.sql` corrigé : il oubliait les litiges, paiements et écritures du grand livre qui référencent les colis et commandes de test (erreur 23503 sur `disputes_parcel_id_fkey`, annulée en bloc, rien n'avait été supprimé). |
 | 2026-10-13 | Interface : écran d'ouverture, barre de navigation (dont « Vendre »), bandeau vendeur sur l'accueil, parcours vendeur en 4 étapes (§20). |
+| 2026-10-13 | Audit des maquettes et du plan : tableau écran par écran des écarts restants (§21). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
