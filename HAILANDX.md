@@ -422,6 +422,7 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 | 2026-10-13 | Phase 4 : application Flotte (candidature, missions, scan du QR, remise par code, espèces), indice de confiance calculé par la base, logo et bandeau, modification de produit, liens suivis, console équipe ; parcours réel vérifié avec le numéro de test. |
 | 2026-10-14 | Phase 5 : offres de plusieurs vendeurs sur une même fiche (classées), recherche, catégories, litiges (signalement, décision de l'équipe, effet sur l'indice), chiffres clés de la console ; . |
 | 2026-10-15 | Phase 6 : paiement numérique (séquestre, règlement à la remise, remboursements, grand livre, reversements, soldes, route de notification signée) ; Orange Money réel non branché (compte marchand à ouvrir). |
+| 2026-10-13 | Déploiement Vercel : le build échouait à l'étape TypeScript (Vercel installe depuis la racine de l'application, `typescript` et `@types/*` n'étaient déclarés qu'à la racine). Ajout de `typescript`, `@types/node`, `@types/react`, `@types/react-dom` dans `devDependencies` de chaque application. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
