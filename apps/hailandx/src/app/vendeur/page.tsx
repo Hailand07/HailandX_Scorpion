@@ -2,16 +2,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Wordmark } from '@hailandx/ui';
-import { formatGnf, slugify } from '@hailandx/commerce';
+import { formatGnf, normalizeGnPhone, slugify } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mediaUrl, uploadPhoto } from '@/lib/media';
 import { SOURCES } from '@/lib/source';
 import { NAVIGATIONX_URL } from '@/lib/links';
 
-interface Shop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
+interface Shop { whatsapp: string | null; id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
-interface Offer { id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Section { id: string; name: string }
+interface Offer { section_id: string | null; id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Link { id: string; code: string; kind: string; source: string | null; clicks: number; offer_ids: string[] }
 interface Cat { id: string; name: string }
 
@@ -51,6 +52,7 @@ export default function SellerPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
+  const [sections, setSections] = useState<Section[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
   const [pname, setPname] = useState('');
   const [chosen, setChosen] = useState<{ id: string; name: string } | null>(null);
@@ -62,7 +64,7 @@ export default function SellerPage() {
     if (!sb || !uid) return;
     const [c, s, d] = await Promise.all([
       sb.from('categories').select('id,name').order('position'),
-      sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path').eq('owner_id', uid).limit(1).maybeSingle(),
+      sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp').eq('owner_id', uid).limit(1).maybeSingle(),
       sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
     setCats((c.data as Cat[]) ?? []);
@@ -73,8 +75,10 @@ export default function SellerPage() {
     await Promise.all(list.map(async (x) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id }); lv[x.id] = typeof r.data === 'number' ? r.data : x.detected_level; }));
     setLevels(lv);
     if (s.data) {
-      const o = await sb.from('offers').select('id,price_gnf,active,photo_paths,offer_variants(id,stock),catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
+      const o = await sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(id,stock),catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
       setOffers((o.data as unknown as Offer[]) ?? []);
+      const sc = await sb.from('shop_sections').select('id,name').eq('shop_id', (s.data as Shop).id).order('position').order('name');
+      setSections((sc.data as Section[]) ?? []);
       const l = await sb.from('share_links').select('id,code,kind,source,clicks,offer_ids').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
       setLinks((l.data as Link[]) ?? []);
     }
@@ -126,7 +130,7 @@ export default function SellerPage() {
       fail(e1);
       productId = (prod as { id: string }).id;
     }
-    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: productId, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
+    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: productId, section_id: String(f.get('section') ?? '') || null, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
     if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans « Mes produits ».');
     fail(e2);
     const { error: e3 } = await sb!.from('offer_variants').insert({ offer_id: (off as { id: string }).id, label: 'Standard', stock });
@@ -150,12 +154,30 @@ export default function SellerPage() {
     if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
     const photo = f.get('photo');
     const photoPath = photo instanceof File && photo.size > 0 ? await uploadPhoto(sb!, uid!, photo) : null;
-    const { error } = await sb!.from('offers').update({ price_gnf: Math.round(price), active: f.get('active') === 'on', ...(photoPath ? { photo_paths: [photoPath, ...(o.photo_paths ?? [])].slice(0, 5) } : {}) }).eq('id', o.id);
+    const { error } = await sb!.from('offers').update({ price_gnf: Math.round(price), section_id: String(f.get('section') ?? '') || null, active: f.get('active') === 'on', ...(photoPath ? { photo_paths: [photoPath, ...(o.photo_paths ?? [])].slice(0, 5) } : {}) }).eq('id', o.id);
     fail(error);
     const v = o.offer_variants?.[0];
     if (v) { const r = await sb!.from('offer_variants').update({ stock }).eq('id', v.id); fail(r.error); }
     setEditing(null);
     return 'Produit mis à jour.';
+  }
+
+  async function saveWhatsapp(f: FormData) {
+    const raw = String(f.get('whatsapp') ?? '').trim();
+    const n = raw ? normalizeGnPhone(raw) : null;
+    if (raw && !n) throw new Error('Entrez un numéro guinéen valide, par exemple 6xx xx xx xx.');
+    const { error } = await sb!.from('shops').update({ whatsapp: n }).eq('id', shop!.id);
+    fail(error);
+    return n ? 'Numéro WhatsApp enregistré : vos clients pourront vous écrire depuis la boutique.' : 'Numéro WhatsApp retiré.';
+  }
+
+  async function addSection(f: FormData) {
+    const name = String(f.get('sname') ?? '').trim();
+    if (name.length < 2) throw new Error('Donnez un nom au rayon (2 lettres au minimum).');
+    const { error } = await sb!.from('shop_sections').insert({ shop_id: shop!.id, name, position: sections.length });
+    if (error?.code === '23505') throw new Error('Ce rayon existe déjà.');
+    fail(error);
+    return 'Rayon ajouté.';
   }
 
   async function addLink(f: FormData) {
@@ -239,10 +261,26 @@ export default function SellerPage() {
             <div className="flex flex-wrap gap-2">
               <ShareButtons url={`${origin}/b/${shop.slug}`} text={`Ma boutique ${shop.name} sur HailandX`} />
             </div>
+            <form action={(f) => run(() => saveWhatsapp(f))} className="flex gap-2">
+              <input name="whatsapp" inputMode="tel" defaultValue={shop.whatsapp ? shop.whatsapp.replace(/^\+?224/, '') : ''} placeholder="WhatsApp de la boutique : 6xx xx xx xx" aria-label="Numéro WhatsApp de la boutique" className={input} />
+              <Button type="submit" variant="secondary" disabled={busy} className="h-12 px-4">Enregistrer</Button>
+            </form>
           </section>
 
           <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link></div>
 
+          <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Mes rayons</h2>
+            <p className="text-[12.5px] font-medium text-muted">Regroupez vos produits (Boubous, Chaussures…) : vos clients les retrouvent en un geste dans la boutique.</p>
+            {sections.length > 0 && <div className="flex flex-wrap gap-2">{sections.map((x) => (
+              <span key={x.id} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-sand pl-3.5 pr-1.5 text-[13px] font-bold">{x.name}
+                <button type="button" aria-label={`Supprimer le rayon ${x.name}`} disabled={busy} onClick={() => run(async () => { const { error } = await sb.from('shop_sections').delete().eq('id', x.id); fail(error); return 'Rayon supprimé : ses produits restent en vente.'; })} className="flex h-8 w-8 items-center justify-center rounded-full text-muted">×</button></span>
+            ))}</div>}
+            <form action={(f) => run(() => addSection(f))} className="flex gap-2">
+              <input name="sname" maxLength={40} placeholder="Nouveau rayon" aria-label="Nom du rayon" className={input} />
+              <Button type="submit" variant="secondary" disabled={busy} className="h-12 px-4">Ajouter</Button>
+            </form>
+          </section>
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Ajouter un produit</h2>
             <form action={(f) => run(() => addProduct(f))} className="flex flex-col gap-3">
@@ -261,6 +299,7 @@ export default function SellerPage() {
                 <input name="stock" required inputMode="numeric" defaultValue="1" placeholder="Stock" className={input} />
               </div>
               <label className="flex flex-col gap-1.5 text-[13px] font-bold">Photo (facultatif)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-[14px] font-medium file:mr-3 file:h-11 file:rounded-2xl file:border-0 file:bg-sand file:px-4 file:text-[13px] file:font-bold" /></label>
+              {sections.length > 0 && <select name="section" className={input} defaultValue="" aria-label="Rayon"><option value="">Rayon (facultatif)</option>{sections.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
               <select name="pcat" className={input} defaultValue={shop.category_id ?? ''}><option value="">Catégorie</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
               <Button type="submit" disabled={busy}>Ajouter</Button>
             </form>
@@ -282,6 +321,7 @@ export default function SellerPage() {
                       <input name="price" required inputMode="numeric" defaultValue={o.price_gnf} aria-label="Prix (GNF)" className={input} />
                       <input name="stock" required inputMode="numeric" defaultValue={o.offer_variants?.[0]?.stock ?? 0} aria-label="Stock" className={input} />
                     </div>
+                    {sections.length > 0 && <select name="section" className={input} defaultValue={o.section_id ?? ''} aria-label="Rayon"><option value="">Sans rayon</option>{sections.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
                     <label className="flex items-center gap-2 text-[13.5px] font-bold"><input name="active" type="checkbox" defaultChecked={o.active} className="h-5 w-5" /> Visible dans la boutique</label>
                     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Nouvelle photo" className="text-[13px] font-medium file:mr-2 file:h-10 file:rounded-xl file:border-0 file:bg-card file:px-3 file:text-[12.5px] file:font-bold" />
                     <Button type="submit" disabled={busy} className="h-12">Enregistrer</Button>

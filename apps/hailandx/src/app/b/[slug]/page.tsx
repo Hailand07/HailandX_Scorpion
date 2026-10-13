@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Badge, PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
-import { formatGnf } from '@hailandx/commerce';
+import { Badge, VerifiedMark } from '@hailandx/ui';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor } from '@/lib/catalog';
+import { serverClient } from '@/lib/supabase';
+import { FollowButton } from '@/components/FollowButton';
+import { ShopProducts, type Section } from '@/components/ShopProducts';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -23,6 +24,19 @@ export default async function ShopPage({ params }: Params) {
   const s = cat.shops.find((x) => x.slug === slug);
   if (!s) notFound();
   const products = cat.products.filter((p) => p.shopSlug === s.slug);
+  // Identifiant, rayons et abonnés : lus à la demande (la vitrine mise en cache ne les porte pas). Boutiques d'exemple : pas de suivi.
+  let shopId: string | null = null; let sections: Section[] = []; let followers = 0;
+  const sb = cat.source === 'base' ? serverClient() : null;
+  if (sb) {
+    const { data: row } = await sb.from('shops').select('id').eq('slug', s.slug).maybeSingle();
+    shopId = (row as { id: string } | null)?.id ?? null;
+    if (shopId) {
+      const [sec, fol] = await Promise.all([sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name'), sb.rpc('fn_shop_followers', { p_shop: shopId })]);
+      sections = (sec.data as Section[]) ?? [];
+      followers = typeof fol.data === 'number' ? fol.data : 0;
+    }
+  }
+  const wa = s.whatsapp ? s.whatsapp.replace(/\D/g, '') : '';
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 pb-10">
@@ -39,19 +53,13 @@ export default async function ShopPage({ params }: Params) {
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">{trustFor(s)}</div><div className="text-[11.5px] font-semibold text-muted">indice de confiance</div></div>
         </div>
         <div className="flex flex-wrap gap-1.5">{badgesOf(s).map((b) => <Badge key={b}>{b}</Badge>)}</div>
+        <div className="flex flex-wrap items-center gap-2">
+          {shopId && <FollowButton shopId={shopId} shopSlug={s.slug} initialCount={followers} />}
+          {wa && <a href={`https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${s.name}, je vous écris depuis HailandX.`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center gap-1.5 rounded-full border border-line bg-card px-4 text-[13.5px] font-extrabold text-ok">WhatsApp</a>}
+        </div>
       </section>
 
-      <section aria-label="Produits" className="grid grid-cols-2 gap-3 px-5 pt-2">
-        {products.map((p) => (
-          <Link key={p.slug} href={`/p/${p.slug}?b=${s.slug}`} className="flex flex-col overflow-hidden rounded-[18px] border border-line-soft bg-card">
-            <PhotoSlot src={p.photoUrl} color={p.color} className="h-[120px]" label={p.name} />
-            <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
-              <span className="truncate text-[13px] font-bold">{p.name}</span>
-              <Price className="text-[14.5px]">{formatGnf(p.priceGnf)}</Price>
-            </span>
-          </Link>
-        ))}
-      </section>
+      <ShopProducts shopSlug={s.slug} products={products} sections={sections} />
     </main>
   );
 }
