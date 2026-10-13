@@ -5,10 +5,14 @@
  *  - `buildingDetection` : bâtiment certifié / OSM / le plus proche, bâtiment sous le doigt ;
  *  - `levels` : niveaux d'adresse 1, 2, 3 ;
  *  - `geoDiagnostic` : pourquoi la localisation échoue et quoi faire (iPhone, navigateur intégré à WhatsApp).
- * Restent à extraire de NavigationX (voir HAILANDX.md §6) : `ownBuilding`, `certifiedBuildings`, `osmDetection`, les écrans d'enregistrement.
+ *  - `osmDetection`, `certifiedBuildings` (extraits le 2026-10-13) et `addressDecision` (proposition faite à l’utilisateur).
+ * Restent à extraire de NavigationX (voir HAILANDX.md §6) : `ownBuilding`, les écrans d’enregistrement complets.
  * ⚠️ Tant que NavigationX garde sa copie, les tests de ce paquet sont la référence : toute correction se fait des deux côtés.
  */
 export * from './levels';
 export * from './gpsAcquisition';
 export * from './buildingDetection';
 export * from './geoDiagnostic';
+export * from './osmDetection';
+export * from './certifiedBuildings';
+export * from './addressDecision';
