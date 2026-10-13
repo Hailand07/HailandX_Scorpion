@@ -6,6 +6,7 @@ import { MAX_HANDOVER_ATTEMPTS, formatGnf, formatGnPhone, doorPrecision, type Ad
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mapsUrl, useGeo } from '@/lib/useGeo';
+import { GuideMap } from '@/components/GuideMap';
 
 interface Info { status: 'accepte' | 'retire'; shop_name: string; shop_lat: number; shop_lng: number; buyer_phone: string; buyer_lat: number; buyer_lng: number; buyer_level: AddressLevel; buyer_accuracy_m: number | null; buyer_floor: string | null; buyer_door: string | null; buyer_landmark: string | null; cod_amount_gnf: number }
 
@@ -96,7 +97,8 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
       {info.status === 'accepte' ? (
         <section className="flex flex-col gap-3 rounded-[22px] border border-night-line bg-night-card p-4">
           <div><div className="text-[11.5px] font-bold text-night-muted">RETRAIT CHEZ</div><div className="text-[17px] font-extrabold">{info.shop_name}</div></div>
-          <a href={mapsUrl(info.shop_lat, info.shop_lng)} target="_blank" rel="noreferrer" className={ghost}>Itinéraire vers la boutique</a>
+          <GuideMap from={fix} to={{ lat: info.shop_lat, lng: info.shop_lng }} label={info.shop_name} />
+          <a href={mapsUrl(info.shop_lat, info.shop_lng)} target="_blank" rel="noreferrer" className={ghost}>Ouvrir dans l’application de cartes</a>
           <button type="button" disabled={busy} onClick={() => setScan(true)} className={cta}>Scanner le QR du colis</button>
           <button type="button" disabled={busy} onClick={release} className="h-11 text-[13px] font-bold text-night-muted">Je ne peux plus faire cette mission</button>
         </section>
@@ -106,7 +108,8 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
             <div className="text-[11.5px] font-bold text-night-muted">LIVRAISON</div>
             <div className="text-[13px] font-semibold text-night-muted">{precision}{info.buyer_accuracy_m ? ` · précision ≈ ${Math.round(info.buyer_accuracy_m)} m` : ''}</div>
             {(info.buyer_landmark || info.buyer_floor || info.buyer_door) && <div className="text-[14.5px] font-bold">{[info.buyer_landmark, info.buyer_floor && `étage ${info.buyer_floor}`, info.buyer_door && `porte ${info.buyer_door}`].filter(Boolean).join(' · ')}</div>}
-            <a href={mapsUrl(info.buyer_lat, info.buyer_lng)} target="_blank" rel="noreferrer" className={ghost}>Itinéraire vers l’acheteur</a>
+            <GuideMap from={fix} to={{ lat: info.buyer_lat, lng: info.buyer_lng }} label="l’acheteur" />
+            <a href={mapsUrl(info.buyer_lat, info.buyer_lng)} target="_blank" rel="noreferrer" className={ghost}>Ouvrir dans l’application de cartes</a>
             <a href={phoneUri} className={ghost}>Appeler l’acheteur · {formatGnPhone(info.buyer_phone.startsWith('+') ? info.buyer_phone : `+${info.buyer_phone}`)}</a>
           </section>
           <form onSubmit={handover} className="flex flex-col gap-3 rounded-[22px] border border-night-line bg-night-card p-4">

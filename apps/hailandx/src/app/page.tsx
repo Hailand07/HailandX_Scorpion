@@ -3,6 +3,8 @@ import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
 import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 import { DeliverTo } from '@/components/DeliverTo';
+import { NotificationBell } from '@/components/NotificationBell';
+import { RueStrip } from '@/components/RueStrip';
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
 export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
@@ -23,9 +25,10 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
       <header className="flex flex-col gap-3.5 px-5 pb-1 pt-5">
         <div className="flex items-center justify-between">
           <Wordmark />
+          <span className="flex items-center gap-2"><NotificationBell />
           <Link href="/panier" aria-label="Panier" className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-          </Link>
+          </Link></span>
         </div>
         <DeliverTo />
         <Link href="/recherche" className="flex h-12 items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14.5px] font-medium text-muted">
@@ -48,16 +51,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
       <section aria-label="La rue" className="flex flex-col gap-2.5 px-5">
         <h2 className="font-display text-lg font-semibold tracking-tight">La rue</h2>
-        <div className="flex gap-3.5 overflow-x-auto pb-1">
-          {SHOPS.map((s) => (
-            <Link key={s.slug} href={`/b/${s.slug}`} className="flex w-[58px] shrink-0 flex-col items-center gap-1.5">
-              <span className={`flex h-[58px] w-[58px] rounded-[20px] p-[3px] ${s.isNew ? 'bg-blue' : 'bg-line'}`}>
-                <span className="flex flex-1 items-center justify-center overflow-hidden rounded-[17px] border-2 border-bg font-display text-[15px] font-bold" style={{ background: s.color }}>{s.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.logoUrl} alt="" className="h-full w-full object-cover" /> : s.initials}</span>
-              </span>
-              <span className="w-[58px] truncate text-center text-[11px] font-semibold">{s.name}</span>
-            </Link>
-          ))}
-        </div>
+        <RueStrip shops={SHOPS.map((x) => ({ slug: x.slug, name: x.name, initials: x.initials, color: x.color, logoUrl: x.logoUrl ?? null, isNew: x.isNew }))} real={source === 'base'} />
       </section>
 
       <section aria-label="Échantillons des boutiques" className="grid grid-cols-2 gap-3 px-5">

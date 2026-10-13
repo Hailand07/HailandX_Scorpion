@@ -6,6 +6,7 @@ import { formatGnf, rankOffers, type Offer } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { BuyBar } from '@/components/BuyBar';
+import { FavoriteButton } from '@/components/FavoriteButton';
 
 type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> };
 
@@ -56,7 +57,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
             <span className="text-[11.5px] font-bold text-blue-ink">Vendeur certifié Hailand · {trustFor(shop)}/100</span>
           </span>
         </Link>
-        <Link href="/" aria-label="HailandX"><Wordmark className="!text-[15px] text-muted" /></Link>
+        <span className="flex items-center gap-2">{p.productId && <FavoriteButton productId={p.productId} next={`/p/${p.slug}?b=${shop.slug}`} />}<Link href="/" aria-label="HailandX"><Wordmark className="!text-[15px] text-muted" /></Link></span>
       </header>
 
       <div className="px-[18px]">

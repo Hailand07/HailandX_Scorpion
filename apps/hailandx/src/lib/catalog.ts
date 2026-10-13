@@ -5,7 +5,7 @@ import { mediaUrl } from './media';
 import { serverClient } from './supabase';
 
 export type ShopView = SampleShop & { logoUrl?: string | null; coverUrl?: string | null; trust?: number; whatsapp?: string | null };
-export type ProductView = SampleProduct & { offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean; sectionId?: string | null; variants?: { id: string; label: string; stock: number }[] };
+export type ProductView = SampleProduct & { offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean; productId?: string; sectionId?: string | null; variants?: { id: string; label: string; stock: number }[] };
 
 export interface Catalog {
   shops: ShopView[];
@@ -35,7 +35,7 @@ interface ShopRow {
 }
 interface OfferRow {
   id: string; price_gnf: number; photo_paths: string[] | null; section_id: string | null; offer_variants: { id: string; label: string; stock: number }[] | null;
-  catalog_products: { slug: string; name: string; category_id: string | null; categories: { name: string } | null } | null;
+  catalog_products: { id: string; slug: string; name: string; category_id: string | null; categories: { name: string } | null } | null;
   shops: { slug: string; status: string } | null;
 }
 
@@ -59,7 +59,7 @@ async function loadCatalog(): Promise<Catalog> {
   try {
     const [s, o] = await Promise.all([
       sb.from('shops').select('slug,name,tagline,created_at,logo_path,cover_path,whatsapp,shop_scores(trust,rating,review_count,reliability,sales,prep_minutes)').eq('status', 'ouverte').order('created_at', { ascending: false }).limit(60),
-      sb.from('offers').select('id,price_gnf,photo_paths,section_id,offer_variants(id,label,stock),catalog_products(slug,name,category_id,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
+      sb.from('offers').select('id,price_gnf,photo_paths,section_id,offer_variants(id,label,stock),catalog_products(id,slug,name,category_id,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
     ]);
     if (s.error || o.error) throw s.error ?? o.error;
     const shops = (s.data as unknown as ShopRow[]).map(shopFromRow);
@@ -72,7 +72,7 @@ async function loadCatalog(): Promise<Catalog> {
       const v = vs.find((x) => x.stock > 0) ?? null;
       products.push({
         variantId: v?.id ?? null, inStock: vs.length === 0 || v !== null,
-        slug: r.catalog_products.slug, offerId: r.id, sectionId: r.section_id, variants: vs, photoUrl: mediaUrl(r.photo_paths?.[0]), name: r.catalog_products.name, shopSlug: r.shops.slug,
+        slug: r.catalog_products.slug, offerId: r.id, productId: r.catalog_products.id, sectionId: r.section_id, variants: vs, photoUrl: mediaUrl(r.photo_paths?.[0]), name: r.catalog_products.name, shopSlug: r.shops.slug,
         category: r.catalog_products.categories?.name ?? 'Autres', priceGnf: r.price_gnf,
         color: colorOf(r.catalog_products.slug), score: 0.5, etaMinutes: etaFor(prepBySlug.get(r.shops.slug)),
       });

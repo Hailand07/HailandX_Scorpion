@@ -30,7 +30,9 @@ create table public.buildings (id text primary key, status text, is_validated bo
 create table public.quartiers (id text primary key, nom text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
-  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, location_floor text, location_door text, declared_landmark text);
+  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz);
+create function public.trg_decl_stub() returns trigger language plpgsql as $f$ begin if new.certification_status = 'demandee' and old.certification_status is distinct from 'demandee' then new.certification_requested_at := now(); end if; return new; end $f$;
+create trigger decl_stub before update on public.declarations for each row execute function public.trg_decl_stub();
 create table public.agents (id uuid primary key, role text not null, active boolean not null default true);
 create function public.is_admin() returns boolean language sql stable security definer as $$ select exists (select 1 from public.agents a where a.id = auth.uid() and a.role = 'admin' and a.active) $$;
 revoke execute on function public.is_admin() from public, anon; grant execute on function public.is_admin() to authenticated;
@@ -59,6 +61,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-10-16_hailandx_boutique.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-16_hailandx_variantes.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-16_hailandx_suivi_ventes.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-17_hailandx_complements.sql', import.meta.url), 'utf8'));
   return db;
 }
 

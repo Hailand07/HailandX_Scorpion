@@ -3,11 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
+import { DisputeThread } from '@/components/DisputeThread';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
 interface Courier { user_id: string; full_name: string; vehicle: string; status: string; cash_balance_gnf: number; cash_limit_gnf: number; created_at: string }
 interface Shop { id: string; name: string; slug: string; status: string }
+const REVIEW_REASON: Record<string, string> = { faux: 'Avis sans commande', injurieux: 'Propos injurieux', hors_sujet: 'Hors sujet', autre: 'Autre' };
+interface Report { id: string; reason: string; details: string | null; created_at: string; reviews: { rating: number; comment: string | null } | null; shops: { name: string } | null }
 interface Dispute { id: string; reason: string; details: string | null; created_at: string; parcels: { subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string } | null } | null }
 const REASON: Record<string, string> = { non_recu: 'Colis non reçu', endommage: 'Produit abîmé', different: 'Produit différent', autre: 'Autre problème' };
 
@@ -19,6 +22,7 @@ export default function AdminPage() {
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [reports, setReports] = useState<Report[]>([]);
   const [owed, setOwed] = useState<{ shopId: string; name: string; amount: number }[]>([]);
   const [refunds, setRefunds] = useState<{ buyer_id: string; amount_gnf: number; buyer_phone: string | null }[]>([]);
   const [rates, setRates] = useState<{ commission_bps: string; courier_share_bps: string; payment_mode: string }>({ commission_bps: '', courier_share_bps: '', payment_mode: '' });
@@ -36,6 +40,8 @@ export default function AdminPage() {
       sb.from('disputes').select('id,reason,details,created_at,parcels(subtotal_gnf,delivery_fee_gnf,shops(name))').eq('status', 'ouvert').order('created_at'),
     ]);
     setDisputes((d.data as unknown as Dispute[]) ?? []);
+    const rp = await sb.from('review_reports').select('id,reason,details,created_at,reviews(rating,comment),shops(name)').eq('status', 'ouvert').order('created_at');
+    setReports((rp.data as unknown as Report[]) ?? []);
     const [led, due, st] = await Promise.all([
       sb.from('ledger_entries').select('account_id,amount_gnf').eq('account', 'shop').limit(5000),
       sb.rpc('fn_refunds_due'),
@@ -89,9 +95,24 @@ export default function AdminPage() {
           <div className="flex items-center justify-between"><span className="text-[14px] font-bold">{REASON[d.reason] ?? d.reason}</span><Badge tone="lime">{d.parcels?.shops?.name ?? 'Boutique'}</Badge></div>
           {d.details && <p className="text-[13px] font-medium text-muted">« {d.details} »</p>}
           <p className="text-[12px] font-semibold text-muted">{d.parcels ? `${formatGnf(d.parcels.subtotal_gnf)} + livraison ${formatGnf(d.parcels.delivery_fee_gnf)} · ` : ''}{new Date(d.created_at).toLocaleDateString('fr-FR')}</p>
+          <DisputeThread disputeId={d.id} mine="equipe" />
           <div className="flex gap-2">
             <button type="button" onClick={() => act(sb!.rpc('fn_resolve_dispute', { p_dispute: d.id, p_in_favor_of: 'acheteur' }), 'Tranché en faveur de l’acheteur : colis annulé.')} className="h-10 flex-1 rounded-xl bg-ink text-[13px] font-bold text-white">Pour l’acheteur</button>
             <button type="button" onClick={() => act(sb!.rpc('fn_resolve_dispute', { p_dispute: d.id, p_in_favor_of: 'vendeur' }), 'Tranché en faveur du vendeur : livraison confirmée.')} className="h-10 flex-1 rounded-xl border border-line text-[13px] font-bold">Pour le vendeur</button>
+          </div>
+        </section>
+      ))}
+
+      <h2 className="font-display text-lg font-semibold">Avis signalés ({reports.length})</h2>
+      {reports.length === 0 && <p className="text-[13.5px] font-medium text-muted">Aucun avis à examiner.</p>}
+      {reports.map((r) => (
+        <section key={r.id} className="flex flex-col gap-2 rounded-2xl border border-line-soft bg-card p-3.5">
+          <div className="flex items-center justify-between"><span className="text-[14px] font-bold">{'★'.repeat(r.reviews?.rating ?? 0)} · {REVIEW_REASON[r.reason] ?? r.reason}</span><Badge tone="lime">{r.shops?.name ?? 'Boutique'}</Badge></div>
+          {r.reviews?.comment && <p className="text-[13px] font-medium">Avis : « {r.reviews.comment} »</p>}
+          {r.details && <p className="text-[12.5px] font-medium text-muted">Le vendeur dit : « {r.details} »</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => act(sb!.rpc('fn_moderate_review', { p_report: r.id, p_hide: true, p_note: null }), 'Avis masqué : il ne compte plus dans l’indice.')} className="h-10 flex-1 rounded-xl bg-ink text-[13px] font-bold text-white">Masquer l’avis</button>
+            <button type="button" onClick={() => act(sb!.rpc('fn_moderate_review', { p_report: r.id, p_hide: false, p_note: null }), 'Avis maintenu.')} className="h-10 flex-1 rounded-xl border border-line text-[13px] font-bold">Maintenir</button>
           </div>
         </section>
       ))}
