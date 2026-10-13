@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { DisputeThread } from '@/components/DisputeThread';
+import { ProofPhoto } from '@/components/ProofPhoto';
 import QRCode from 'qrcode';
 import { Badge, Wordmark } from '@hailandx/ui';
 import { formatGnf, type ParcelStatus } from '@hailandx/commerce';
@@ -64,6 +65,7 @@ export default function SellerOrdersPage() {
           <div className="flex items-center justify-between"><span className="text-[12.5px] font-bold text-muted">{new Date(p.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><Badge tone={p.status === 'attente_vendeur' ? 'lime' : p.status === 'remis' ? 'ok' : 'sand'}>{LABEL[p.status]}</Badge></div>
           <ul className="flex flex-col gap-0.5 text-[14px] font-bold">{p.order_items.map((i) => <li key={i.id}>{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ''}</li>)}</ul>
           {p.status === 'litige' && <SellerDispute parcel={p.id} />}
+          {(p.status === 'remis' || p.status === 'litige') && <ProofPhoto parcelId={p.id} />}
           <div className="flex justify-between text-[13px] font-semibold text-muted"><span>Vos articles</span><span>{formatGnf(p.subtotal_gnf)}</span></div>
           {p.status === 'attente_vendeur' && p.orders?.payment_method === 'orange_money' && p.orders.payment_status === 'en_attente' && <p className="rounded-2xl bg-amber-soft px-3.5 py-2.5 text-[12.5px] font-bold">En attente du paiement de l’acheteur (Orange Money) : vous pourrez préparer le colis dès que l’argent est bloqué.</p>}
           {p.status === 'attente_vendeur' && p.orders?.payment_method === 'orange_money' && p.orders.payment_status === 'bloque' && <p className="rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[12.5px] font-bold text-ok">Payé : l’argent est bloqué par Hailand et vous sera versé à la remise.</p>}

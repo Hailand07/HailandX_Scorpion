@@ -259,9 +259,9 @@ describe('mission : informations réservées au livreur attribué', () => {
 describe('remise : contrôle de proximité, scan de l’acheteur ou code, verrouillage', () => {
   it('sans position récente du livreur, ou trop loin de l’adresse, la remise est refusée', async () => {
     const code = (await as(db, U.acheteur, () => one<{ fn_my_handover_code: string }>('select fn_my_handover_code($1)', [parcelId]))).fn_my_handover_code;
-    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'code', code])))).toMatch(/position du livreur inconnue/);
+    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3, $4)', [parcelId, 'code', code, `${U.livreur}/${parcelId}/preuve.jpg`])))).toMatch(/position du livreur inconnue/);
     await as(db, U.livreur, () => db.query('select fn_courier_ping($1, $2)', [FAR.lat, FAR.lng]));
-    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'code', code])))).toMatch(/pas à l'adresse/);
+    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3, $4)', [parcelId, 'code', code, `${U.livreur}/${parcelId}/preuve.jpg`])))).toMatch(/pas à l'adresse/);
   });
 
   it('un mauvais code est refusé et compté ; cinq échecs verrouillent le colis même avec le bon code', async () => {
@@ -269,29 +269,29 @@ describe('remise : contrôle de proximité, scan de l’acheteur ou code, verrou
     const code = (await as(db, U.acheteur, () => one<{ fn_my_handover_code: string }>('select fn_my_handover_code($1)', [parcelId]))).fn_my_handover_code;
     const wrong = code === '0000' ? '1111' : '0000';
     for (let i = 0; i < 5; i++) {
-      expect((await as(db, U.livreur, () => one<{ fn_parcel_handover: string }>('select fn_parcel_handover($1, $2, $3)', [parcelId, 'code', wrong]))).fn_parcel_handover).toBe('refuse');
+      expect((await as(db, U.livreur, () => one<{ fn_parcel_handover_proof: string }>('select fn_parcel_handover_proof($1, $2, $3, $4)', [parcelId, 'code', wrong, `${U.livreur}/${parcelId}/preuve.jpg`]))).fn_parcel_handover_proof).toBe('refuse');
     }
-    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'code', code])))).toMatch(/verrouillé/);
+    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3, $4)', [parcelId, 'code', code, `${U.livreur}/${parcelId}/preuve.jpg`])))).toMatch(/verrouillé/);
     await db.exec(`update parcels set handover_failures = 0 where id = '${parcelId}'`); // déverrouillage par l'équipe
   });
 
   it('seul l’acheteur de la commande confirme par scan ; un autre compte ou le vendeur ne le peut pas', async () => {
     const qr = (await as(db, U.vendeur, () => one<{ fn_parcel_qr: string }>('select fn_parcel_qr($1)', [parcelId]))).fn_parcel_qr;
-    expect(await as(db, U.acheteur2, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
-    expect(await as(db, U.vendeur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
-    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
+    expect(await as(db, U.acheteur2, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
+    expect(await as(db, U.vendeur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
+    expect(await as(db, U.livreur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/seul l'acheteur/);
   });
 
   it('le scan de l’acheteur confirme la remise ; les espèces s’ajoutent au solde du livreur ; l’événement est journalisé', async () => {
     const qr = (await as(db, U.vendeur, () => one<{ fn_parcel_qr: string }>('select fn_parcel_qr($1)', [parcelId]))).fn_parcel_qr;
     const cod = (await one<{ cod_amount_gnf: number }>('select cod_amount_gnf from parcels where id = $1', [parcelId])).cod_amount_gnf;
     const before = (await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf;
-    expect((await as(db, U.acheteur, () => one<{ fn_parcel_handover: string }>('select fn_parcel_handover($1, $2, $3)', [parcelId, 'scan', qr]))).fn_parcel_handover).toBe('remis');
+    expect((await as(db, U.acheteur, () => one<{ fn_parcel_handover_proof: string }>('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr]))).fn_parcel_handover_proof).toBe('remis');
     expect((await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf).toBe(before + cod);
     expect((await one<{ status: string; delivered_at: string | null }>('select status, delivered_at from parcels where id = $1', [parcelId])).status).toBe('remis');
     expect((await one<{ kind: string }>('select kind from delivery_events where parcel_id = $1 order by id desc limit 1', [parcelId])).kind).toBe('remis');
     // Une remise confirmée ne se rejoue pas.
-    expect(await as(db, U.acheteur, () => refused(db.query('select fn_parcel_handover($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/n'est pas en cours de livraison/);
+    expect(await as(db, U.acheteur, () => refused(db.query('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr])))).toMatch(/n'est pas en cours de livraison/);
   });
 });
 

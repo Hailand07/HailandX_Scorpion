@@ -7,6 +7,7 @@ import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mapsUrl, useGeo } from '@/lib/useGeo';
 import { GuideMap } from '@/components/GuideMap';
+import { uploadProof } from '@/lib/proof';
 
 interface Info { status: 'accepte' | 'retire'; shop_name: string; shop_lat: number; shop_lng: number; buyer_phone: string; buyer_lat: number; buyer_lng: number; buyer_level: AddressLevel; buyer_accuracy_m: number | null; buyer_floor: string | null; buyer_door: string | null; buyer_landmark: string | null; cod_amount_gnf: number }
 
@@ -24,6 +25,8 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
   const [gone, setGone] = useState(false);
   const [scan, setScan] = useState(false);
   const [code, setCode] = useState('');
+  const [shot, setShot] = useState<File | null>(null);
+  const [shotUrl, setShotUrl] = useState<string | null>(null);
   const [failures, setFailures] = useState(0);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [done, setDone] = useState<{ cod: number } | null>(null);
@@ -61,7 +64,10 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
     e.preventDefault(); setMsg(null); setBusy(true);
     // La position la plus récente est envoyée juste avant : le serveur vérifie la proximité de l'adresse.
     if (fix) await sb!.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng });
-    const { data, error } = await sb!.rpc('fn_parcel_handover', { p_parcel: id, p_method: 'code', p_value: code });
+    let photoPath: string;
+    try { photoPath = await uploadProof(sb!, session!.user.id, id, shot!); }
+    catch (err) { setBusy(false); return setMsg({ tone: 'err', text: err instanceof Error ? err.message : 'Photo non envoyée.' }); }
+    const { data, error } = await sb!.rpc('fn_parcel_handover_proof', { p_parcel: id, p_method: 'code', p_value: code, p_photo: photoPath });
     setBusy(false);
     if (error) return setMsg({ tone: 'err', text: error.message.replace(/^.*?:\s*/, '') });
     if (data === 'remis') return setDone({ cod: info?.cod_amount_gnf ?? 0 });
@@ -113,11 +119,17 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
             <a href={phoneUri} className={ghost}>Appeler l’acheteur · {formatGnPhone(info.buyer_phone.startsWith('+') ? info.buyer_phone : `+${info.buyer_phone}`)}</a>
           </section>
           <form onSubmit={handover} className="flex flex-col gap-3 rounded-[22px] border border-night-line bg-night-card p-4">
-            <h2 className="text-[14px] font-extrabold">Remise : code de l’acheteur</h2>
+            <h2 className="text-[14px] font-extrabold">Remise : photo puis code de l’acheteur</h2>
+            <label className="flex flex-col gap-2 text-[13px] font-bold">
+              1. Photo du colis à l’adresse (obligatoire)
+              <input type="file" accept="image/*" capture="environment" aria-label="Photo de la remise" onChange={(e) => { const f = e.target.files?.[0] ?? null; setShot(f); setShotUrl((u) => { if (u) URL.revokeObjectURL(u); return f ? URL.createObjectURL(f) : null; }); }} className="text-[13px] font-medium file:mr-3 file:h-11 file:rounded-xl file:border-0 file:bg-night file:px-4 file:text-[13px] file:font-bold file:text-night-text" />
+              {shotUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={shotUrl} alt="Aperçu de la photo de remise" className="h-32 w-full rounded-2xl object-cover" />}
+            </label>
+            <span className="text-[13px] font-bold">2. Code de l’acheteur</span>
             <p className="text-[12.5px] font-medium text-night-muted">L’acheteur voit un code à 4 chiffres dans son suivi, ou scanne lui-même le QR du colis. Vous devez être à son adresse.</p>
             <input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" autoComplete="off" aria-label="Code de remise à 4 chiffres" placeholder="••••" disabled={left === 0}
               className="h-14 rounded-2xl border border-night-line bg-night text-center font-display text-[26px] tracking-[0.5em] outline-none focus:border-lime" />
-            <button type="submit" disabled={busy || code.length !== 4 || left === 0} className={cta}>{busy ? 'Vérification…' : 'Confirmer la remise'}</button>
+            <button type="submit" disabled={busy || code.length !== 4 || left === 0 || !shot} className={cta}>{busy ? 'Envoi et vérification…' : !shot ? 'Prenez d’abord la photo' : 'Confirmer la remise'}</button>
             <p className="text-[12px] font-semibold text-night-muted">{left === 0 ? 'Colis verrouillé : contactez l’équipe Hailand.' : failures > 0 ? `${left} essai${left > 1 ? 's' : ''} restant${left > 1 ? 's' : ''}.` : ''}</p>
           </form>
         </>

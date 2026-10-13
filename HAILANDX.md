@@ -433,19 +433,19 @@ Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10.
 | 6 Commande | ✅ | **« Où livrer ? »** : adresse créée dans HailandX (position GPS moyennée par Scorpion, repère ajustable sur la carte) ; niveau 1 ; niveau 3 via NavigationX |
 | 7 Suivi | ✅ | Étapes, code à 4 chiffres, scan du QR, **carte de suivi** (boutique, adresse, livreur après retrait) |
 | 8 Page d'un lien social | ✅ | Lien suivi, source mémorisée, aperçu riche, **avertissement « ouvrir dans Safari / Chrome »** |
-| 9 « Où livrer ? » avec Scorpion | 🟡 | Position et carte ✅ ; **détection du bâtiment** (niveau 2) et rattachement à un bâtiment certifié restent dans NavigationX (extraction de `osmDetection` / `certifiedBuildings` non faite) |
+| 9 « Où livrer ? » avec Scorpion | ✅ | Position, carte, **détection du bâtiment** (certifié Hailand → niveau 3 vérifié par la base ; contour OSM → niveau 2 ; sinon zone) avec confirmation de l'utilisateur (§24) |
 | 10 Tableau de bord vendeur | ✅ | Statut, commandes, solde, produits, liens, **ventes par jour et par source** |
 | 11 Ajouter un produit | ✅ | Fiche existante ou nouvelle, **variantes avec stock par variante**, rayon |
 | 12 Colis à préparer | ✅ | QR du colis, **étiquette imprimable (A6)**, liens |
 | 13 Flotte : missions, gains, espèces | ✅ | **Guidage dans l'application** : itinéraire sur la carte, distance, durée, consigne suivante (§23) |
-| 14 Flotte : retrait et remise | ✅ | Photo à la remise 🟡 (non exigée) |
+| 14 Flotte : retrait et remise | ✅ | **Photo de remise exigée** (stockage privé, preuve visible de l'acheteur, du vendeur et de l'équipe) (§24) |
 | Écran d'ouverture, navigation, parcours vendeur | ✅ | §20 |
 | Connexion par téléphone | 🟡 | Numéros de test seulement : **fournisseur de SMS réel** ❌ (décision du fondateur) |
 | Paiement Orange Money réel | ❌ | Séquestre et comptabilité ✅ (simulation) ; contrat marchand requis (§19) |
 | Notifications | 🟡 | **Centre de notifications dans l'application** ✅ (§23) ; envoi **SMS / WhatsApp / notification hors application** ❌ : fournisseur à choisir |
 | Phase 7 : abonnement, mise en avant payante, promotions, langues locales, API | ❌ | Prévue après le pilote |
 
-Autres ❌ : domaine `hx.gn`, polices hébergées par nous, détection du bâtiment (niveau 2) et rattachement certifié dans HailandX (extraction de `osmDetection` / `certifiedBuildings`), photo de remise exigée dans Flotte, notifications hors application (push navigateur hors page ouverte, SMS, WhatsApp).
+Autres ❌ : domaine `hx.gn`, polices hébergées par nous, notifications hors application (push navigateur hors page ouverte, SMS, WhatsApp), écrans d'enregistrement complets de NavigationX (`ownBuilding`, création d'un nouveau bâtiment) non repris dans HailandX.
 
 ## 22. Reprise des écarts (blocs 1 à 6, 2026-10-13) ✅ code, base et tests ; ⚠️ parcours en ligne à essayer par le fondateur
 
@@ -470,6 +470,13 @@ Migration `2026-10-17_hailandx_complements.sql` (**appliquée**, 11 tests SQL) e
 - **Boutiques proches** : `fn_shops_nearby(lat, lng)` (distance arrondie à 0,1 km, jamais les coordonnées ; ouverte aux visiteurs) ; « La rue » trie les boutiques par distance depuis l'adresse enregistrée, ou depuis la position du téléphone (bouton « Boutiques autour de moi »).
 - **Vérifié** : `npm test` : 155 vérifications (dont 11 nouvelles), lint, builds HailandX et Flotte ; pages ouvertes sans erreur dans un navigateur. Deux erreurs trouvées par les tests puis corrigées (variable `id` ambiguë dans deux fonctions). ⚠️ Non rejoué en ligne avec un vrai compte.
 
+## 24. Détection du bâtiment et photo de remise (2026-10-13) ✅ code, base et tests ; ⚠️ parcours en ligne à essayer
+
+- **Détection du bâtiment dans « Où livrer ? »** : `packages/scorpion` reçoit `osmDetection` (contours OSM lus sur la carte), `certifiedBuildings` (bâtiments certifiés autour d'un point) et `addressDecision` (proposition faite à l'utilisateur), repris de NavigationX sans changer la logique de `detectBuilding` / `detectAtTap`. Après « Me localiser » ou une touche sur la carte, l'écran cherche le bâtiment (certifié Hailand d'abord, sinon contour OSM, sinon zone), le dessine et demande **« C'est le vôtre ? »**. Rien n'est enregistré sans confirmation. Enregistrement : contour OSM confirmé → `osm_polygon_id` + `osm_polygon_geom`, `detected_level` 2 ; bâtiment certifié confirmé → `certified_building_id` envoyé, **la base vérifie** (certifié, actif, validé, à moins de max(100 m, précision) du GPS) et rattache (`link_method = 'resident'`) : niveau 3 ; sinon niveau 1. Le niveau effectif lu en base est affiché après l'enregistrement et dans la liste des adresses. La position GPS mesurée reste dans `gps_point`, le repère posé dans `anchor_point`. Le rattachement automatique par la base (position dans un bâtiment certifié) continue de s'appliquer.
+- **Limites** : ⚠️ la lecture des contours OSM et des bâtiments certifiés n'a pu être essayée que sur des polygones simulés (tests unitaires, 10 nouveaux) : le bac à sable n'atteint ni les tuiles Mapbox ni la base depuis un navigateur ; seul le repli « zone, niveau 1 » a été vu dans un navigateur. À essayer sur place par le fondateur (avec une adresse certifiée, par exemple celle d'une boutique). Les écrans d'enregistrement de **nouveaux** bâtiments restent dans NavigationX / HailandMap. NavigationX garde sa propre copie de ces modules : ⚠️ toute correction se fait des deux côtés.
+- **Photo de remise exigée** (migrations `2026-10-18_hailandx_preuves.sql` et `…_preuves_stockage.sql`, appliquées ; 6 tests SQL) : `fn_parcel_handover_proof(colis, méthode, valeur, photo)` remplace l'appel direct de `fn_parcel_handover` (retiré aux comptes connectés). **Par code (livreur)** : la photo est obligatoire et son chemin doit être `<livreur>/<colis>/<fichier>` ; sans elle, la remise est refusée **et le code n'est pas consommé**. **Par scan (acheteur)** : sans photo (l'acheteur confirme lui-même). La photo est rattachée à l'événement « remis » (`delivery_events.photo_path`). Stockage privé `hx-preuves` (3 Mo, JPEG / PNG / WebP) : écriture par le livreur du colis, colis retiré, dans son dossier ; lecture par le livreur, l'acheteur, le vendeur et l'équipe (liens temporaires de 10 min). Flotte : appareil photo (`capture`), aperçu, photo réduite à 1280 px, bouton « Confirmer la remise » inactif tant que la photo manque. HailandX : « Preuve de remise » dans le suivi de l'acheteur, les commandes du vendeur et chaque litige de la console équipe.
+- ⚠️ **Retrait de l'ancienne fonction** : la migration `…_preuves.sql` retire à `authenticated` l'exécution de `fn_parcel_handover` ; **en production ce retrait n'est appliqué qu'après le déploiement du nouveau code** (sinon l'ancienne appli de remise cesserait de fonctionner). Tant qu'il n'est pas appliqué, un appel direct à l'ancienne fonction contourne l'exigence de photo.
+
 ## 13. Journal des mises à jour
 
 | Date | Changement |
@@ -492,6 +499,7 @@ Migration `2026-10-17_hailandx_complements.sql` (**appliquée**, 11 tests SQL) e
 | 2026-10-13 | Audit des maquettes et du plan : tableau écran par écran des écarts restants (§21). |
 | 2026-10-13 | Blocs 1 à 6 : « Où livrer ? », Suivre / WhatsApp / rayons, filtres de recherche, avertissement navigateur intégré, variantes, étiquette, carte de suivi, ventes par période et par source, adresse en en-tête (§22). Trois migrations appliquées (`boutique`, `variantes`, `suivi_ventes`). |
 | 2026-10-13 | Compléments (§23) : certification prioritaire vers HailandMap, favoris, modération des avis, messages de litige, notifications (centre dans l'application), guidage dans Flotte, boutiques triées par distance, page Compte. Migration `complements` appliquée. |
+| 2026-10-13 | Détection du bâtiment dans « Où livrer ? » (Scorpion : `osmDetection`, `certifiedBuildings`, `addressDecision`) et photo de remise exigée dans Flotte (§24). Migrations `preuves` et `preuves_stockage` appliquées ; retrait de l'ancienne fonction de remise à appliquer après déploiement. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
