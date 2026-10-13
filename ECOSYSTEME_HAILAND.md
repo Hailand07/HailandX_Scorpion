@@ -4,7 +4,7 @@
 > Ce fichier est **identique dans les trois dépôts** (copie, hors la ligne « Fichiers liés »). Quand on le modifie dans l'un, on le recopie dans les deux autres.
 > Fichiers liés : [`HAILANDX.md`](./HAILANDX.md) (dépôt HailandX_Scorpion) · `NAVIGATIONX.md` (dépôt Lynx) · `HAILANDMAP.md` (dépôt HailandMap_EMC) · [`CLAUDE.md`](./CLAUDE.md) (règles de travail).
 >
-> **Révision : 61** — quand les deux copies diffèrent, celle dont la révision est la plus élevée fait foi (augmenter de 1 à chaque modification).
+> **Révision : 62** — quand les deux copies diffèrent, celle dont la révision est la plus élevée fait foi (augmenter de 1 à chaque modification).
 > **Dernière mise à jour :** 2026-10-12 · **État de la base observé :** 2026-10-02 (lecture seule via le connecteur Supabase : tables, politiques RLS, fonctions, triggers, vues, extensions, comptes, stockage, alertes de sécurité)
 
 ---
@@ -810,3 +810,4 @@ Pilote dans une zone dense (10 à 20 vendeurs, 3 à 5 livreurs) avant toute ouve
 | 2026-10-13 | Révision 59 : §14 — photos, phase 3 de HailandX, 4 migrations appliquées, vitrine visiteurs corrigée, téléphone acheteur masqué. |
 | 2026-10-13 | Révision 60 : §14 — phase 4 de HailandX (Flotte, indice de confiance en base, liens suivis, console équipe), parcours réel vérifié, pièges du bac à sable. |
 | 2026-10-14 | Révision 61 : §14 — phase 5 de HailandX (offres multi-vendeurs, recherche, litiges, chiffres clés) . |
+| 2026-10-14 | Révision 62 : correction — le connecteur Supabase du bac à sable ne mène pas à terme `DELETE`/`DROP` (nettoyage des données de test par le fondateur). |
