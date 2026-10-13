@@ -46,7 +46,7 @@ insert into public.quartiers (id, nom) values ('qtr-coleah', 'Coleah Domino');
 export async function freshDb(): Promise<PGlite> {
   const db = new PGlite({ extensions: { pgcrypto } });
   await db.exec(DECORS);
-  await db.exec(readFileSync(new URL('../proposed/2026-10-12_hailandx_commerce.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-12_hailandx_commerce.sql', import.meta.url), 'utf8'));
   return db;
 }
 

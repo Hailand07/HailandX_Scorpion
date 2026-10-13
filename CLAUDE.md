@@ -29,4 +29,4 @@ Utiliser la légende ✅ constaté / 📄 documenté / ⚠️ à vérifier / �
 - Commits : messages clairs au format conventionnel (`feat:`, `fix:`, `docs:`, `refactor:`).
 - Qualité visée (demande du fondateur) : application **très esthétique, épurée, fluide et simple**, digne d'une grande entreprise ; maquettes validées par le fondateur avant de coder un écran ; tests de bout en bout sur écran de téléphone.
 - Commandes (à la racine, npm workspaces) : `npm run dev` (HailandX, port 3000), `npm run dev:flotte`, `npm run build`, `npm run lint`, `npm test` (règles métier + banc SQL sur Postgres embarqué). Lancer `lint` et `test` avant de pousser.
-- Migrations SQL : écrites dans `supabase/proposed/`, **testées** par `supabase/tests/` (RLS comprise), **jamais appliquées** sans accord explicite du fondateur.
+- Migrations SQL : écrites dans `supabase/migrations/` (une migration non encore appliquée porte la mention « PROPOSÉE »), **testées** par `supabase/tests/` (RLS comprise) ; appliquées au projet `sffowxfozwynmuaesvdk` seulement avec l'accord explicite du fondateur (la migration de commerce l'est depuis le 2026-10-13).
