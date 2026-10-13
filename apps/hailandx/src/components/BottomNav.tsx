@@ -8,7 +8,7 @@ const TABS = [
   { href: '/', label: 'Accueil', match: (p: string) => p === '/' || p.startsWith('/b/'), svg: icon(<><path d="M3 11 12 3l9 8" /><path d="M5 10v10h14V10" /></>) },
   { href: '/recherche', label: 'Chercher', match: (p: string) => p.startsWith('/recherche'), svg: icon(<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>) },
   { href: '/vendeur', label: 'Vendre', match: (p: string) => p.startsWith('/vendeur'), svg: icon(<><path d="M4 9h16l-1.4-5H5.4z" /><path d="M5 9v11h14V9" /><path d="M10 20v-5h4v5" /></>) },
-  { href: '/compte', label: 'Compte', match: (p: string) => ['/compte', '/commandes', '/panier', '/favoris', '/notifications', '/adresse'].some((x) => p.startsWith(x)), svg: icon(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>) },
+  { href: '/compte', label: 'Compte', match: (p: string) => ['/compte', '/commandes', '/panier', '/favoris', '/notifications', '/adresse', '/parametres'].some((x) => p.startsWith(x)), svg: icon(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>) },
 ];
 
 /** Barre de navigation du bas : Accueil, Chercher, Vendre, Commandes. Masquée là où une barre d'action la remplace. */

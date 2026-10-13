@@ -7,8 +7,8 @@ import { NotificationBell } from '@/components/NotificationBell';
 import { RueStrip } from '@/components/RueStrip';
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
-export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
-  const { cat } = await searchParams;
+export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string; compte?: string }> }) {
+  const { cat, compte } = await searchParams;
   const { shops: SHOPS, products: PRODUCTS, source } = await getCatalog();
   const CATEGORIES = [...new Set(PRODUCTS.map((p) => p.category))].sort((a, b) => a.localeCompare(b, 'fr'));
   const shopBySlug = (slug: string) => SHOPS.find((s) => s.slug === slug);
@@ -22,6 +22,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-4">
+      {compte === 'supprime' && <p role="status" className="mx-5 mt-5 rounded-2xl bg-ok-soft px-4 py-3 text-[13.5px] font-bold text-ok">Votre compte a été supprimé. Vous pouvez recommencer avec le même numéro quand vous voulez.</p>}
       <header className="flex flex-col gap-3.5 px-5 pb-1 pt-5">
         <div className="flex items-center justify-between">
           <Wordmark />
