@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { badgesOf, trustOf } from '@/data/sample';
-import { getCatalog } from '@/lib/catalog';
+import { badgesOf } from '@/data/sample';
+import { getCatalog, trustFor } from '@/lib/catalog';
 import { BuyBar } from '@/components/BuyBar';
 
 type Params = { params: Promise<{ slug: string }> };
@@ -39,10 +39,10 @@ export default async function ProductLinkPage({ params }: Params) {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">
       <header className="flex items-center justify-between px-[18px] py-3">
         <Link href={`/b/${shop.slug}`} className="flex items-center gap-2.5">
-          <span className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-ink font-display text-sm font-bold" style={{ color: shop.color }}>{shop.initials}</span>
+          <span className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-[13px] bg-ink font-display text-sm font-bold" style={{ color: shop.color }}>{shop.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={shop.logoUrl} alt="" className="h-full w-full object-cover" /> : shop.initials}</span>
           <span className="flex flex-col">
             <span className="flex items-center gap-1.5 text-[14.5px] font-extrabold">{shop.name}<VerifiedMark size={15} /></span>
-            <span className="text-[11.5px] font-bold text-blue-ink">Vendeur certifié Hailand · {trustOf(shop)}/100</span>
+            <span className="text-[11.5px] font-bold text-blue-ink">Vendeur certifié Hailand · {trustFor(shop)}/100</span>
           </span>
         </Link>
         <Link href="/" aria-label="HailandX"><Wordmark className="!text-[15px] text-muted" /></Link>

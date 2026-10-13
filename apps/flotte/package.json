@@ -11,6 +11,7 @@
     "@hailandx/commerce": "*",
     "@hailandx/scorpion": "*",
     "@hailandx/ui": "*",
+    "@supabase/supabase-js": "^2.117.3",
     "next": "^16.4.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1"

@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
-import { trustOf } from '@/data/sample';
-import { getCatalog } from '@/lib/catalog';
+import { getCatalog, trustFor } from '@/lib/catalog';
 
 const CATEGORIES = ['Tout', 'Mode', 'Beauté', 'Téléphones', 'Maison', 'Alimentation'];
 
@@ -15,7 +14,7 @@ export default async function Home() {
   const productBySlug = (slug: string) => PRODUCTS.find((p) => p.slug === slug);
   const candidates: FeedCandidate[] = PRODUCTS.map((p) => {
     const shop = shopBySlug(p.shopSlug)!;
-    return { id: p.slug, shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustOf(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
+    return { id: p.slug, shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustFor(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
   });
   // La rotation change l'échantillon retenu toutes les heures.
   const feed = buildFeed(candidates, { rotation: Math.floor(Date.now() / 3_600_000), limit: 12 });
@@ -46,7 +45,7 @@ export default async function Home() {
           {SHOPS.map((s) => (
             <Link key={s.slug} href={`/b/${s.slug}`} className="flex w-[58px] shrink-0 flex-col items-center gap-1.5">
               <span className={`flex h-[58px] w-[58px] rounded-[20px] p-[3px] ${s.isNew ? 'bg-blue' : 'bg-line'}`}>
-                <span className="flex flex-1 items-center justify-center rounded-[17px] border-2 border-bg font-display text-[15px] font-bold" style={{ background: s.color }}>{s.initials}</span>
+                <span className="flex flex-1 items-center justify-center overflow-hidden rounded-[17px] border-2 border-bg font-display text-[15px] font-bold" style={{ background: s.color }}>{s.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.logoUrl} alt="" className="h-full w-full object-cover" /> : s.initials}</span>
               </span>
               <span className="w-[58px] truncate text-center text-[11px] font-semibold">{s.name}</span>
             </Link>

@@ -4,6 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "main": "src/index.ts",
-  "peerDependencies": { "react": "^19.0.0" },
-  "types": "src/index.ts"
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "types": "src/index.ts",
+  "dependencies": {
+    "jsqr": "^1.4.0"
+  }
 }
