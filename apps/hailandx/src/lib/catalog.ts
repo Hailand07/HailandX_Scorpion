@@ -49,6 +49,9 @@ function shopFromRow(r: ShopRow): ShopView {
   return { slug: r.slug, name: r.name, initials: initialsOf(r.name), color: colorOf(r.slug), place: '', tagline: r.tagline ?? '', stats, isNew: ageDays < 30, trust: sc?.trust, whatsapp: r.whatsapp, logoUrl: mediaUrl(r.logo_path), coverUrl: mediaUrl(r.cover_path) };
 }
 
+/** Délai annoncé : préparation habituelle de la boutique + ≈ 20 min de trajet, arrondi à 5 minutes (estimation tant que la distance réelle n'est pas connue). */
+export const etaFor = (prepMinutes: number | undefined): number => Math.round(((prepMinutes ?? 30) + 20) / 5) * 5;
+
 /** Lit la vitrine : boutiques ouvertes à la vente et leurs offres actives. Repli sur les exemples si la base est vide ou injoignable. */
 async function loadCatalog(): Promise<Catalog> {
   const sb = serverClient();
@@ -62,6 +65,7 @@ async function loadCatalog(): Promise<Catalog> {
     const shops = (s.data as unknown as ShopRow[]).map(shopFromRow);
     if (shops.length === 0) return { shops: SAMPLE_SHOPS, products: SAMPLE_PRODUCTS, source: 'exemple' };
     const products: ProductView[] = [];
+    const prepBySlug = new Map(shops.map((x) => [x.slug, x.stats.prepMinutes]));
     for (const r of o.data as unknown as OfferRow[]) {
       if (!r.catalog_products || !r.shops) continue;
       const vs = r.offer_variants ?? [];
@@ -70,7 +74,7 @@ async function loadCatalog(): Promise<Catalog> {
         variantId: v?.id ?? null, inStock: vs.length === 0 || v !== null,
         slug: r.catalog_products.slug, offerId: r.id, sectionId: r.section_id, photoUrl: mediaUrl(r.photo_paths?.[0]), name: r.catalog_products.name, shopSlug: r.shops.slug,
         category: r.catalog_products.categories?.name ?? 'Autres', priceGnf: r.price_gnf,
-        color: colorOf(r.catalog_products.slug), score: 0.5, etaMinutes: 40,
+        color: colorOf(r.catalog_products.slug), score: 0.5, etaMinutes: etaFor(prepBySlug.get(r.shops.slug)),
       });
     }
     return { shops, products, source: 'base' };
