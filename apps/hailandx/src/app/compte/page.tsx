@@ -11,6 +11,7 @@ const ITEMS = [
   ['/adresse', 'Mes adresses', 'Où me livrer'],
   ['/notifications', 'Notifications', 'Commandes, suivi, avis, litiges'],
   ['/vendeur', 'Mon espace vendeur', 'Boutique, produits, ventes'],
+  ['/parametres', 'Paramètres', 'Mon compte, suppression du compte'],
 ] as const;
 
 /** Mon compte : tout ce qui concerne la personne, au même endroit. */

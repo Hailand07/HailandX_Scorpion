@@ -18,10 +18,10 @@ interface Link { id: string; code: string; kind: string; source: string | null; 
 interface Cat { id: string; name: string }
 
 const STEPS = [
-  ['Connectez-vous', 'Votre numéro de téléphone suffit : un code vous est envoyé par SMS.'],
-  ['Créez votre boutique', 'Un nom, une phrase, une catégorie. Ajoutez un logo quand vous voulez.'],
-  ['Ajoutez vos produits', 'Nom, prix, stock et une photo. Vous pouvez préparer tout cela dès maintenant.'],
-  ['Faites certifier votre adresse', 'La vente s’ouvre quand Hailand a certifié votre adresse (niveau 3) : c’est ce qui rassure vos clients.'],
+  ['Créez votre compte et identifiez votre bâtiment', 'Connexion par téléphone, puis votre adresse : repérez votre bâtiment avec NavigationX (ou « Où livrer ? »).'],
+  ['Créez votre boutique', 'Un nom, une catégorie, une phrase. Un logo et un numéro WhatsApp si vous voulez.'],
+  ['Faites certifier votre boutique', 'Hailand certifie l’adresse de votre boutique (niveau 3) : c’est ce qui ouvre la vente.'],
+  ['Utilisez votre tableau de bord', 'La vente ouverte : produits, rayons, commandes, ventes et liens à partager.'],
 ] as const;
 
 /** Les quatre étapes pour vendre, montrées avant et pendant la création de la boutique. */
@@ -112,6 +112,7 @@ export default function SellerPage() {
     const name = String(f.get('name') ?? '').trim();
     const slug = slugify(name);
     if (name.length < 2 || slug.length < 3) throw new Error('Donnez un nom de boutique d’au moins 3 lettres.');
+    if (!String(f.get('declaration') ?? '')) throw new Error('Choisissez l’adresse de votre boutique : identifiez d’abord votre bâtiment.');
     const { error } = await sb!.from('shops').insert({ slug, name, tagline: String(f.get('tagline') ?? '').trim() || null, category_id: String(f.get('category') ?? '') || null, owner_id: uid, declaration_id: String(f.get('declaration') ?? '') || null, status: 'preparation' });
     if (error?.code === '23505') throw new Error('Ce nom de boutique est déjà pris, essayez-en un autre.');
     fail(error);
@@ -222,6 +223,7 @@ export default function SellerPage() {
   }
   const decl = decls.find((d) => d.id === shop?.declaration_id);
   const level = decl ? levels[decl.id] ?? decl.detected_level : 0;
+  const dashboard = shop?.status === 'ouverte';
   const prepare = shop !== null && shop.status !== 'ouverte' && shop.status !== 'suspendue' && level !== 3;
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -233,21 +235,29 @@ export default function SellerPage() {
       </div>
       {msg && <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${msg.tone === 'err' ? 'bg-[#fde8e4] text-[#8a2a1c]' : 'bg-ok-soft text-ok'}`}>{msg.text}</p>}
 
-      {!shop && <Steps current={1} />}
-      {shop && level !== 3 && shop.status !== 'ouverte' && shop.status !== 'suspendue' && <Steps current={offers.length ? 3 : 2} />}
+      {!dashboard && <Steps current={!decls.length ? 0 : !shop ? 1 : 2} />}
       {!shop ? (
-        <form action={(f) => run(() => createShop(f))} className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
-          <h2 className="font-display text-lg font-semibold">Créer ma boutique</h2>
-          <input name="name" required minLength={2} maxLength={60} placeholder="Nom de la boutique" className={input} />
-          <input name="tagline" maxLength={90} placeholder="Une phrase pour vous présenter (facultatif)" className={input} />
-          <select name="category" className={input} defaultValue=""><option value="">Catégorie principale</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <select name="declaration" className={input} defaultValue={decls[0]?.id ?? ''}>
-            <option value="">{decls.length ? 'Adresse de la boutique' : 'Aucune adresse enregistrée'}</option>
-            {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Adresse'} — niveau {levels[d.id] ?? d.detected_level}</option>)}
-          </select>
-          {!decls.length && <p className="text-[12.5px] font-medium text-muted">Vous pouvez créer la boutique maintenant. Pour vendre, enregistrez votre adresse dans <a href={NAVIGATIONX_URL} className="font-bold text-blue-ink underline">NavigationX</a> : c’est elle que Hailand certifiera.</p>}
-          <Button type="submit" disabled={busy}>Créer ma boutique</Button>
-        </form>
+        !decls.length ? (
+          <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">D’abord, votre adresse</h2>
+            <p className="text-[13.5px] font-medium text-muted">Une boutique HailandX est rattachée à un bâtiment : c’est ce que Hailand certifie, et ce qui rassure vos clients. Identifiez votre bâtiment, puis revenez ici.</p>
+            <a href={NAVIGATIONX_URL} className="inline-flex h-[54px] items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Identifier mon bâtiment avec NavigationX</a>
+            <Link href="/adresse?next=/vendeur" className="inline-flex h-12 items-center justify-center rounded-2xl border border-line text-[14px] font-bold">Ou l’enregistrer ici (« Où livrer ? »)</Link>
+          </section>
+        ) : (
+          <form action={(f) => run(() => createShop(f))} className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Créer ma boutique</h2>
+            <input name="name" required minLength={2} maxLength={60} placeholder="Nom de la boutique" className={input} />
+            <input name="tagline" maxLength={90} placeholder="Une phrase pour vous présenter (facultatif)" className={input} />
+            <select name="category" className={input} defaultValue=""><option value="">Catégorie principale</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
+            <label className="flex flex-col gap-1.5 text-[13px] font-bold">Adresse de la boutique
+              <select name="declaration" required className={input} defaultValue={decls[0]?.id ?? ''}>
+                {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Adresse'} — niveau {levels[d.id] ?? d.detected_level}</option>)}
+              </select>
+            </label>
+            <Button type="submit" disabled={busy}>Créer ma boutique</Button>
+          </form>
+        )
       ) : (
         <>
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
@@ -255,7 +265,7 @@ export default function SellerPage() {
               <div><h2 className="font-display text-lg font-semibold">{shop.name}</h2><p className="text-[12.5px] font-semibold text-muted">/b/{shop.slug}</p></div>
               <Badge tone={shop.status === 'ouverte' ? 'ok' : 'sand'}>{shop.status === 'ouverte' ? 'Ouverte' : shop.status === 'suspendue' ? 'Suspendue' : 'En préparation'}</Badge>
             </div>
-            {prepare && <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">Vous pouvez préparer votre boutique. La vente s’ouvre quand votre adresse est certifiée par Hailand (niveau 3){decl ? ` — actuellement niveau ${level}` : ' — aucune adresse rattachée'}.</p>}
+            {prepare && <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">Votre boutique est créée. La vente s’ouvre quand l’adresse de la boutique est certifiée par Hailand (niveau 3){decl ? ` — actuellement niveau ${level}` : ' — aucune adresse rattachée'}. Le tableau de bord (produits, commandes, ventes) s’ouvre à ce moment-là.</p>}
             {!decl && decls.length > 0 && (
               <form action={(f) => run(async () => { const { error } = await sb.from('shops').update({ declaration_id: String(f.get('declaration')) }).eq('id', shop.id); fail(error); return 'Adresse rattachée.'; })} className="flex gap-2">
                 <select name="declaration" className={input} defaultValue={decls[0]!.id}>{decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Adresse'} — niveau {levels[d.id] ?? d.detected_level}</option>)}</select>
@@ -295,6 +305,14 @@ export default function SellerPage() {
             </form>
           </section>
 
+          {!dashboard && (
+            <section className="flex flex-col gap-1.5 rounded-[22px] border border-dashed border-line bg-sand p-5" aria-label="Tableau de bord">
+              <h2 className="font-display text-lg font-semibold">Tableau de bord</h2>
+              <p className="text-[13px] font-medium text-muted">{shop.status === 'suspendue' ? 'Votre boutique est suspendue par l’équipe Hailand.' : 'Produits, rayons, commandes, ventes et liens à partager apparaissent ici dès que la vente est ouverte, c’est-à-dire quand Hailand a certifié l’adresse de votre boutique.'}</p>
+            </section>
+          )}
+          {dashboard && (
+            <>
           <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link><Link href="/vendeur/avis" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes avis</Link><Link href="/vendeur/ventes" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes ventes par jour et par source</Link></div>
 
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
@@ -371,6 +389,8 @@ export default function SellerPage() {
               </div>
             ))}
           </section>
+            </>
+          )}
         </>
       )}
     </Shell>
