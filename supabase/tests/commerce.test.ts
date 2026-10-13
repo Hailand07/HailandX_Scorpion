@@ -76,7 +76,7 @@ describe('catalogue : fiche commune, offres et visiteurs', () => {
   it('un visiteur sans compte voit la vitrine mais ni commandes ni colis', async () => {
     expect(await as(db, 'anon', () => q('select slug from shops'))).toEqual([{ slug: 'kadi-wax' }]);
     expect(await as(db, 'anon', () => q('select price_gnf from offers'))).toHaveLength(1);
-    expect(await as(db, 'anon', () => q('select 1 from orders'))).toHaveLength(0);
+    expect(await as(db, 'anon', () => refused(db.query('select id from orders')))).toMatch(/permission denied/);
     expect(await as(db, 'anon', () => refused(db.query('select id from parcels')))).toMatch(/permission denied/);
   });
 
@@ -146,6 +146,13 @@ describe('droits de lecture sur les commandes', () => {
     expect(await as(db, U.acheteur2, () => q('select id from parcels'))).toHaveLength(0);
     expect(await as(db, U.vendeur, () => q('select id from parcels where id = $1', [parcelId]))).toHaveLength(1);
     expect(await as(db, U.vendeur2, () => q('select id from parcels where id = $1', [parcelId]))).toHaveLength(0);
+  });
+
+  it('le téléphone de l’acheteur n’est lisible par personne (ni acheteur, ni vendeur) ; la commande reste lisible', async () => {
+    expect(await as(db, U.acheteur, () => refused(db.query('select buyer_phone from orders')))).toMatch(/permission denied/);
+    expect(await as(db, U.vendeur, () => refused(db.query('select buyer_phone from orders')))).toMatch(/permission denied/);
+    expect(await as(db, U.vendeur, () => refused(db.query('select * from orders')))).toMatch(/permission denied/);
+    expect(await as(db, U.vendeur, () => q('select id, total_gnf from orders where id = $1', [orderId]))).toHaveLength(1);
   });
 
   it('personne ne peut lire le code de remise dans la table ; l’acheteur le lit par la fonction, le vendeur non', async () => {

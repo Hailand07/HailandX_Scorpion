@@ -61,7 +61,7 @@ export default async function Home() {
           return (
             <Link key={p.slug} href={`/p/${p.slug}`} className="flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card">
               <span className="relative block">
-                <PhotoSlot color={p.color} className="h-[150px]" label={p.name} />
+                <PhotoSlot src={p.photoUrl} color={p.color} className="h-[150px]" label={p.name} />
                 <span className="absolute bottom-2.5 right-2.5 rounded-full bg-white/90 px-2 py-1 text-[10.5px] font-bold">≈ {p.etaMinutes} min</span>
                 {shop.isNew && <span className="absolute left-2.5 top-2.5"><Badge tone="ink">Nouveau</Badge></span>}
               </span>

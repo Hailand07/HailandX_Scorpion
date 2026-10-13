@@ -5,6 +5,7 @@ import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
 import { badgesOf, trustOf } from '@/data/sample';
 import { getCatalog } from '@/lib/catalog';
+import { BuyBar } from '@/components/BuyBar';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -22,7 +23,7 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
   const title = `${p.name} — ${formatGnf(p.priceGnf)}`;
   const description = `Vendu par ${shop.name}, vendeur certifié Hailand. Livré à votre porte en ≈ ${p.etaMinutes} min.`;
-  return { title, description, openGraph: { title, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN' }, twitter: { card: 'summary_large_image', title, description } };
+  return { title, description, openGraph: { title, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN', ...(p.photoUrl ? { images: [p.photoUrl] } : {}) }, twitter: { card: 'summary_large_image', title, description, ...(p.photoUrl ? { images: [p.photoUrl] } : {}) } };
 }
 
 /** Page d'un lien partagé : le produit mis en avant, puis le reste de la boutique (jamais un cul-de-sac). */
@@ -48,7 +49,7 @@ export default async function ProductLinkPage({ params }: Params) {
       </header>
 
       <div className="px-[18px]">
-        <PhotoSlot color={p.color} className="h-[300px] rounded-3xl" label={p.name} />
+        <PhotoSlot src={p.photoUrl} color={p.color} className="h-[300px] rounded-3xl" label={p.name} />
       </div>
       <div className="flex flex-col gap-1 px-[18px]">
         <h1 className="font-display text-[22px] font-semibold leading-tight tracking-tight">{p.name}</h1>
@@ -68,7 +69,7 @@ export default async function ProductLinkPage({ params }: Params) {
           <div className="flex gap-2.5 overflow-x-auto">
             {others.map((o) => (
               <Link key={o.slug} href={`/p/${o.slug}`} className="flex w-[110px] shrink-0 flex-col gap-1.5">
-                <PhotoSlot color={o.color} className="h-[110px] rounded-2xl" label={o.name} />
+                <PhotoSlot src={o.photoUrl} color={o.color} className="h-[110px] rounded-2xl" label={o.name} />
                 <span className="truncate text-xs font-bold">{o.name}</span>
                 <span className="text-[12.5px] font-extrabold">{formatGnf(o.priceGnf)}</span>
               </Link>
@@ -77,12 +78,7 @@ export default async function ProductLinkPage({ params }: Params) {
         </section>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md gap-2.5 border-t border-line-soft bg-card px-[18px] pb-[max(26px,env(safe-area-inset-bottom))] pt-3">
-        <Link href="/panier" aria-label="Ajouter au panier" className="flex h-[54px] w-[54px] items-center justify-center rounded-2xl border border-line">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#12141c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-        </Link>
-        <Link href="/commande" className="flex h-[54px] flex-1 items-center justify-center rounded-2xl bg-ink text-[15.5px] font-extrabold text-white">Acheter maintenant</Link>
-      </div>
+      <BuyBar available={p.inStock !== false} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
     </main>
   );
 }

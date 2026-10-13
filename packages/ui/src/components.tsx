@@ -28,16 +28,20 @@ export const Price: React.FC<{ children: React.ReactNode; className?: string }> 
   <span className={`font-display font-semibold tracking-tight ${className}`}>{children}</span>
 );
 
-/** Emplacement de photo (les vraies photos viendront du stockage). */
-export const PhotoSlot: React.FC<{ color: string; className?: string; label?: string }> = ({ color, className = '', label }) => (
-  <span className={`flex items-center justify-center ${className}`} style={{ background: color }} role={label ? 'img' : undefined} aria-label={label}>
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(18,20,28,0.32)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="3" width="18" height="18" rx="3" />
-      <circle cx="9" cy="9" r="2" />
-      <path d="m21 15-5-5L5 21" />
-    </svg>
-  </span>
-);
+/** Photo d'un produit ou d'une boutique ; sans image, un emplacement coloré. */
+export const PhotoSlot: React.FC<{ color: string; className?: string; label?: string; src?: string | null }> = ({ color, className = '', label, src }) =>
+  src ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={label ?? ''} loading="lazy" decoding="async" className={`w-full object-cover ${className}`} style={{ background: color }} />
+  ) : (
+    <span className={`flex items-center justify-center ${className}`} style={{ background: color }} role={label ? 'img' : undefined} aria-label={label}>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(18,20,28,0.32)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <circle cx="9" cy="9" r="2" />
+        <path d="m21 15-5-5L5 21" />
+      </svg>
+    </span>
+  );
 
 export const Wordmark: React.FC<{ className?: string }> = ({ className = '' }) => (
   <span className={`font-display text-2xl font-bold tracking-[-0.03em] ${className}`}>

@@ -33,6 +33,7 @@ create table public.declarations (
   gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text);
 create table public.agents (id uuid primary key, role text not null, active boolean not null default true);
 create function public.is_admin() returns boolean language sql stable security definer as $$ select exists (select 1 from public.agents a where a.id = auth.uid() and a.role = 'admin' and a.active) $$;
+revoke execute on function public.is_admin() from public, anon; grant execute on function public.is_admin() to authenticated;
 create function public.is_agent() returns boolean language sql stable security definer as $$ select exists (select 1 from public.agents a where a.id = auth.uid() and a.active) $$;
 grant usage on schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
@@ -47,6 +48,8 @@ export async function freshDb(): Promise<PGlite> {
   const db = new PGlite({ extensions: { pgcrypto } });
   await db.exec(DECORS);
   await db.exec(readFileSync(new URL('../migrations/2026-10-12_hailandx_commerce.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-13_hailandx_orders_hide_phone.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-13_hailandx_vitrine_visiteurs.sql', import.meta.url), 'utf8'));
   return db;
 }
 
