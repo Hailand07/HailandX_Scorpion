@@ -62,6 +62,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-10-16_hailandx_variantes.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-16_hailandx_suivi_ventes.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-17_hailandx_complements.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-18_hailandx_preuves.sql', import.meta.url), 'utf8'));
   return db;
 }
 

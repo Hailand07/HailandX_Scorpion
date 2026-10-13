@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Badge, Button, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
 import { DisputeThread } from '@/components/DisputeThread';
+import { ProofPhoto } from '@/components/ProofPhoto';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
@@ -11,7 +12,7 @@ interface Courier { user_id: string; full_name: string; vehicle: string; status:
 interface Shop { id: string; name: string; slug: string; status: string }
 const REVIEW_REASON: Record<string, string> = { faux: 'Avis sans commande', injurieux: 'Propos injurieux', hors_sujet: 'Hors sujet', autre: 'Autre' };
 interface Report { id: string; reason: string; details: string | null; created_at: string; reviews: { rating: number; comment: string | null } | null; shops: { name: string } | null }
-interface Dispute { id: string; reason: string; details: string | null; created_at: string; parcels: { subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string } | null } | null }
+interface Dispute { id: string; parcel_id: string; reason: string; details: string | null; created_at: string; parcels: { subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string } | null } | null }
 const REASON: Record<string, string> = { non_recu: 'Colis non reçu', endommage: 'Produit abîmé', different: 'Produit différent', autre: 'Autre problème' };
 
 /** Console d'équipe (administrateurs Hailand) : valider les livreurs, enregistrer leurs reversements d'espèces, suspendre une boutique. */
@@ -37,7 +38,7 @@ export default function AdminPage() {
     const [c, s, d] = await Promise.all([
       sb.from('couriers').select('user_id,full_name,vehicle,status,cash_balance_gnf,cash_limit_gnf,created_at').order('created_at', { ascending: false }),
       sb.from('shops').select('id,name,slug,status').order('created_at', { ascending: false }).limit(100),
-      sb.from('disputes').select('id,reason,details,created_at,parcels(subtotal_gnf,delivery_fee_gnf,shops(name))').eq('status', 'ouvert').order('created_at'),
+      sb.from('disputes').select('id,parcel_id,reason,details,created_at,parcels(subtotal_gnf,delivery_fee_gnf,shops(name))').eq('status', 'ouvert').order('created_at'),
     ]);
     setDisputes((d.data as unknown as Dispute[]) ?? []);
     const rp = await sb.from('review_reports').select('id,reason,details,created_at,reviews(rating,comment),shops(name)').eq('status', 'ouvert').order('created_at');
@@ -95,6 +96,7 @@ export default function AdminPage() {
           <div className="flex items-center justify-between"><span className="text-[14px] font-bold">{REASON[d.reason] ?? d.reason}</span><Badge tone="lime">{d.parcels?.shops?.name ?? 'Boutique'}</Badge></div>
           {d.details && <p className="text-[13px] font-medium text-muted">« {d.details} »</p>}
           <p className="text-[12px] font-semibold text-muted">{d.parcels ? `${formatGnf(d.parcels.subtotal_gnf)} + livraison ${formatGnf(d.parcels.delivery_fee_gnf)} · ` : ''}{new Date(d.created_at).toLocaleDateString('fr-FR')}</p>
+          <ProofPhoto parcelId={d.parcel_id} />
           <DisputeThread disputeId={d.id} mine="equipe" />
           <div className="flex gap-2">
             <button type="button" onClick={() => act(sb!.rpc('fn_resolve_dispute', { p_dispute: d.id, p_in_favor_of: 'acheteur' }), 'Tranché en faveur de l’acheteur : colis annulé.')} className="h-10 flex-1 rounded-xl bg-ink text-[13px] font-bold text-white">Pour l’acheteur</button>

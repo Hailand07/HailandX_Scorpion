@@ -5,6 +5,7 @@ import { Badge, QrScanner, Wordmark } from '@hailandx/ui';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 import { DisputeThread } from '@/components/DisputeThread';
+import { ProofPhoto } from '@/components/ProofPhoto';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
@@ -66,7 +67,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       <h1 className="font-display text-[22px] font-semibold tracking-tight">Suivi de commande</h1>
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
       {order && order.payment_method === 'orange_money' && <PaymentBox order={order} onDone={() => load()} />}
-      {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
+      {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover_proof', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
       {!order ? <p className="text-[14px] font-medium text-muted">Chargement…</p> : (
         <>
           {parcels.map((p) => {
@@ -80,6 +81,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 )}
                 {idx >= 0 && <p className="text-[13px] font-medium text-muted">{STEPS[idx]!.help}</p>}
                 {['accepte', 'retire'].includes(p.status) && <TrackingMap parcelId={p.id} />}
+                {['remis', 'litige'].includes(p.status) && <ProofPhoto parcelId={p.id} />}
                 <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ""}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
                 <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>
                 {codes[p.id] && (p.status === 'accepte' || p.status === 'retire') && (
