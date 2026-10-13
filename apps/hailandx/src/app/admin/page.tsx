@@ -19,6 +19,9 @@ export default function AdminPage() {
   const [couriers, setCouriers] = useState<Courier[]>([]);
   const [shops, setShops] = useState<Shop[]>([]);
   const [disputes, setDisputes] = useState<Dispute[]>([]);
+  const [owed, setOwed] = useState<{ shopId: string; name: string; amount: number }[]>([]);
+  const [refunds, setRefunds] = useState<{ buyer_id: string; amount_gnf: number; buyer_phone: string | null }[]>([]);
+  const [rates, setRates] = useState<{ commission_bps: string; courier_share_bps: string; payment_mode: string }>({ commission_bps: '', courier_share_bps: '', payment_mode: '' });
   const [kpi, setKpi] = useState<{ shops: number; orders: number; delivered: number; couriers: number; sales: number } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
@@ -33,6 +36,17 @@ export default function AdminPage() {
       sb.from('disputes').select('id,reason,details,created_at,parcels(subtotal_gnf,delivery_fee_gnf,shops(name))').eq('status', 'ouvert').order('created_at'),
     ]);
     setDisputes((d.data as unknown as Dispute[]) ?? []);
+    const [led, due, st] = await Promise.all([
+      sb.from('ledger_entries').select('account_id,amount_gnf').eq('account', 'shop').limit(5000),
+      sb.rpc('fn_refunds_due'),
+      sb.from('settings').select('key,value'),
+    ]);
+    const totals = new Map<string, number>();
+    for (const r of (led.data as { account_id: string; amount_gnf: number }[]) ?? []) totals.set(r.account_id, (totals.get(r.account_id) ?? 0) + r.amount_gnf);
+    setOwed([...totals].filter(([, v]) => v > 0).map(([id, v]) => ({ shopId: id, name: ((s.data as Shop[]) ?? []).find((x) => x.id === id)?.name ?? 'Boutique', amount: v })));
+    setRefunds((due.data as { buyer_id: string; amount_gnf: number; buyer_phone: string | null }[]) ?? []);
+    const map = Object.fromEntries(((st.data as { key: string; value: string }[]) ?? []).map((r) => [r.key, r.value]));
+    setRates({ commission_bps: map.commission_bps ?? '', courier_share_bps: map.courier_share_bps ?? '', payment_mode: map.payment_mode ?? '' });
     const count = async (table: string, f?: (q: any) => any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
       // Une colonne précise (jamais « * ») : certaines colonnes sensibles ne sont pas lisibles directement.
       let q = sb.from(table).select(table === 'couriers' ? 'user_id' : 'id', { count: 'exact', head: true });
@@ -81,6 +95,33 @@ export default function AdminPage() {
           </div>
         </section>
       ))}
+
+      <h2 className="font-display text-lg font-semibold">À verser aux vendeurs</h2>
+      {owed.length === 0 && <p className="text-[13.5px] font-medium text-muted">Rien à verser.</p>}
+      {owed.map((o) => (
+        <div key={o.shopId} className="flex items-center justify-between gap-2 rounded-2xl border border-line-soft bg-card px-3.5 py-3">
+          <span className="flex min-w-0 flex-col"><span className="truncate text-[14px] font-bold">{o.name}</span><span className="text-[12.5px] font-semibold text-muted">{formatGnf(o.amount)}</span></span>
+          <button type="button" onClick={() => act(sb!.rpc('fn_shop_payout', { p_shop: o.shopId, p_amount: o.amount }), 'Versement enregistré.')} className="h-10 shrink-0 rounded-xl bg-ink px-3 text-[13px] font-bold text-white">Versé</button>
+        </div>
+      ))}
+
+      <h2 className="font-display text-lg font-semibold">Remboursements à effectuer</h2>
+      {refunds.length === 0 && <p className="text-[13.5px] font-medium text-muted">Aucun remboursement en attente.</p>}
+      {refunds.map((r) => (
+        <div key={r.buyer_id} className="flex items-center justify-between gap-2 rounded-2xl border border-line-soft bg-card px-3.5 py-3">
+          <span className="flex min-w-0 flex-col"><span className="text-[14px] font-bold">{r.buyer_phone ?? 'Acheteur'}</span><span className="text-[12.5px] font-semibold text-muted">{formatGnf(r.amount_gnf)}</span></span>
+          <button type="button" onClick={() => act(sb!.rpc('fn_refund_paid', { p_buyer: r.buyer_id, p_amount: r.amount_gnf }), 'Remboursement enregistré.')} className="h-10 shrink-0 rounded-xl bg-ink px-3 text-[13px] font-bold text-white">Remboursé</button>
+        </div>
+      ))}
+
+      <h2 className="font-display text-lg font-semibold">Taux et paiement</h2>
+      <form className="flex flex-col gap-2 rounded-2xl border border-line-soft bg-card p-3.5" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); void (async () => { for (const [k, v] of [['commission_bps', Math.round(Number(f.get('commission')) * 100)], ['courier_share_bps', Math.round(Number(f.get('courier')) * 100)], ['payment_mode', String(f.get('mode'))]] as const) { const r = await sb!.from('settings').update({ value: String(v), updated_at: new Date().toISOString() }).eq('key', k); if (r.error) { setMsg(r.error.message); return; } } setMsg('Réglages enregistrés.'); await load(); })(); }}>
+        <label className="flex items-center justify-between gap-2 text-[13px] font-bold">Commission sur les articles (%)<input name="commission" inputMode="decimal" defaultValue={Number(rates.commission_bps) / 100} key={rates.commission_bps} className="h-10 w-24 rounded-xl border border-line bg-card px-3 text-[14px]" /></label>
+        <label className="flex items-center justify-between gap-2 text-[13px] font-bold">Part des frais pour le livreur (%)<input name="courier" inputMode="decimal" defaultValue={Number(rates.courier_share_bps) / 100} key={rates.courier_share_bps} className="h-10 w-24 rounded-xl border border-line bg-card px-3 text-[14px]" /></label>
+        <label className="flex items-center justify-between gap-2 text-[13px] font-bold">Paiement en ligne<select name="mode" defaultValue={rates.payment_mode} key={rates.payment_mode} className="h-10 rounded-xl border border-line bg-card px-2 text-[14px]"><option value="simulation">Essai (équipe seulement)</option><option value="orange_money">Orange Money (public)</option></select></label>
+        <p className="text-[11.5px] font-medium text-muted">Taux provisoires, à valider. Ne passez en « Orange Money » qu’une fois le compte marchand ouvert et la notification de paiement configurée.</p>
+        <button type="submit" className="h-10 rounded-xl border border-line text-[13px] font-bold">Enregistrer</button>
+      </form>
 
       <h2 className="font-display text-lg font-semibold">Livreurs</h2>
       {couriers.length === 0 && <p className="text-[13.5px] font-medium text-muted">Aucun livreur.</p>}
