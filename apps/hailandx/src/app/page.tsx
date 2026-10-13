@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
 import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
+import { DeliverTo } from '@/components/DeliverTo';
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
 export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
@@ -26,6 +27,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
           </Link>
         </div>
+        <DeliverTo />
         <Link href="/recherche" className="flex h-12 items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14.5px] font-medium text-muted">
           Rechercher un produit, une boutique…
         </Link>

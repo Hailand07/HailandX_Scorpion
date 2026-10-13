@@ -5,6 +5,8 @@ import { useSyncExternalStore } from 'react';
 export interface CartLine {
   offerId: string;
   variantId: string | null;
+  /** Libellé de la variante choisie (« M · Bleu ») ; vide pour une variante unique « Standard ». */
+  variantLabel?: string | null;
   slug: string;
   name: string;
   priceGnf: number;

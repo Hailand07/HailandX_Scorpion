@@ -12,15 +12,25 @@ interface Order { id: string; total_gnf: number; created_at: string; payment_met
 export default function OrdersPage() {
   const session = useSession();
   const [orders, setOrders] = useState<Order[] | null>(null);
+  const [followed, setFollowed] = useState<{ slug: string; name: string }[]>([]);
   useEffect(() => {
     const sb = browserClient();
     if (!sb || !session) return;
     sb.from('orders').select('id,total_gnf,created_at,payment_method').eq('buyer_id', session.user.id).order('created_at', { ascending: false }).limit(50).then(({ data }) => setOrders((data as Order[]) ?? []));
+    sb.from('shop_follows').select('shops(slug,name)').eq('user_id', session.user.id).order('created_at', { ascending: false }).then(({ data }) => {
+      setFollowed(((data as unknown as { shops: { slug: string; name: string } | null }[]) ?? []).map((r) => r.shops).filter((x): x is { slug: string; name: string } => Boolean(x)));
+    });
   }, [session]);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-6">
       <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><h1 className="font-display text-[20px] font-semibold">Mes commandes</h1></div>
+      {followed.length > 0 && (
+        <section aria-label="Boutiques suivies" className="flex flex-col gap-2">
+          <h2 className="text-[13px] font-extrabold text-muted">Boutiques suivies</h2>
+          <div className="flex flex-wrap gap-2">{followed.map((f) => <Link key={f.slug} href={`/b/${f.slug}`} className="flex h-10 items-center rounded-full border border-line bg-card px-3.5 text-[13px] font-bold">{f.name}</Link>)}</div>
+        </section>
+      )}
       {session === null && <Link href="/connexion?next=/commandes" className="font-bold text-blue-ink">Se connecter pour voir mes commandes</Link>}
       {session && orders === null && <p className="text-[14px] font-medium text-muted">Chargement…</p>}
       {orders?.length === 0 && <p className="text-[14px] font-medium text-muted">Aucune commande pour l’instant.</p>}

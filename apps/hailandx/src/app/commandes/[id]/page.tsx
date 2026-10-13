@@ -3,11 +3,12 @@ import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, QrScanner, Wordmark } from '@hailandx/ui';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
+import { TrackingMap } from '@/components/TrackingMap';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
-interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; quantity: number; price_gnf_snapshot: number }[] }
+interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
 
 const STEPS = [
   { key: 'confirmee', label: 'Confirmée', help: 'Le vendeur prépare votre colis.' },
@@ -33,7 +34,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,payment_status,created_at').eq('id', id).maybeSingle();
     if (!o.data) { setMissing(true); return; }
     setOrder(o.data as Order);
-    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,shops(name,slug),order_items(id,name_snapshot,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
+    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,shops(name,slug),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
     const list = (p.data as unknown as Parcel[]) ?? [];
     setParcels(list);
     const c: Record<string, string> = {};
@@ -77,7 +78,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <ol className="flex gap-1.5" aria-label="Étapes">{STEPS.map((s, i) => <li key={s.key} className={`h-1.5 flex-1 rounded-full ${i <= idx ? 'bg-blue' : 'bg-line'}`} aria-current={i === idx ? 'step' : undefined} title={s.label} />)}</ol>
                 )}
                 {idx >= 0 && <p className="text-[13px] font-medium text-muted">{STEPS[idx]!.help}</p>}
-                <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
+                {['accepte', 'retire'].includes(p.status) && <TrackingMap parcelId={p.id} />}
+                <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ""}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
                 <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>
                 {codes[p.id] && (p.status === 'accepte' || p.status === 'retire') && (
                   <div className="flex flex-col items-center gap-1 rounded-2xl bg-lime px-4 py-3">
