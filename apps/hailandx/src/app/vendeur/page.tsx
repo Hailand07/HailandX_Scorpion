@@ -5,10 +5,11 @@ import { Badge, Button, Wordmark } from '@hailandx/ui';
 import { formatGnf, slugify } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
+import { mediaUrl, uploadPhoto } from '@/lib/media';
 
 interface Shop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null }
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
-interface Offer { id: string; price_gnf: number; active: boolean; catalog_products: { name: string; slug: string } | null }
+interface Offer { id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; catalog_products: { name: string; slug: string } | null }
 interface Cat { id: string; name: string }
 
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
@@ -43,7 +44,7 @@ export default function SellerPage() {
     await Promise.all(list.map(async (x) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id }); lv[x.id] = typeof r.data === 'number' ? r.data : x.detected_level; }));
     setLevels(lv);
     if (s.data) {
-      const o = await sb.from('offers').select('id,price_gnf,active,catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
+      const o = await sb.from('offers').select('id,price_gnf,active,photo_paths,catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
       setOffers((o.data as unknown as Offer[]) ?? []);
     }
     setLoading(false);
@@ -75,9 +76,11 @@ export default function SellerPage() {
     const stock = Math.max(0, Math.floor(Number(f.get('stock') ?? 0)));
     if (name.length < 2) throw new Error('Donnez un nom au produit.');
     if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
+    const photo = f.get('photo');
+    const photoPath = photo instanceof File && photo.size > 0 ? await uploadPhoto(sb!, uid!, photo) : null;
     const { data: prod, error: e1 } = await sb!.from('catalog_products').insert({ slug: `${slugify(name) || 'produit'}-${rand()}`, name, category_id: String(f.get('pcat') ?? '') || shop?.category_id || null, created_by: uid }).select('id').single();
     fail(e1);
-    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: (prod as { id: string }).id, price_gnf: Math.round(price) }).select('id').single();
+    const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: (prod as { id: string }).id, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
     fail(e2);
     const { error: e3 } = await sb!.from('offer_variants').insert({ offer_id: (off as { id: string }).id, label: 'Standard', stock });
     fail(e3);
@@ -144,6 +147,8 @@ export default function SellerPage() {
             </div>
           </section>
 
+          <Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Voir mes commandes</Link>
+
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Ajouter un produit</h2>
             <form action={(f) => run(() => addProduct(f))} className="flex flex-col gap-3">
@@ -152,6 +157,7 @@ export default function SellerPage() {
                 <input name="price" required inputMode="numeric" placeholder="Prix (GNF)" className={input} />
                 <input name="stock" required inputMode="numeric" defaultValue="1" placeholder="Stock" className={input} />
               </div>
+              <label className="flex flex-col gap-1.5 text-[13px] font-bold">Photo (facultatif)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-[14px] font-medium file:mr-3 file:h-11 file:rounded-2xl file:border-0 file:bg-sand file:px-4 file:text-[13px] file:font-bold" /></label>
               <select name="pcat" className={input} defaultValue={shop.category_id ?? ''}><option value="">Catégorie</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
               <Button type="submit" disabled={busy}>Ajouter</Button>
             </form>
@@ -162,7 +168,7 @@ export default function SellerPage() {
             {offers.length === 0 && <p className="text-[13.5px] font-medium text-muted">Aucun produit pour l’instant.</p>}
             {offers.map((o) => (
               <div key={o.id} className="flex flex-col gap-2 rounded-2xl border border-line-soft bg-card px-4 py-3">
-                <div className="flex items-baseline justify-between gap-3"><span className="truncate text-[14px] font-bold">{o.catalog_products?.name}</span><span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(o.price_gnf)}</span></div>
+                <div className="flex items-center gap-3">{mediaUrl(o.photo_paths?.[0]) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl(o.photo_paths?.[0])!} alt="" className="h-12 w-12 rounded-xl object-cover" />}<div className="flex min-w-0 flex-1 items-baseline justify-between gap-3"><span className="truncate text-[14px] font-bold">{o.catalog_products?.name}</span><span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(o.price_gnf)}</span></div></div>
                 {o.catalog_products && <ShareButtons url={`${origin}/p/${o.catalog_products.slug}`} text={`${o.catalog_products.name} — ${formatGnf(o.price_gnf)}`} />}
               </div>
             ))}

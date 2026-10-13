@@ -46,7 +46,7 @@ export default async function ShopPage({ params }: Params) {
       <section aria-label="Produits" className="grid grid-cols-2 gap-3 px-5 pt-2">
         {products.map((p) => (
           <Link key={p.slug} href={`/p/${p.slug}`} className="flex flex-col overflow-hidden rounded-[18px] border border-line-soft bg-card">
-            <PhotoSlot color={p.color} className="h-[120px]" label={p.name} />
+            <PhotoSlot src={p.photoUrl} color={p.color} className="h-[120px]" label={p.name} />
             <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
               <span className="truncate text-[13px] font-bold">{p.name}</span>
               <Price className="text-[14.5px]">{formatGnf(p.priceGnf)}</Price>

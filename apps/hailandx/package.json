@@ -13,11 +13,13 @@
     "@hailandx/ui": "*",
     "@supabase/supabase-js": "^2.117.3",
     "next": "^16.4.0",
+    "qrcode": "^1.5.4",
     "react": "^19.0.1",
     "react-dom": "^19.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.14",
+    "@types/qrcode": "^1.5.6",
     "postcss": "^8.5.0",
     "tailwindcss": "^4.1.14"
   }

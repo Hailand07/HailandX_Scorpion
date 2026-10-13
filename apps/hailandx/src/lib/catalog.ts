@@ -1,9 +1,10 @@
 import { type ShopStats } from '@hailandx/commerce';
 import { PRODUCTS as SAMPLE_PRODUCTS, SHOPS as SAMPLE_SHOPS, type SampleProduct, type SampleShop } from '@/data/sample';
+import { mediaUrl } from './media';
 import { serverClient } from './supabase';
 
 export type ShopView = SampleShop;
-export type ProductView = SampleProduct & { offerId?: string };
+export type ProductView = SampleProduct & { offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean };
 
 export interface Catalog {
   shops: ShopView[];
@@ -29,7 +30,7 @@ interface ShopRow {
   shop_scores: { rating: number; review_count: number; reliability: number; sales: number; prep_minutes: number | null } | null;
 }
 interface OfferRow {
-  id: string; price_gnf: number;
+  id: string; price_gnf: number; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null;
   catalog_products: { slug: string; name: string; category_id: string | null; categories: { name: string } | null } | null;
   shops: { slug: string; status: string } | null;
 }
@@ -51,7 +52,7 @@ export async function getCatalog(): Promise<Catalog> {
   try {
     const [s, o] = await Promise.all([
       sb.from('shops').select('slug,name,tagline,created_at,shop_scores(rating,review_count,reliability,sales,prep_minutes)').eq('status', 'ouverte').order('created_at', { ascending: false }).limit(60),
-      sb.from('offers').select('id,price_gnf,catalog_products(slug,name,category_id,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
+      sb.from('offers').select('id,price_gnf,photo_paths,offer_variants(id,label,stock),catalog_products(slug,name,category_id,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
     ]);
     if (s.error || o.error) throw s.error ?? o.error;
     const shops = (s.data as unknown as ShopRow[]).map(shopFromRow);
@@ -59,8 +60,11 @@ export async function getCatalog(): Promise<Catalog> {
     const products: ProductView[] = [];
     for (const r of o.data as unknown as OfferRow[]) {
       if (!r.catalog_products || !r.shops) continue;
+      const vs = r.offer_variants ?? [];
+      const v = vs.find((x) => x.stock > 0) ?? null;
       products.push({
-        slug: r.catalog_products.slug, offerId: r.id, name: r.catalog_products.name, shopSlug: r.shops.slug,
+        variantId: v?.id ?? null, inStock: vs.length === 0 || v !== null,
+        slug: r.catalog_products.slug, offerId: r.id, photoUrl: mediaUrl(r.photo_paths?.[0]), name: r.catalog_products.name, shopSlug: r.shops.slug,
         category: r.catalog_products.categories?.name ?? 'Autres', priceGnf: r.price_gnf,
         color: colorOf(r.catalog_products.slug), score: 0.5, etaMinutes: 40,
       });

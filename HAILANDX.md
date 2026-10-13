@@ -418,6 +418,7 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 | 2026-10-12 | Création : vision détaillée du fondateur (vitrine globale « la rue », liens sociaux, Flotte Hailand avec QR, Scorpion, niveaux requis), propositions (fiche commune et offres, indice de confiance, avis vérifiés par la flotte, double preuve de remise, paiement bloqué, panier multi-vendeurs), parcours, place de la flotte, architecture, schéma proposé, design, plan en 8 phases, décisions à prendre. Rien n'est codé. |
 | 2026-10-13 | Migration de commerce et de Flotte **appliquée à la base de production** (14 tables, 14 fonctions, sécurité par ligne vérifiée) ; fichier déplacé dans `supabase/migrations/` ; deux correctifs (chemin de recherche `extensions`, droits des déclencheurs). |
 | 2026-10-13 | Phase 2 commencée : vitrine lue dans la base (repli sur exemples), connexion par téléphone, espace vendeur, 10 catégories de départ créées en production. |
+| 2026-10-13 | Photos (bucket `hx-media`, réduction côté navigateur) ; phase 3 acheteur (panier, commande, suivi, code de remise, avis) et commandes vendeur avec QR ; 3 migrations (téléphone masqué, vitrine visiteurs, bucket) ; défaut de lecture visiteur corrigé. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -451,3 +452,22 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 - Écran téléphone (390 px) : accueil, invite de connexion du vendeur, validation du numéro ; aucun défilement horizontal, aucune erreur.
 
 **Pas encore fait (phase 2 suite)** : photos des produits (stockage d'images), modification et suppression de produits, extraction de l'enregistrement d'adresse de NavigationX dans `packages/scorpion` (aujourd'hui l'adresse se crée dans NavigationX), liens suivis (`share_links`, clics par source), certification prioritaire demandée depuis l'espace vendeur.
+
+## 16. Photos et phase 3 (acheteur) — état (2026-10-13) ✅ code et base, ⚠️ pas encore testé avec un vrai compte
+
+**Photos** : bucket public `hx-media` (3 Mo, JPEG/PNG/WebP), écriture seulement dans le dossier de son propre compte (`<compte>/…`, vérifié en base : dossier d'un autre refusé). Le navigateur **réduit la photo** avant l'envoi (côté le plus long ≤ 1 280 px, JPEG 0,8) pour la 3G. Envoi depuis l'espace vendeur ; affichage sur l'accueil, la boutique et la fiche ; la photo sert aussi d'**aperçu riche** (`og:image`) quand elle existe. Migration `2026-10-13_hailandx_media_bucket.sql` (appliquée).
+
+**Acheteur (phase 3)** :
+- **Panier** (`/panier`, conservé dans le navigateur) multi-vendeurs : un bloc par boutique = un colis ; quantités ; sous-total.
+- **Commande** (`/commande`) : connexion, adresse de livraison parmi ses adresses (niveau 1 au minimum), téléphone prérempli, paiement **espèces à la livraison** (Orange Money « bientôt »). Le serveur (`fn_place_order`) recalcule prix, stock et frais de livraison.
+- **Suivi** (`/commandes`, `/commandes/<id>`) : un bloc par colis, étapes Confirmée → Prête → En route → Remise (rafraîchi toutes les 10 s), **code de remise à 4 chiffres** visible seulement une fois le livreur attribué, annulation avant préparation, **avis vérifié** après la remise.
+- Fiche produit : barre « Ajouter / Acheter » (inactive sur les produits d'exemple, « Rupture de stock » si plus de stock).
+
+**Vendeur** : `/vendeur/commandes` — commandes à préparer, « Colis prêt » (propose la mission aux livreurs), **QR signé du colis** à faire scanner au retrait, refus / annulation.
+
+**Base** : quatre migrations appliquées le 2026-10-13 en plus de la phase 1 (accord du fondateur) : catégories, bucket d'images, **téléphone de l'acheteur masqué** (plus lisible ni par le vendeur ni par le livreur ; il sera donné au livreur pendant sa mission par une fonction, phase 4), **vitrine lisible par les visiteurs**.
+- ⚠️ **Défaut trouvé en rejouant le flux sur la vraie base** : les règles de lecture appelaient `is_admin()`, dont l'exécution est retirée aux visiteurs (durcissement du 2026-10-05) ; un visiteur ne voyait donc aucune boutique et le site retombait sur les exemples. Corrigé (règles séparées pour les visiteurs) et couvert par un test (le banc reproduit désormais ce retrait de droit).
+
+**Vérifié** : `npm test` 101 vérifications (dont 29 scénarios SQL) ; parcours complet rejoué sur la vraie base **en transaction annulée** (niveau 3 du vendeur, boutique ouverte, visible d'un visiteur, commande avec frais 13 000 GNF, stock 5 → 3, colis prêt, QR de 103 caractères, annulation, stock remis à 5) — base laissée à 0 boutique / 0 commande ; 17 contrôles sur écran de téléphone (390 px) avec **session et serveur simulés** (aucun identifiant utilisé) : panier, commande, suivi, code, avis, commandes vendeur, QR ; aucun défilement horizontal.
+
+**Pas encore fait** : indice de confiance mis à jour par les avis (`shop_scores` n'est pas encore recalculé : phase 5), photos des boutiques (logo, bandeau), modification de produit, scan du QR par l'acheteur et par le livreur (phase 4, application Flotte), suivi des clics des liens (`share_links`), Orange Money (phase 6).
