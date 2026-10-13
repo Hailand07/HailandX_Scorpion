@@ -7,12 +7,13 @@ import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mediaUrl, uploadPhoto } from '@/lib/media';
 import { SOURCES } from '@/lib/source';
+import { VariantEditor } from '@/components/VariantEditor';
 import { NAVIGATIONX_URL } from '@/lib/links';
 
 interface Shop { whatsapp: string | null; id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
 interface Section { id: string; name: string }
-interface Offer { section_id: string | null; id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Offer { section_id: string | null; id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Link { id: string; code: string; kind: string; source: string | null; clicks: number; offer_ids: string[] }
 interface Cat { id: string; name: string }
 
@@ -53,6 +54,7 @@ export default function SellerPage() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [links, setLinks] = useState<Link[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
+  const [formKey, setFormKey] = useState(0);
   const [editing, setEditing] = useState<string | null>(null);
   const [pname, setPname] = useState('');
   const [chosen, setChosen] = useState<{ id: string; name: string } | null>(null);
@@ -75,7 +77,7 @@ export default function SellerPage() {
     await Promise.all(list.map(async (x) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id }); lv[x.id] = typeof r.data === 'number' ? r.data : x.detected_level; }));
     setLevels(lv);
     if (s.data) {
-      const o = await sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(id,stock),catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
+      const o = await sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(id,label,stock),catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
       setOffers((o.data as unknown as Offer[]) ?? []);
       const sc = await sb.from('shop_sections').select('id,name').eq('shop_id', (s.data as Shop).id).order('position').order('name');
       setSections((sc.data as Section[]) ?? []);
@@ -116,10 +118,19 @@ export default function SellerPage() {
     return 'Boutique créée. Ajoutez vos produits.';
   }
 
+  /** Lit les lignes du formulaire de variantes : une seule ligne sans nom devient « Standard ». */
+  function readVariants(f: FormData) {
+    const ids = f.getAll('vid').map(String); const labels = f.getAll('vlabel').map((x) => String(x).trim()); const stocks = f.getAll('vstock').map((x) => Math.max(0, Math.floor(Number(String(x).replace(/\s/g, '')) || 0)));
+    const rows = ids.map((id, i) => ({ id, label: labels[i] || (ids.length === 1 ? 'Standard' : ''), stock: stocks[i] ?? 0 }));
+    if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
+    if (new Set(rows.map((r) => r.label.toLowerCase())).size !== rows.length) throw new Error('Deux variantes portent le même nom.');
+    return { rows, removed: f.getAll('vdel').map(String) };
+  }
+
   async function addProduct(f: FormData) {
     const name = String(f.get('pname') ?? '').trim();
     const price = Number(String(f.get('price') ?? '').replace(/\s/g, ''));
-    const stock = Math.max(0, Math.floor(Number(f.get('stock') ?? 0)));
+    const { rows: variants } = readVariants(f);
     if (name.length < 2) throw new Error('Donnez un nom au produit.');
     if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
     const photo = f.get('photo');
@@ -133,9 +144,9 @@ export default function SellerPage() {
     const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop!.id, product_id: productId, section_id: String(f.get('section') ?? '') || null, price_gnf: Math.round(price), photo_paths: photoPath ? [photoPath] : [] }).select('id').single();
     if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans « Mes produits ».');
     fail(e2);
-    const { error: e3 } = await sb!.from('offer_variants').insert({ offer_id: (off as { id: string }).id, label: 'Standard', stock });
+    const { error: e3 } = await sb!.from('offer_variants').insert(variants.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
     fail(e3);
-    setPname(''); setChosen(null);
+    setPname(''); setChosen(null); setFormKey((k) => k + 1);
     return chosen ? 'Votre offre est ajoutée à la fiche existante.' : 'Produit ajouté.';
   }
 
@@ -150,14 +161,20 @@ export default function SellerPage() {
 
   async function saveOffer(o: Offer, f: FormData) {
     const price = Number(String(f.get('price') ?? '').replace(/\s/g, ''));
-    const stock = Math.max(0, Math.floor(Number(f.get('stock') ?? 0)));
     if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
     const photo = f.get('photo');
     const photoPath = photo instanceof File && photo.size > 0 ? await uploadPhoto(sb!, uid!, photo) : null;
     const { error } = await sb!.from('offers').update({ price_gnf: Math.round(price), section_id: String(f.get('section') ?? '') || null, active: f.get('active') === 'on', ...(photoPath ? { photo_paths: [photoPath, ...(o.photo_paths ?? [])].slice(0, 5) } : {}) }).eq('id', o.id);
     fail(error);
-    const v = o.offer_variants?.[0];
-    if (v) { const r = await sb!.from('offer_variants').update({ stock }).eq('id', v.id); fail(r.error); }
+    const { rows, removed } = readVariants(f);
+    for (const id of removed) {
+      const r = await sb!.from('offer_variants').delete().eq('id', id);
+      if (r.error?.code === '23503') throw new Error('Une variante déjà commandée ne se supprime pas : mettez plutôt son stock à 0.');
+      fail(r.error);
+    }
+    for (const v of rows.filter((x) => x.id)) { const r = await sb!.from('offer_variants').update({ label: v.label, stock: v.stock }).eq('id', v.id); if (r.error?.code === '23505') throw new Error('Deux variantes portent le même nom.'); fail(r.error); }
+    const fresh = rows.filter((x) => !x.id);
+    if (fresh.length) { const r = await sb!.from('offer_variants').insert(fresh.map((v) => ({ offer_id: o.id, label: v.label, stock: v.stock }))); if (r.error?.code === '23505') throw new Error('Deux variantes portent le même nom.'); fail(r.error); }
     setEditing(null);
     return 'Produit mis à jour.';
   }
@@ -283,7 +300,7 @@ export default function SellerPage() {
           </section>
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Ajouter un produit</h2>
-            <form action={(f) => run(() => addProduct(f))} className="flex flex-col gap-3">
+            <form key={formKey} action={(f) => run(() => addProduct(f))} className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
                 <input name="pname" required placeholder="Nom du produit" value={pname} onChange={(e) => { setPname(e.target.value); setChosen(null); }} autoComplete="off" className={input} />
                 {chosen && <p className="flex items-center justify-between rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[12.5px] font-bold text-ok"><span>Fiche existante : vous ajoutez votre offre.</span><button type="button" onClick={() => setChosen(null)} className="underline">Créer une nouvelle fiche</button></p>}
@@ -294,10 +311,8 @@ export default function SellerPage() {
                   </div>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <input name="price" required inputMode="numeric" placeholder="Prix (GNF)" className={input} />
-                <input name="stock" required inputMode="numeric" defaultValue="1" placeholder="Stock" className={input} />
-              </div>
+              <input name="price" required inputMode="numeric" placeholder="Prix (GNF)" className={input} />
+              <VariantEditor />
               <label className="flex flex-col gap-1.5 text-[13px] font-bold">Photo (facultatif)<input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-[14px] font-medium file:mr-3 file:h-11 file:rounded-2xl file:border-0 file:bg-sand file:px-4 file:text-[13px] file:font-bold" /></label>
               {sections.length > 0 && <select name="section" className={input} defaultValue="" aria-label="Rayon"><option value="">Rayon (facultatif)</option>{sections.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
               <select name="pcat" className={input} defaultValue={shop.category_id ?? ''}><option value="">Catégorie</option>{cats.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
@@ -312,15 +327,13 @@ export default function SellerPage() {
               <div key={o.id} className={`flex flex-col gap-2 rounded-2xl border border-line-soft bg-card px-4 py-3 ${o.active ? '' : 'opacity-60'}`}>
                 <div className="flex items-center gap-3">{mediaUrl(o.photo_paths?.[0]) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl(o.photo_paths?.[0])!} alt="" className="h-12 w-12 rounded-xl object-cover" />}<div className="flex min-w-0 flex-1 items-baseline justify-between gap-3"><span className="truncate text-[14px] font-bold">{o.catalog_products?.name}{o.active ? '' : ' (masqué)'}</span><span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(o.price_gnf)}</span></div></div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[12px] font-semibold text-muted">Stock : {o.offer_variants?.[0]?.stock ?? '—'}</span>
+                  <span className="text-[12px] font-semibold text-muted">Stock : {o.offer_variants?.length ? o.offer_variants.map((v) => (o.offer_variants!.length > 1 ? `${v.label} ${v.stock}` : String(v.stock))).join(' · ') : '—'}</span>
                   <button type="button" onClick={() => setEditing(editing === o.id ? null : o.id)} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-bold">{editing === o.id ? 'Fermer' : 'Modifier'}</button>
                 </div>
                 {editing === o.id && (
                   <form action={(f) => run(() => saveOffer(o, f))} className="flex flex-col gap-2.5 rounded-2xl bg-sand p-3">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <input name="price" required inputMode="numeric" defaultValue={o.price_gnf} aria-label="Prix (GNF)" className={input} />
-                      <input name="stock" required inputMode="numeric" defaultValue={o.offer_variants?.[0]?.stock ?? 0} aria-label="Stock" className={input} />
-                    </div>
+                    <input name="price" required inputMode="numeric" defaultValue={o.price_gnf} aria-label="Prix (GNF)" className={input} />
+                    <VariantEditor initial={o.offer_variants ?? []} />
                     {sections.length > 0 && <select name="section" className={input} defaultValue={o.section_id ?? ''} aria-label="Rayon"><option value="">Sans rayon</option>{sections.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select>}
                     <label className="flex items-center gap-2 text-[13.5px] font-bold"><input name="active" type="checkbox" defaultChecked={o.active} className="h-5 w-5" /> Visible dans la boutique</label>
                     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Nouvelle photo" className="text-[13px] font-medium file:mr-2 file:h-10 file:rounded-xl file:border-0 file:bg-card file:px-3 file:text-[12.5px] file:font-bold" />

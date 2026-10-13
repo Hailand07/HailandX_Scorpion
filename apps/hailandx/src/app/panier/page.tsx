@@ -30,7 +30,7 @@ export default function CartPage() {
                   <div key={`${l.offerId}-${l.variantId}`} className="flex gap-3">
                     <PhotoSlot src={l.photoUrl} color="#f2f0ea" className="h-[68px] w-[68px] shrink-0 rounded-2xl" label={l.name} />
                     <div className="flex min-w-0 flex-1 flex-col justify-between">
-                      <span className="truncate text-[14px] font-bold">{l.name}</span>
+                      <span className="truncate text-[14px] font-bold">{l.name}{l.variantLabel ? <span className="font-semibold text-muted"> · {l.variantLabel}</span> : null}</span>
                       <div className="flex items-center justify-between">
                         <span className="font-display text-[14.5px] font-semibold">{formatGnf(l.priceGnf * l.qty)}</span>
                         <span className="flex items-center gap-1">
