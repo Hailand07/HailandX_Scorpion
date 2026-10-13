@@ -284,7 +284,7 @@ export default function SellerPage() {
             </form>
           </section>
 
-          <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link></div>
+          <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link><Link href="/vendeur/ventes" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes ventes par jour et par source</Link></div>
 
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Mes rayons</h2>

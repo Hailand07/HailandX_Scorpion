@@ -419,33 +419,43 @@ Constat du fondateur : pas d'interface d'ouverture soignée, et aucun moyen visi
 - Adresses des autres applications : `NEXT_PUBLIC_FLOTTE_URL` et `NEXT_PUBLIC_NAVIGATIONX_URL` (facultatives, valeurs par défaut dans `src/lib/links.ts`).
 - 💡 À faire plus tard : héberger les polices soi-même, ajouter une vraie page « Mon compte », illustrations propres à HailandX.
 
-## 21. Audit des maquettes validées et du plan (2026-10-13) — ce qui est fait, ce qui reste
+## 21. Audit des maquettes validées et du plan (2026-10-13) — état après les blocs 1 à 6
 
-Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10. ✅ fait et testé · 🟡 fait en partie · ❌ pas fait.
+Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10. ✅ fait et testé · 🟡 fait en partie · ❌ pas fait. Mis à jour après la reprise des écarts (blocs 1 à 6, §22).
 
 | Écran / fonction demandée | État | Détail |
 |---|---|---|
-| 1 Accueil « la rue » (échantillon par boutique et catégorie, badges, délais) | ✅ | Manque : adresse de livraison en en-tête, boutiques « à proximité » (pas de calcul de distance). 🟡 |
-| 2 Recherche, « proposé par N vendeurs » | 🟡 | Recherche et catégories ✅ ; **filtres** (prix, délai, certifié) ❌ |
-| 3 Fiche produit, offres classées, avis vérifiés | ✅ | |
-| 4 Boutique (indicateurs de confiance) | 🟡 | Indice et avis ✅ ; **« Suivre » la boutique** ❌ ; bouton **WhatsApp** de la boutique ❌ ; rayons ❌ |
-| 5 Panier (un colis par vendeur, frais par colis) | ✅ | |
-| 6 Commande (adresse, téléphone, paiement) | 🟡 | Adresse choisie parmi celles de NavigationX ✅ ; **création de l'adresse dans HailandX** (« Où livrer ? » avec Scorpion : me localiser, toucher la carte) ❌ — l'acheteur doit passer par NavigationX |
-| 7 Suivi (carte, étapes, code et scan) | 🟡 | Étapes, code à 4 chiffres, scan du QR ✅ ; **carte de suivi** ❌ |
-| 8 Page d'un lien social | 🟡 | Lien suivi, source mémorisée, aperçu riche ✅ ; **avertissement « ouvrir dans Safari / Chrome »** dans le navigateur intégré ❌ |
-| 9 « Où livrer ? » avec Scorpion | ❌ | Voir ligne 6 : extraction de l'enregistrement d'adresse dans `packages/scorpion` non faite |
-| 10 Tableau de bord vendeur | 🟡 | Statut, commandes, solde, produits, liens ✅ ; **ventes par période et sources des ventes en graphique** ❌ |
-| 11 Ajouter un produit | 🟡 | Rejoindre une fiche existante ou créer ✅ ; **variantes** (taille, couleur) ❌ : une seule variante « Standard » |
-| 12 Colis à préparer (QR, étiquette, liens) | 🟡 | QR du colis ✅ ; **étiquette imprimable** ❌ |
+| 1 Accueil « la rue » | ✅ | Échantillon par boutique et catégorie, badges, délais, **adresse de livraison en en-tête**. Boutiques « à proximité » 🟡 : pas de tri par distance (les boutiques ne sont pas encore assez nombreuses pour que ce soit utile) |
+| 2 Recherche | ✅ | « Proposé par N vendeurs », **filtres** (catégorie, prix, délai, confiance élevée) et **tri** |
+| 3 Fiche produit, offres classées, avis vérifiés | ✅ | **Variantes** (taille, couleur) choisies sur la fiche |
+| 4 Boutique | ✅ | Indice, avis, **Suivre**, **WhatsApp**, **rayons** |
+| 5 Panier (un colis par vendeur) | ✅ | La variante choisie est rappelée |
+| 6 Commande | ✅ | **« Où livrer ? »** : adresse créée dans HailandX (position GPS moyennée par Scorpion, repère ajustable sur la carte) ; niveau 1 ; niveau 3 via NavigationX |
+| 7 Suivi | ✅ | Étapes, code à 4 chiffres, scan du QR, **carte de suivi** (boutique, adresse, livreur après retrait) |
+| 8 Page d'un lien social | ✅ | Lien suivi, source mémorisée, aperçu riche, **avertissement « ouvrir dans Safari / Chrome »** |
+| 9 « Où livrer ? » avec Scorpion | 🟡 | Position et carte ✅ ; **détection du bâtiment** (niveau 2) et rattachement à un bâtiment certifié restent dans NavigationX (extraction de `osmDetection` / `certifiedBuildings` non faite) |
+| 10 Tableau de bord vendeur | ✅ | Statut, commandes, solde, produits, liens, **ventes par jour et par source** |
+| 11 Ajouter un produit | ✅ | Fiche existante ou nouvelle, **variantes avec stock par variante**, rayon |
+| 12 Colis à préparer | ✅ | QR du colis, **étiquette imprimable (A6)**, liens |
 | 13 Flotte : missions, gains, espèces | ✅ | Guidage dans l'application ❌ (lien vers l'application de cartes) |
-| 14 Flotte : retrait et remise | ✅ | **Photo à la remise** 🟡 (non exigée) |
-| Écran d'ouverture, navigation, parcours vendeur | ✅ | Ajoutés après le test du fondateur (§20) |
-| Connexion par téléphone | 🟡 | Code envoyé avec les **numéros de test** ; **fournisseur de SMS réel** ❌ (décision du fondateur) |
-| Paiement Orange Money réel | ❌ | Comptabilité et séquestre ✅ (simulation) ; contrat marchand requis (§19) |
+| 14 Flotte : retrait et remise | ✅ | Photo à la remise 🟡 (non exigée) |
+| Écran d'ouverture, navigation, parcours vendeur | ✅ | §20 |
+| Connexion par téléphone | 🟡 | Numéros de test seulement : **fournisseur de SMS réel** ❌ (décision du fondateur) |
+| Paiement Orange Money réel | ❌ | Séquestre et comptabilité ✅ (simulation) ; contrat marchand requis (§19) |
 | Notifications (SMS / WhatsApp) | ❌ | Fournisseur à choisir |
 | Phase 7 : abonnement, mise en avant payante, promotions, langues locales, API | ❌ | Prévue après le pilote |
 
-Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap, favoris, modération des avis, historique des messages d'un litige, domaine `hx.gn`, polices hébergées par nous.
+Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap, favoris de produits, modération des avis, historique des messages d'un litige, domaine `hx.gn`, polices hébergées par nous, boutiques « à proximité » triées par distance.
+
+## 22. Reprise des écarts (blocs 1 à 6, 2026-10-13) ✅ code, base et tests ; ⚠️ parcours en ligne à essayer par le fondateur
+
+- **Bloc 1, « Où livrer ? »** (`/adresse`, `AddressPicker`, `lib/address.ts`) : « Me localiser » recueille plusieurs mesures GPS pendant 15 s au plus et en tire une position et une précision (`summarize` / `shouldStop` de Scorpion, mêmes règles que NavigationX) ; on ajuste le repère en touchant la carte (Mapbox satellite) ou en le faisant glisser ; nom (Domicile, Travail, Autre), étage, porte, repère. Insertion dans `declarations` au **niveau 1** ; le code Hailand et la chaîne administrative sont attribués par le serveur ; vérifié par un essai annulé sur la base (code `GN-CKY-…` attribué). La commande renvoie vers `/adresse?next=/commande`. Variable publique `NEXT_PUBLIC_MAPBOX_TOKEN` (jeton public déjà utilisé par NavigationX) posée dans Vercel, jamais dans le dépôt. Navigateur intégré à WhatsApp : l'avertissement s'affiche et la carte permet de poser le repère à la main.
+- **Bloc 2, boutique** (migration `2026-10-16_hailandx_boutique.sql`, appliquée) : table `shop_sections` (rayons) et `offers.section_id` (le rayon doit appartenir à la même boutique) ; table `shop_follows` écrite par `fn_follow_shop` (abonnés comptés par `fn_shop_followers`, lisible par les visiteurs) ; format du numéro WhatsApp contrôlé. Interface : bouton **Suivre**, bouton **WhatsApp** (`wa.me`), rayons filtrables sur la boutique, gestion des rayons et du numéro dans l'espace vendeur, « Boutiques suivies » dans Commandes. 10 tests SQL.
+- **Bloc 3, recherche** : filtres catégorie, prix min et max, délai, vendeurs à confiance élevée (indice 70 et plus), tri (confiance, prix, délai). ⚠️ Le filtre « certifié » des maquettes n'a pas de sens tant que toute boutique ouverte est certifiée au niveau 3 : il est remplacé par « confiance élevée ». Le délai affiché est désormais une estimation (préparation habituelle de la boutique + ≈ 20 min, arrondie à 5 min) au lieu d'un 40 min fixe.
+- **Bloc 4, liens sociaux** : `InAppBrowserNotice` détecte le navigateur intégré (WhatsApp, TikTok, Facebook…) sur la boutique, le produit, le panier, la commande et l'adresse ; consignes iPhone / Android et bouton « Copier le lien ». Testé avec les agents utilisateurs WhatsApp et Safari.
+- **Bloc 5, variantes** (migration `2026-10-16_hailandx_variantes.sql`, appliquée) : plusieurs variantes par offre avec stock chacune, un libellé par offre (insensible à la casse), `order_items.variant_label` (le libellé acheté est figé dans la commande). Interface : éditeur de variantes (ajout, retrait, stock) chez le vendeur, sélecteur sur la fiche produit (une variante épuisée est grisée), rappel dans le panier, les commandes et l'étiquette. Une variante déjà commandée ne se supprime pas (mettre le stock à 0). 5 tests SQL.
+- **Bloc 6, suivi et ventes** (migration `2026-10-16_hailandx_suivi_ventes.sql`, appliquée) : `fn_parcel_tracking` (réservée à l'acheteur de la commande ; la position du livreur n'apparaît que colis retiré et si elle date de moins de 10 min), `fn_shop_sales` et `fn_shop_sources` (réservées aux membres de la boutique et à l'équipe). Interface : **carte de suivi** dans la commande, **étiquette imprimable** (`/vendeur/commandes/etiquette?colis=…`), page **Mes ventes** (`/vendeur/ventes` : 7, 30 ou 90 jours, histogramme, meilleures sources), **adresse de livraison en en-tête** de l'accueil. 6 tests SQL.
+- **Vérifié** : `npm test` (voir §13), lint, build ; essais navigateur du sélecteur d'adresse (position simulée, ajustement sur la carte), des variantes, de l'avertissement et des filtres. ⚠️ Non rejoué en ligne avec un vrai compte : création d'adresse, suivre une boutique, variantes, étiquette, ventes (pas de code de connexion de test disponible dans cette session) — à essayer par le fondateur.
 
 ## 13. Journal des mises à jour
 
@@ -467,6 +477,7 @@ Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap
 | 2026-10-13 | Script `supabase/tests/nettoyage-test.sql` corrigé : il oubliait les litiges, paiements et écritures du grand livre qui référencent les colis et commandes de test (erreur 23503 sur `disputes_parcel_id_fkey`, annulée en bloc, rien n'avait été supprimé). |
 | 2026-10-13 | Interface : écran d'ouverture, barre de navigation (dont « Vendre »), bandeau vendeur sur l'accueil, parcours vendeur en 4 étapes (§20). |
 | 2026-10-13 | Audit des maquettes et du plan : tableau écran par écran des écarts restants (§21). |
+| 2026-10-13 | Blocs 1 à 6 : « Où livrer ? », Suivre / WhatsApp / rayons, filtres de recherche, avertissement navigateur intégré, variantes, étiquette, carte de suivi, ventes par période et par source, adresse en en-tête (§22). Trois migrations appliquées (`boutique`, `variantes`, `suivi_ventes`). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 

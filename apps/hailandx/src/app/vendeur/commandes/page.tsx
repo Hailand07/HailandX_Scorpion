@@ -73,6 +73,7 @@ export default function SellerOrdersPage() {
           )}
           {(p.status === 'mission_proposee' || p.status === 'accepte' || p.status === 'prepare') && (
             <>
+              <Link href={`/vendeur/commandes/etiquette?colis=${p.id}`} className="flex h-11 items-center justify-center rounded-2xl border border-line text-[13.5px] font-bold">Étiquette imprimable</Link>
               {!qr[p.id] && <button type="button" onClick={() => showQr(p.id)} className="h-12 rounded-2xl bg-lime text-[14.5px] font-extrabold">Afficher le QR du colis</button>}
               {qr[p.id] && (
                 <div className="flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3">
