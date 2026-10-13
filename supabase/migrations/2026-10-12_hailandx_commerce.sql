@@ -1,8 +1,9 @@
 -- ============================================================================================================================
--- HailandX — tables de commerce et de Flotte (phase 1)                                         PROPOSÉE — NON APPLIQUÉE
+-- HailandX — tables de commerce et de Flotte (phase 1)                                         APPLIQUÉE le 2026-10-13
 -- ----------------------------------------------------------------------------------------------------------------------------
--- À appliquer SEULEMENT avec l'accord explicite du fondateur pour cette opération (la base n'a aucune sauvegarde).
--- Testée en local sur un Postgres embarqué (supabase/tests/commerce.test.ts) : jamais exécutée sur la production.
+-- APPLIQUÉE en production le 2026-10-13 avec l'accord explicite du fondateur (nouvelles tables seulement ; aucune table existante modifiée).
+-- Testée sur un Postgres embarqué (supabase/tests/commerce.test.ts). Sur Supabase, pgcrypto vit dans le schéma `extensions` : il figure dans le
+-- chemin de recherche des fonctions de signature (première tentative d'application annulée pour ce motif, sans effet sur la base).
 --
 -- Principes (HAILANDX.md §8, ECOSYSTEME_HAILAND.md §18) :
 --  * HailandX est PROPRIÉTAIRE de ces tables ; il LIT `declarations` et `buildings` (jamais de modification).
@@ -391,12 +392,12 @@ begin
 end $$;
 
 -- ── QR du colis : signé par le serveur, lisible par le vendeur (étiquette) ──────────────────────────────────────────────
-create or replace function private.parcel_signature(p_payload text) returns text language sql stable set search_path = public, private, pg_temp as $$
+create or replace function private.parcel_signature(p_payload text) returns text language sql stable set search_path = public, private, extensions, pg_temp as $$
   select rtrim(translate(encode(hmac(convert_to(p_payload, 'utf8'), (select value from private.secrets where name = 'parcel_qr_hmac'), 'sha256'), 'base64'), E'+/\n', '-_'), '=')
 $$;
 
 create or replace function public.fn_parcel_qr(p_parcel uuid)
-returns text language plpgsql stable security definer set search_path = public, private, pg_temp as $$
+returns text language plpgsql stable security definer set search_path = public, private, extensions, pg_temp as $$
 declare p public.parcels; payload text;
 begin
   select * into p from public.parcels where id = p_parcel;
@@ -406,7 +407,7 @@ begin
   return payload || '.' || private.parcel_signature(payload);
 end $$;
 
-create or replace function private.parse_qr(p_qr text) returns uuid language plpgsql stable set search_path = public, private, pg_temp as $$
+create or replace function private.parse_qr(p_qr text) returns uuid language plpgsql stable set search_path = public, private, extensions, pg_temp as $$
 declare m text[]; payload text;
 begin
   m := regexp_match(btrim(p_qr), '^hx1\.([0-9a-fA-F-]{36})\.([0-9a-f]{18})\.([A-Za-z0-9_-]{43})$');
@@ -468,7 +469,7 @@ begin
 end $$;
 
 create or replace function public.fn_parcel_pickup(p_qr text, p_lat double precision default null, p_lng double precision default null, p_photo text default null)
-returns text language plpgsql security definer set search_path = public, private, pg_temp as $$
+returns text language plpgsql security definer set search_path = public, private, extensions, pg_temp as $$
 declare pid uuid; p public.parcels;
 begin
   pid := private.parse_qr(p_qr);
@@ -488,7 +489,7 @@ $$;
 
 -- ── Remise : scan de l'acheteur (depuis son compte) OU code saisi par le livreur ───────────────────────────────────────
 create or replace function public.fn_parcel_handover(p_parcel uuid, p_method text, p_value text)
-returns text language plpgsql security definer set search_path = public, private, pg_temp as $$
+returns text language plpgsql security definer set search_path = public, private, extensions, pg_temp as $$
 declare
   p public.parcels; o public.orders; c public.couriers; d public.declarations;
   a_lat double precision; a_lng double precision; dist double precision; ok boolean := false;
@@ -682,5 +683,8 @@ revoke truncate on public.shops, public.shop_members, public.catalog_products, p
 revoke select on public.parcels from anon, authenticated;
 grant select (id, order_id, shop_id, status, courier_id, subtotal_gnf, delivery_fee_gnf, distance_km, cod_amount_gnf, created_at, ready_at, picked_up_at, delivered_at, handover_failures)
   on public.parcels to authenticated;
+
+-- Fonctions de déclencheur : jamais appelables depuis l'API (suivi 2026-10-13).
+revoke all on function public.shops_guard_before(), public.shops_owner_member_after(), public.couriers_guard_before() from public, anon, authenticated;
 
 commit;
