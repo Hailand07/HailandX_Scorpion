@@ -11,7 +11,7 @@ import { VariantEditor } from '@/components/VariantEditor';
 import { NAVIGATIONX_URL } from '@/lib/links';
 
 interface Shop { whatsapp: string | null; id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
-interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
+interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number; certification_status: string | null }
 interface Section { id: string; name: string }
 interface Offer { section_id: string | null; id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Link { id: string; code: string; kind: string; source: string | null; clicks: number; offer_ids: string[] }
@@ -67,7 +67,7 @@ export default function SellerPage() {
     const [c, s, d] = await Promise.all([
       sb.from('categories').select('id,name').order('position'),
       sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp').eq('owner_id', uid).limit(1).maybeSingle(),
-      sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).order('created_at', { ascending: false }),
+      sb.from('declarations').select('id,declared_label,hailand_code,detected_level,certification_status').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
     setCats((c.data as Cat[]) ?? []);
     setShop((s.data as Shop | null) ?? null);
@@ -262,6 +262,17 @@ export default function SellerPage() {
                 <Button type="submit" variant="secondary" className="h-12 px-4">Rattacher</Button>
               </form>
             )}
+            {decl && level !== 3 && (
+              <div className="flex flex-col gap-2 rounded-2xl border border-line-soft bg-sand px-4 py-3">
+                <span className="text-[13px] font-extrabold">Certification de votre adresse</span>
+                {decl.certification_status === 'demandee'
+                  ? <span className="text-[12.5px] font-semibold text-muted">Demande envoyée à Hailand en <b>priorité</b> : l’équipe vérifie votre bâtiment. Vous serez prévenu ici dès que c’est fait.</span>
+                  : <>
+                      <span className="text-[12.5px] font-medium text-muted">{decl.certification_status === 'refusee' ? 'Votre dernière demande a été refusée : corrigez votre adresse dans NavigationX puis redemandez.' : 'Hailand certifie votre adresse au niveau 3 : c’est ce qui ouvre la vente.'}</span>
+                      <Button type="button" variant="secondary" disabled={busy} onClick={() => run(async () => { const { error } = await sb.rpc('fn_request_priority_certification', { p_shop: shop.id }); fail(error); return 'Demande envoyée à Hailand, en priorité.'; })}>Demander la certification en priorité</Button>
+                    </>}
+              </div>
+            )}
             {shop.status !== 'ouverte' && shop.status !== 'suspendue' && level === 3 && (
               <Button disabled={busy} variant="lime" onClick={() => run(async () => { const { error } = await sb.rpc('fn_shop_open', { p_shop: shop.id }); fail(error); return 'Votre boutique est ouverte à la vente.'; })}>Ouvrir la vente</Button>
             )}
@@ -284,7 +295,7 @@ export default function SellerPage() {
             </form>
           </section>
 
-          <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link><Link href="/vendeur/ventes" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes ventes par jour et par source</Link></div>
+          <div className="grid grid-cols-2 gap-2.5"><Link href="/vendeur/commandes" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes commandes</Link><Link href="/vendeur/solde" className="flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mon solde</Link><Link href="/vendeur/avis" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes avis</Link><Link href="/vendeur/ventes" className="col-span-2 flex h-[54px] items-center justify-center rounded-2xl border border-line bg-card text-[15px] font-extrabold">Mes ventes par jour et par source</Link></div>
 
           <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
             <h2 className="font-display text-lg font-semibold">Mes rayons</h2>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Badge, QrScanner, Wordmark } from '@hailandx/ui';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
+import { DisputeThread } from '@/components/DisputeThread';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
@@ -135,11 +136,11 @@ function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelSta
   const [reason, setReason] = useState('non_recu');
   const [details, setDetails] = useState('');
   const [err, setErr] = useState<string | null>(null);
-  const [dispute, setDispute] = useState<{ status: string; resolution: string | null } | null | undefined>(undefined);
-  useEffect(() => { sb?.from('disputes').select('status,resolution').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setDispute((data as { status: string; resolution: string | null } | null) ?? null)); }, [sb, parcel, status]);
+  const [dispute, setDispute] = useState<{ id: string; status: string; resolution: string | null } | null | undefined>(undefined);
+  useEffect(() => { sb?.from('disputes').select('id,status,resolution').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setDispute((data as { id: string; status: string; resolution: string | null } | null) ?? null)); }, [sb, parcel, status]);
   if (dispute === undefined) return null;
   if (dispute) {
-    return <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">{dispute.status === 'ouvert' ? 'Problème signalé : l’équipe Hailand examine votre demande et vous recontacte.' : RESOLUTION[dispute.resolution ?? 'vendeur']}</p>;
+    return <div className="flex flex-col gap-2"><p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">{dispute.status === 'ouvert' ? 'Problème signalé : l’équipe Hailand examine votre demande et vous recontacte.' : RESOLUTION[dispute.resolution ?? 'vendeur']}</p><DisputeThread disputeId={dispute.id} open={dispute.status === 'ouvert'} mine="acheteur" /></div>;
   }
   if (status !== 'retire' && status !== 'remis') return null;
   if (!open) return <button type="button" onClick={() => setOpen(true)} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Signaler un problème</button>;

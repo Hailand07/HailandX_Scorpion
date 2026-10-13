@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
+import { DisputeThread } from '@/components/DisputeThread';
 import QRCode from 'qrcode';
 import { Badge, Wordmark } from '@hailandx/ui';
 import { formatGnf, type ParcelStatus } from '@hailandx/commerce';
@@ -62,6 +63,7 @@ export default function SellerOrdersPage() {
         <section key={p.id} className="flex flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
           <div className="flex items-center justify-between"><span className="text-[12.5px] font-bold text-muted">{new Date(p.created_at).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span><Badge tone={p.status === 'attente_vendeur' ? 'lime' : p.status === 'remis' ? 'ok' : 'sand'}>{LABEL[p.status]}</Badge></div>
           <ul className="flex flex-col gap-0.5 text-[14px] font-bold">{p.order_items.map((i) => <li key={i.id}>{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ''}</li>)}</ul>
+          {p.status === 'litige' && <SellerDispute parcel={p.id} />}
           <div className="flex justify-between text-[13px] font-semibold text-muted"><span>Vos articles</span><span>{formatGnf(p.subtotal_gnf)}</span></div>
           {p.status === 'attente_vendeur' && p.orders?.payment_method === 'orange_money' && p.orders.payment_status === 'en_attente' && <p className="rounded-2xl bg-amber-soft px-3.5 py-2.5 text-[12.5px] font-bold">En attente du paiement de l’acheteur (Orange Money) : vous pourrez préparer le colis dès que l’argent est bloqué.</p>}
           {p.status === 'attente_vendeur' && p.orders?.payment_method === 'orange_money' && p.orders.payment_status === 'bloque' && <p className="rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[12.5px] font-bold text-ok">Payé : l’argent est bloqué par Hailand et vous sera versé à la remise.</p>}
@@ -88,5 +90,18 @@ export default function SellerOrdersPage() {
         </section>
       ))}
     </main>
+  );
+}
+
+/** Litige ouvert par l'acheteur sur ce colis : le vendeur répond dans le fil ; l'équipe tranche. */
+function SellerDispute({ parcel }: { parcel: string }) {
+  const [d, setD] = useState<{ id: string; status: string; reason: string } | null | undefined>(undefined);
+  useEffect(() => { browserClient()?.from('disputes').select('id,status,reason').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setD((data as { id: string; status: string; reason: string } | null) ?? null)); }, [parcel]);
+  if (!d) return null;
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="rounded-2xl bg-amber-soft px-3.5 py-2.5 text-[12.5px] font-bold">L’acheteur a signalé un problème. Expliquez votre version : l’équipe Hailand tranche.</p>
+      <DisputeThread disputeId={d.id} open={d.status === 'ouvert'} mine="vendeur" />
+    </div>
   );
 }

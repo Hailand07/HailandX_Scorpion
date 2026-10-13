@@ -425,7 +425,7 @@ Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10.
 
 | Écran / fonction demandée | État | Détail |
 |---|---|---|
-| 1 Accueil « la rue » | ✅ | Échantillon par boutique et catégorie, badges, délais, **adresse de livraison en en-tête**. Boutiques « à proximité » 🟡 : pas de tri par distance (les boutiques ne sont pas encore assez nombreuses pour que ce soit utile) |
+| 1 Accueil « la rue » | ✅ | Échantillon par boutique et catégorie, badges, délais, adresse de livraison en en-tête, **boutiques triées par distance** (§23) |
 | 2 Recherche | ✅ | « Proposé par N vendeurs », **filtres** (catégorie, prix, délai, confiance élevée) et **tri** |
 | 3 Fiche produit, offres classées, avis vérifiés | ✅ | **Variantes** (taille, couleur) choisies sur la fiche |
 | 4 Boutique | ✅ | Indice, avis, **Suivre**, **WhatsApp**, **rayons** |
@@ -437,15 +437,15 @@ Comparaison écran par écran avec le canevas du §11.1 et avec le plan du §10.
 | 10 Tableau de bord vendeur | ✅ | Statut, commandes, solde, produits, liens, **ventes par jour et par source** |
 | 11 Ajouter un produit | ✅ | Fiche existante ou nouvelle, **variantes avec stock par variante**, rayon |
 | 12 Colis à préparer | ✅ | QR du colis, **étiquette imprimable (A6)**, liens |
-| 13 Flotte : missions, gains, espèces | ✅ | Guidage dans l'application ❌ (lien vers l'application de cartes) |
+| 13 Flotte : missions, gains, espèces | ✅ | **Guidage dans l'application** : itinéraire sur la carte, distance, durée, consigne suivante (§23) |
 | 14 Flotte : retrait et remise | ✅ | Photo à la remise 🟡 (non exigée) |
 | Écran d'ouverture, navigation, parcours vendeur | ✅ | §20 |
 | Connexion par téléphone | 🟡 | Numéros de test seulement : **fournisseur de SMS réel** ❌ (décision du fondateur) |
 | Paiement Orange Money réel | ❌ | Séquestre et comptabilité ✅ (simulation) ; contrat marchand requis (§19) |
-| Notifications (SMS / WhatsApp) | ❌ | Fournisseur à choisir |
+| Notifications | 🟡 | **Centre de notifications dans l'application** ✅ (§23) ; envoi **SMS / WhatsApp / notification hors application** ❌ : fournisseur à choisir |
 | Phase 7 : abonnement, mise en avant payante, promotions, langues locales, API | ❌ | Prévue après le pilote |
 
-Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap, favoris de produits, modération des avis, historique des messages d'un litige, domaine `hx.gn`, polices hébergées par nous, boutiques « à proximité » triées par distance.
+Autres ❌ : domaine `hx.gn`, polices hébergées par nous, détection du bâtiment (niveau 2) et rattachement certifié dans HailandX (extraction de `osmDetection` / `certifiedBuildings`), photo de remise exigée dans Flotte, notifications hors application (push navigateur hors page ouverte, SMS, WhatsApp).
 
 ## 22. Reprise des écarts (blocs 1 à 6, 2026-10-13) ✅ code, base et tests ; ⚠️ parcours en ligne à essayer par le fondateur
 
@@ -456,6 +456,19 @@ Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap
 - **Bloc 5, variantes** (migration `2026-10-16_hailandx_variantes.sql`, appliquée) : plusieurs variantes par offre avec stock chacune, un libellé par offre (insensible à la casse), `order_items.variant_label` (le libellé acheté est figé dans la commande). Interface : éditeur de variantes (ajout, retrait, stock) chez le vendeur, sélecteur sur la fiche produit (une variante épuisée est grisée), rappel dans le panier, les commandes et l'étiquette. Une variante déjà commandée ne se supprime pas (mettre le stock à 0). 5 tests SQL.
 - **Bloc 6, suivi et ventes** (migration `2026-10-16_hailandx_suivi_ventes.sql`, appliquée) : `fn_parcel_tracking` (réservée à l'acheteur de la commande ; la position du livreur n'apparaît que colis retiré et si elle date de moins de 10 min), `fn_shop_sales` et `fn_shop_sources` (réservées aux membres de la boutique et à l'équipe). Interface : **carte de suivi** dans la commande, **étiquette imprimable** (`/vendeur/commandes/etiquette?colis=…`), page **Mes ventes** (`/vendeur/ventes` : 7, 30 ou 90 jours, histogramme, meilleures sources), **adresse de livraison en en-tête** de l'accueil. 6 tests SQL.
 - **Vérifié** : `npm test` (voir §13), lint, build ; essais navigateur du sélecteur d'adresse (position simulée, ajustement sur la carte), des variantes, de l'avertissement et des filtres. ⚠️ Non rejoué en ligne avec un vrai compte : création d'adresse, suivre une boutique, variantes, étiquette, ventes (pas de code de connexion de test disponible dans cette session) — à essayer par le fondateur.
+
+## 23. Compléments au plan (2026-10-13) ✅ code, base et tests ; ⚠️ parcours en ligne à essayer par le fondateur
+
+Migration `2026-10-17_hailandx_complements.sql` (**appliquée**, 11 tests SQL) et interface :
+- **Certification prioritaire** : `fn_request_priority_certification(boutique)` (membre de la boutique, adresse à elle, pas déjà de niveau 3) met la demande de certification de l'adresse à « demandée » et inscrit une ligne dans `certification_priorities` (table séparée : on ne peut pas s'accorder la priorité soi-même). HailandMap (Revue → Demandes, `loadDeclarations` + `DemandesPanel`) lit cette table (agents seulement) : les demandes prioritaires passent en tête avec le badge « PRIORITAIRE · boutique … ». Côté vendeur : bouton « Demander la certification en priorité » dans l'espace vendeur ; l'état de la demande y est rappelé.
+- **Favoris** : table `product_favorites` écrite par `fn_toggle_favorite` ; cœur sur la fiche produit ; page `/favoris` (meilleur prix actuel de chaque produit).
+- **Modération des avis** : `reviews.hidden` ; le vendeur signale (`fn_report_review`, une fois par avis) depuis `/vendeur/avis` ; l'équipe masque ou maintient (`fn_moderate_review`, console `/admin`, section « Avis signalés ») ; un avis masqué disparaît de la lecture publique (le vendeur et l'auteur le voient encore) et **sort de l'indice de confiance** (`fn_refresh_shop_score` ne compte que les avis non masqués).
+- **Messages de litige** : table `dispute_messages` écrite par `fn_dispute_post` (acheteur, vendeur, livreur du colis, équipe ; fermé aux autres, et fermé aux parties une fois le litige tranché). Fil de discussion (`DisputeThread`) dans le suivi de l'acheteur, dans les commandes du vendeur et dans la console équipe.
+- **Notifications** : table `notifications` alimentée par des déclencheurs (nouvelle commande, colis accepté / retiré / remis / annulé, avis reçu, litige ouvert / message / tranché, avis signalé ou jugé) ; cloche avec compteur (accueil, compte), page `/notifications` (tout marquer lu) et **alertes du navigateur tant que la page est ouverte**. ⚠️ Pas d'envoi hors application : une notification **push** hors page ouverte demande une clé VAPID et un service worker (non faits), **SMS / WhatsApp** demandent le fournisseur (§7 bis).
+- **Compte** : nouvelle page `/compte` (commandes, favoris, adresses, notifications, espace vendeur, déconnexion) ; l'onglet « Commandes » de la barre du bas devient « Compte ».
+- **Guidage dans Flotte** : `GuideMap` calcule l'itinéraire (Mapbox Directions) du livreur vers la boutique puis vers l'acheteur, l'affiche sur la carte avec distance, durée, consigne suivante et liste des étapes, recalculé quand le livreur se déplace de plus de 100 m ; le lien vers l'application de cartes reste en secours. Variable publique `NEXT_PUBLIC_MAPBOX_TOKEN` posée sur le projet Vercel de Flotte.
+- **Boutiques proches** : `fn_shops_nearby(lat, lng)` (distance arrondie à 0,1 km, jamais les coordonnées ; ouverte aux visiteurs) ; « La rue » trie les boutiques par distance depuis l'adresse enregistrée, ou depuis la position du téléphone (bouton « Boutiques autour de moi »).
+- **Vérifié** : `npm test` : 155 vérifications (dont 11 nouvelles), lint, builds HailandX et Flotte ; pages ouvertes sans erreur dans un navigateur. Deux erreurs trouvées par les tests puis corrigées (variable `id` ambiguë dans deux fonctions). ⚠️ Non rejoué en ligne avec un vrai compte.
 
 ## 13. Journal des mises à jour
 
@@ -478,6 +491,7 @@ Autres ❌ : certification prioritaire demandée depuis HailandX vers HailandMap
 | 2026-10-13 | Interface : écran d'ouverture, barre de navigation (dont « Vendre »), bandeau vendeur sur l'accueil, parcours vendeur en 4 étapes (§20). |
 | 2026-10-13 | Audit des maquettes et du plan : tableau écran par écran des écarts restants (§21). |
 | 2026-10-13 | Blocs 1 à 6 : « Où livrer ? », Suivre / WhatsApp / rayons, filtres de recherche, avertissement navigateur intégré, variantes, étiquette, carte de suivi, ventes par période et par source, adresse en en-tête (§22). Trois migrations appliquées (`boutique`, `variantes`, `suivi_ventes`). |
+| 2026-10-13 | Compléments (§23) : certification prioritaire vers HailandMap, favoris, modération des avis, messages de litige, notifications (centre dans l'application), guidage dans Flotte, boutiques triées par distance, page Compte. Migration `complements` appliquée. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
