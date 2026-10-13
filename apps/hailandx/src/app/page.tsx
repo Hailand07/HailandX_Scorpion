@@ -18,7 +18,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const feed = buildFeed(candidates, { rotation: Math.floor(Date.now() / 3_600_000), limit: 12, category: cat && CATEGORIES.includes(cat) ? cat : undefined });
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-28">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-4">
       <header className="flex flex-col gap-3.5 px-5 pb-1 pt-5">
         <div className="flex items-center justify-between">
           <Wordmark />
@@ -37,6 +37,12 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
           return <Link key={c} href={c === 'Tout' ? '/' : `/?cat=${encodeURIComponent(c)}`} aria-current={active ? 'true' : undefined} className={`flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-bold ${active ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{c}</Link>;
         })}
       </nav>
+
+      <Link href="/vendeur" className="mx-5 flex items-center gap-3.5 rounded-[22px] bg-night px-4 py-4 text-night-text active:opacity-90">
+        <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-lime text-ink"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9h16l-1.4-5H5.4z" /><path d="M5 9v11h14V9" /><path d="M10 20v-5h4v5" /></svg></span>
+        <span className="flex flex-1 flex-col"><span className="font-display text-[16px] font-semibold tracking-tight">Vous vendez ? Ouvrez votre boutique</span><span className="text-[12.5px] font-medium text-night-muted">Gratuit, avec votre numéro de téléphone.</span></span>
+        <span aria-hidden="true" className="text-[20px] font-bold text-lime">›</span>
+      </Link>
 
       <section aria-label="La rue" className="flex flex-col gap-2.5 px-5">
         <h2 className="font-display text-lg font-semibold tracking-tight">La rue</h2>
@@ -73,7 +79,13 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         })}
       </section>
 
-      {source === 'exemple' && <p className="px-5 text-center text-[11.5px] font-semibold text-muted">Boutiques d’exemple : aucune boutique n’est encore ouverte à la vente.</p>}
+      {source === 'exemple' && (
+        <section className="mx-5 flex flex-col gap-2 rounded-[22px] border border-line bg-card p-4">
+          <h2 className="font-display text-[16px] font-semibold">Les boutiques ci-dessus sont des exemples</h2>
+          <p className="text-[13px] font-medium text-muted">Aucune boutique n’est encore ouverte à la vente. Soyez le premier vendeur de votre quartier.</p>
+          <Link href="/vendeur" className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Ouvrir ma boutique</Link>
+        </section>
+      )}
     </main>
   );
 }
