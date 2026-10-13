@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { SourceCapture } from '@/components/SourceCapture';
+import { BottomNav } from '@/components/BottomNav';
+import { WelcomeGate } from '@/components/WelcomeGate';
 
 export const metadata: Metadata = {
   title: { default: 'HailandX — la place du marché adressée', template: '%s · HailandX' },
@@ -20,7 +22,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* ⚠️ Polices chargées depuis Google Fonts ; à héberger soi-même avant la mise en production (vitesse en 3G, vie privée). */}
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="min-h-dvh bg-bg font-sans text-ink"><SourceCapture />{children}</body>
+      <body className="min-h-dvh bg-bg font-sans text-ink"><SourceCapture />{children}<BottomNav /><WelcomeGate /></body>
     </html>
   );
 }

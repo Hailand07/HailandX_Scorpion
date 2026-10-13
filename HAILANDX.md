@@ -408,6 +408,17 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 
 ---
 
+## 20. Écran d'ouverture, navigation et parcours vendeur (retour du fondateur après test en ligne)
+
+Constat du fondateur : pas d'interface d'ouverture soignée, et aucun moyen visible de créer une boutique ou d'ajouter des produits. Cause (✅ constaté) : la page `/vendeur` existait mais **aucun lien ne menait vers elle** depuis l'accueil.
+
+- **Écran d'ouverture** (`WelcomeScreen`, affiché à la première visite par `WelcomeGate`, mémorisé dans le navigateur ; toujours accessible sur `/bienvenue`) : thème nuit, halos bleu et citron, trois promesses (vendeurs certifiés, livré à la porte, payé à la remise) et trois actions : *Explorer la rue*, *Ouvrir ma boutique*, *Je veux livrer* (lien vers Flotte).
+- **Barre de navigation du bas** (`BottomNav`) : Accueil, Chercher, **Vendre** (mise en avant), Commandes. Masquée sur la fiche produit, la commande, la connexion, l'écran d'ouverture et la console équipe.
+- **Accueil** : bandeau « Vous vendez ? Ouvrez votre boutique » ; quand seules des boutiques d'exemple existent, un encart l'explique et propose d'ouvrir la première boutique.
+- **`/vendeur`** : avant connexion, présentation et **4 étapes** (se connecter, créer la boutique, ajouter les produits, faire certifier l'adresse) ; l'étape en cours est surlignée pendant la préparation. Sans adresse enregistrée, un lien renvoie vers NavigationX.
+- Adresses des autres applications : `NEXT_PUBLIC_FLOTTE_URL` et `NEXT_PUBLIC_NAVIGATIONX_URL` (facultatives, valeurs par défaut dans `src/lib/links.ts`).
+- 💡 À faire plus tard : héberger les polices soi-même, ajouter une vraie page « Mon compte », illustrations propres à HailandX.
+
 ## 13. Journal des mises à jour
 
 | Date | Changement |
@@ -424,6 +435,9 @@ Canevas « HailandX — Maquettes » : https://claude.ai/artifact/FdwUuRZqPT8h3j
 | 2026-10-15 | Phase 6 : paiement numérique (séquestre, règlement à la remise, remboursements, grand livre, reversements, soldes, route de notification signée) ; Orange Money réel non branché (compte marchand à ouvrir). |
 | 2026-10-13 | Déploiement Vercel : le build échouait à l'étape TypeScript (Vercel installe depuis la racine de l'application, `typescript` et `@types/*` n'étaient déclarés qu'à la racine). Ajout de `typescript`, `@types/node`, `@types/react`, `@types/react-dom` dans `devDependencies` de chaque application. |
 | 2026-10-13 | Déploiement Vercel (suite) : Vercel installe depuis le dossier de l'application, sans les dépendances de développement de la racine (`vitest`) ; `next build` vérifiait le test `orange.test.ts` et échouait (`module_not_found`). Les fichiers `*.test.ts` sont exclus du `tsconfig` de HailandX (ils restent exécutés par `npm test`). Reproduit puis vérifié en local avec une installation depuis `apps/*` : les deux applications se construisent. |
+| 2026-10-13 | Déploiement Vercel terminé : projets `hailandx-boutiques` (`apps/hailandx`) et `hailandx-flotte` (`apps/flotte`), production = `main`, variables publiques Supabase posées, accès public. Voir `ECOSYSTEME_HAILAND.md` §14 (révision 65 : projet renommé `hailandx-scorpion`) pour les adresses et le reste à faire. |
+| 2026-10-13 | Script `supabase/tests/nettoyage-test.sql` corrigé : il oubliait les litiges, paiements et écritures du grand livre qui référencent les colis et commandes de test (erreur 23503 sur `disputes_parcel_id_fkey`, annulée en bloc, rien n'avait été supprimé). |
+| 2026-10-13 | Interface : écran d'ouverture, barre de navigation (dont « Vendre »), bandeau vendeur sur l'accueil, parcours vendeur en 4 étapes (§20). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 

@@ -7,12 +7,34 @@ import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mediaUrl, uploadPhoto } from '@/lib/media';
 import { SOURCES } from '@/lib/source';
+import { NAVIGATIONX_URL } from '@/lib/links';
 
 interface Shop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
 interface Offer { id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Link { id: string; code: string; kind: string; source: string | null; clicks: number; offer_ids: string[] }
 interface Cat { id: string; name: string }
+
+const STEPS = [
+  ['Connectez-vous', 'Votre numéro de téléphone suffit : un code vous est envoyé par SMS.'],
+  ['Créez votre boutique', 'Un nom, une phrase, une catégorie. Ajoutez un logo quand vous voulez.'],
+  ['Ajoutez vos produits', 'Nom, prix, stock et une photo. Vous pouvez préparer tout cela dès maintenant.'],
+  ['Faites certifier votre adresse', 'La vente s’ouvre quand Hailand a certifié votre adresse (niveau 3) : c’est ce qui rassure vos clients.'],
+] as const;
+
+/** Les quatre étapes pour vendre, montrées avant et pendant la création de la boutique. */
+function Steps({ current }: { current: number }) {
+  return (
+    <ol className="flex flex-col gap-2" aria-label="Étapes pour vendre">
+      {STEPS.map(([t, d], i) => (
+        <li key={t} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${i === current ? 'border-blue bg-blue-soft' : 'border-line-soft bg-card'}`}>
+          <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[13px] font-extrabold ${i < current ? 'bg-ok text-white' : i === current ? 'bg-blue text-white' : 'bg-sand text-muted'}`}>{i < current ? '✓' : i + 1}</span>
+          <span className="flex flex-col"><span className="text-[14px] font-extrabold">{t}</span><span className="text-[12.5px] font-medium text-muted">{d}</span></span>
+        </li>
+      ))}
+    </ol>
+  );
+}
 
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
 const rand = () => Math.random().toString(36).slice(2, 6);
@@ -150,13 +172,15 @@ export default function SellerPage() {
   if (!session) {
     return (
       <Shell>
-        <h1 className="font-display text-[26px] font-semibold tracking-tight">Vendre sur HailandX</h1>
-        <p className="text-[14px] font-medium text-muted">Connectez-vous avec votre téléphone pour ouvrir votre boutique.</p>
-        <Link href="/connexion?next=/vendeur" className="inline-flex h-[54px] items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Se connecter</Link>
+        <div className="flex flex-col gap-1.5">
+          <h1 className="font-display text-[28px] font-semibold leading-tight tracking-tight">Vendez sur HailandX</h1>
+          <p className="text-[14.5px] font-medium text-muted">Ouvrez votre boutique en ligne, partagez-la sur vos réseaux, et laissez la Flotte Hailand livrer vos clients.</p>
+        </div>
+        <Steps current={0} />
+        <Link href="/connexion?next=/vendeur" className="inline-flex h-[56px] items-center justify-center rounded-2xl bg-ink px-7 text-[16px] font-extrabold text-white">Commencer : me connecter</Link>
       </Shell>
     );
   }
-
   const decl = decls.find((d) => d.id === shop?.declaration_id);
   const level = decl ? levels[decl.id] ?? decl.detected_level : 0;
   const prepare = shop !== null && shop.status !== 'ouverte' && shop.status !== 'suspendue' && level !== 3;
@@ -170,6 +194,8 @@ export default function SellerPage() {
       </div>
       {msg && <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${msg.tone === 'err' ? 'bg-[#fde8e4] text-[#8a2a1c]' : 'bg-ok-soft text-ok'}`}>{msg.text}</p>}
 
+      {!shop && <Steps current={1} />}
+      {shop && level !== 3 && shop.status !== 'ouverte' && shop.status !== 'suspendue' && <Steps current={offers.length ? 3 : 2} />}
       {!shop ? (
         <form action={(f) => run(() => createShop(f))} className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
           <h2 className="font-display text-lg font-semibold">Créer ma boutique</h2>
@@ -180,7 +206,7 @@ export default function SellerPage() {
             <option value="">{decls.length ? 'Adresse de la boutique' : 'Aucune adresse enregistrée'}</option>
             {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Adresse'} — niveau {levels[d.id] ?? d.detected_level}</option>)}
           </select>
-          {!decls.length && <p className="text-[12.5px] font-medium text-muted">Enregistrez d’abord votre adresse dans NavigationX : c’est elle que Hailand certifiera pour ouvrir la vente.</p>}
+          {!decls.length && <p className="text-[12.5px] font-medium text-muted">Vous pouvez créer la boutique maintenant. Pour vendre, enregistrez votre adresse dans <a href={NAVIGATIONX_URL} className="font-bold text-blue-ink underline">NavigationX</a> : c’est elle que Hailand certifiera.</p>}
           <Button type="submit" disabled={busy}>Créer ma boutique</Button>
         </form>
       ) : (
