@@ -1,23 +1,21 @@
 import Link from 'next/link';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
-import { getCatalog, trustFor } from '@/lib/catalog';
-
-const CATEGORIES = ['Tout', 'Mode', 'Beauté', 'Téléphones', 'Maison', 'Alimentation'];
+import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
-export const revalidate = 60;
-
-export default async function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string }> }) {
+  const { cat } = await searchParams;
   const { shops: SHOPS, products: PRODUCTS, source } = await getCatalog();
+  const CATEGORIES = [...new Set(PRODUCTS.map((p) => p.category))].sort((a, b) => a.localeCompare(b, 'fr'));
   const shopBySlug = (slug: string) => SHOPS.find((s) => s.slug === slug);
-  const productBySlug = (slug: string) => PRODUCTS.find((p) => p.slug === slug);
+  const productByKey = (key: string) => PRODUCTS.find((p) => offerKey(p) === key);
   const candidates: FeedCandidate[] = PRODUCTS.map((p) => {
     const shop = shopBySlug(p.shopSlug)!;
-    return { id: p.slug, shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustFor(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
+    return { id: offerKey(p), shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustFor(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
   });
   // La rotation change l'échantillon retenu toutes les heures.
-  const feed = buildFeed(candidates, { rotation: Math.floor(Date.now() / 3_600_000), limit: 12 });
+  const feed = buildFeed(candidates, { rotation: Math.floor(Date.now() / 3_600_000), limit: 12, category: cat && CATEGORIES.includes(cat) ? cat : undefined });
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-28">
@@ -34,9 +32,10 @@ export default async function Home() {
       </header>
 
       <nav aria-label="Catégories" className="flex gap-2 overflow-x-auto px-5 pb-1">
-        {CATEGORIES.map((c, i) => (
-          <span key={c} className={`flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-bold ${i === 0 ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{c}</span>
-        ))}
+        {['Tout', ...CATEGORIES].map((c) => {
+          const active = c === 'Tout' ? !cat || !CATEGORIES.includes(cat) : c === cat;
+          return <Link key={c} href={c === 'Tout' ? '/' : `/?cat=${encodeURIComponent(c)}`} aria-current={active ? 'true' : undefined} className={`flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-bold ${active ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{c}</Link>;
+        })}
       </nav>
 
       <section aria-label="La rue" className="flex flex-col gap-2.5 px-5">
@@ -55,10 +54,10 @@ export default async function Home() {
 
       <section aria-label="Échantillons des boutiques" className="grid grid-cols-2 gap-3 px-5">
         {feed.map((f) => {
-          const p = productBySlug(f.id)!;
+          const p = productByKey(f.id)!;
           const shop = shopBySlug(f.shopId)!;
           return (
-            <Link key={p.slug} href={`/p/${p.slug}`} className="flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card">
+            <Link key={offerKey(p)} href={`/p/${p.slug}?b=${p.shopSlug}`} className="flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card">
               <span className="relative block">
                 <PhotoSlot src={p.photoUrl} color={p.color} className="h-[150px]" label={p.name} />
                 <span className="absolute bottom-2.5 right-2.5 rounded-full bg-white/90 px-2 py-1 text-[10.5px] font-bold">≈ {p.etaMinutes} min</span>

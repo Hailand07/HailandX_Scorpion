@@ -87,6 +87,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 {p.status === 'retire' && <button type="button" onClick={() => setScanFor(p.id)} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Livreur arrivé : scanner le colis</button>}
                 {p.status === 'attente_vendeur' && <button type="button" onClick={() => act(() => sb!.rpc('fn_parcel_cancel', { p_parcel: p.id }), 'Colis annulé.')} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Annuler ce colis</button>}
                 {p.status === 'remis' && <Review parcel={p.id} onDone={() => load()} />}
+                {(p.status === 'retire' || p.status === 'remis' || p.status === 'litige' || p.status === 'annule') && <Problem parcel={p.id} status={p.status} onDone={() => load()} />}
               </section>
             );
           })}
@@ -118,5 +119,34 @@ function Review({ parcel, onDone }: { parcel: string; onDone: () => void }) {
       {state === 'error' && <p role="alert" className="text-[12.5px] font-semibold text-[#8a2a1c]">L’avis n’a pas pu être envoyé.</p>}
       <button type="button" disabled={!rating || state === 'sending'} onClick={async () => { setState('sending'); const { error } = await sb!.rpc('fn_submit_review', { p_parcel: parcel, p_rating: rating, p_comment: comment }); setState(error ? 'error' : 'done'); if (!error) onDone(); }} className="h-11 rounded-2xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-40">Envoyer mon avis</button>
     </div>
+  );
+}
+
+const REASONS: [string, string][] = [['non_recu', 'Je n’ai pas reçu le colis'], ['endommage', 'Le produit est abîmé'], ['different', 'Ce n’est pas ce que j’ai commandé'], ['autre', 'Autre problème']];
+const RESOLUTION: Record<string, string> = { acheteur: 'Décision de l’équipe Hailand : en votre faveur. Le colis est annulé ; l’équipe vous contacte pour le remboursement.', vendeur: 'Décision de l’équipe Hailand : la livraison est confirmée.' };
+
+/** Signaler un problème (colis en route ou remis depuis moins de 72 h) ; suivi de la décision de l'équipe. */
+function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelStatus; onDone: () => void }) {
+  const sb = browserClient();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('non_recu');
+  const [details, setDetails] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const [dispute, setDispute] = useState<{ status: string; resolution: string | null } | null | undefined>(undefined);
+  useEffect(() => { sb?.from('disputes').select('status,resolution').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setDispute((data as { status: string; resolution: string | null } | null) ?? null)); }, [sb, parcel, status]);
+  if (dispute === undefined) return null;
+  if (dispute) {
+    return <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">{dispute.status === 'ouvert' ? 'Problème signalé : l’équipe Hailand examine votre demande et vous recontacte.' : RESOLUTION[dispute.resolution ?? 'vendeur']}</p>;
+  }
+  if (status !== 'retire' && status !== 'remis') return null;
+  if (!open) return <button type="button" onClick={() => setOpen(true)} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Signaler un problème</button>;
+  return (
+    <form className="flex flex-col gap-2 rounded-2xl border border-line-soft p-3" onSubmit={async (e) => { e.preventDefault(); setErr(null); const { error } = await sb!.rpc('fn_open_dispute', { p_parcel: parcel, p_reason: reason, p_details: details }); if (error) return setErr(error.message.replace(/^.*?:\s*/, '')); onDone(); }}>
+      <span className="text-[13px] font-extrabold">Quel est le problème ?</span>
+      <select value={reason} onChange={(e) => setReason(e.target.value)} className="h-12 rounded-2xl border border-line bg-card px-3 text-[15px]" aria-label="Problème">{REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+      <textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={500} rows={2} placeholder="Expliquez en quelques mots (facultatif)" className="rounded-2xl border border-line bg-card px-3 py-2 text-[15px] outline-none" />
+      {err && <p role="alert" className="text-[12.5px] font-semibold text-[#8a2a1c]">{err}</p>}
+      <div className="flex gap-2"><button type="submit" className="h-11 flex-1 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Envoyer</button><button type="button" onClick={() => setOpen(false)} className="h-11 rounded-2xl border border-line px-4 text-[13.5px] font-bold">Annuler</button></div>
+    </form>
   );
 }

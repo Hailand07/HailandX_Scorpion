@@ -8,8 +8,6 @@ import { getCatalog, trustFor } from '@/lib/catalog';
 
 type Params = { params: Promise<{ slug: string }> };
 
-export const revalidate = 60;
-
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const s = (await getCatalog()).shops.find((x) => x.slug === slug);
@@ -45,7 +43,7 @@ export default async function ShopPage({ params }: Params) {
 
       <section aria-label="Produits" className="grid grid-cols-2 gap-3 px-5 pt-2">
         {products.map((p) => (
-          <Link key={p.slug} href={`/p/${p.slug}`} className="flex flex-col overflow-hidden rounded-[18px] border border-line-soft bg-card">
+          <Link key={p.slug} href={`/p/${p.slug}?b=${s.slug}`} className="flex flex-col overflow-hidden rounded-[18px] border border-line-soft bg-card">
             <PhotoSlot src={p.photoUrl} color={p.color} className="h-[120px]" label={p.name} />
             <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
               <span className="truncate text-[13px] font-bold">{p.name}</span>

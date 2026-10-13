@@ -2,23 +2,32 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { formatGnf } from '@hailandx/commerce';
+import { formatGnf, rankOffers, type Offer } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
-import { getCatalog, trustFor } from '@/lib/catalog';
+import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { BuyBar } from '@/components/BuyBar';
 
-type Params = { params: Promise<{ slug: string }> };
+type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> };
 
-export const revalidate = 60;
+/** Offres d'une même fiche produit, classées (confiance 60 %, prix 25 %, délai 15 %) ; `b` choisit la boutique mise en avant (lien reçu). */
+function pickOffers(cat: Catalog, slug: string, b?: string) {
+  const all = cat.products.filter((x) => x.slug === slug);
+  const asOffer = (x: ProductView): Offer => ({ id: x.shopSlug, shopId: x.shopSlug, priceGnf: x.priceGnf, shopTrust: trustFor(cat.shops.find((s) => s.slug === x.shopSlug)!), etaMinutes: x.etaMinutes, inStock: x.inStock !== false });
+  const ranked = rankOffers(all.map(asOffer)).map((o) => all.find((x) => x.shopSlug === o.shopId)!);
+  const recommended = ranked[0];
+  const selected = (b && ranked.find((x) => x.shopSlug === b)) || recommended;
+  return { ranked, recommended, selected };
+}
 
 /**
  * Aperçu riche (titre, description, image) lu par WhatsApp, TikTok et Facebook quand un vendeur partage ce lien :
  * c'est la raison d'être du rendu côté serveur (HAILANDX.md §7).
  */
-export async function generateMetadata({ params }: Params): Promise<Metadata> {
+export async function generateMetadata({ params, searchParams }: Params): Promise<Metadata> {
   const { slug } = await params;
+  const { b } = await searchParams;
   const cat = await getCatalog();
-  const p = cat.products.find((x) => x.slug === slug);
+  const p = pickOffers(cat, slug, b).selected;
   if (!p) return { title: 'Produit introuvable' };
   const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
   const title = `${p.name} — ${formatGnf(p.priceGnf)}`;
@@ -27,13 +36,15 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 }
 
 /** Page d'un lien partagé : le produit mis en avant, puis le reste de la boutique (jamais un cul-de-sac). */
-export default async function ProductLinkPage({ params }: Params) {
+export default async function ProductLinkPage({ params, searchParams }: Params) {
   const { slug } = await params;
+  const { b } = await searchParams;
   const cat = await getCatalog();
-  const p = cat.products.find((x) => x.slug === slug);
+  const { ranked, recommended, selected: p } = pickOffers(cat, slug, b);
   if (!p) notFound();
   const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
   const others = cat.products.filter((o) => o.shopSlug === shop.slug && o.slug !== p.slug);
+  const sellers = ranked.filter((o) => o.shopSlug !== p.shopSlug);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">
@@ -57,8 +68,24 @@ export default async function ProductLinkPage({ params }: Params) {
           <Price className="text-xl">{formatGnf(p.priceGnf)}</Price>
           <span className="text-[12.5px] font-semibold text-muted">livré à votre porte ≈ {p.etaMinutes} min</span>
         </div>
-        <div className="mt-1 flex flex-wrap gap-1.5">{badgesOf(shop).map((b) => <Badge key={b}>{b}</Badge>)}</div>
+        <div className="mt-1 flex flex-wrap gap-1.5">{ranked.length > 1 && p.shopSlug === recommended?.shopSlug && <Badge tone="lime">Offre recommandée</Badge>}{ranked.length > 1 && <Badge tone="blue">Proposé par {ranked.length} vendeurs</Badge>}{badgesOf(shop).map((x) => <Badge key={x}>{x}</Badge>)}</div>
       </div>
+
+      {sellers.length > 0 && (
+        <section aria-label="Autres vendeurs de ce produit" className="flex flex-col gap-2.5 px-[18px]">
+          <h2 className="text-sm font-extrabold">Proposé par {ranked.length} vendeurs</h2>
+          {p.shopSlug === recommended?.shopSlug && <p className="text-[12px] font-semibold text-muted">Vous voyez l’offre recommandée : meilleur équilibre confiance, prix et délai.</p>}
+          {sellers.map((o) => {
+            const s = cat.shops.find((x) => x.slug === o.shopSlug)!;
+            return (
+              <Link key={o.shopSlug} href={`/p/${slug}?b=${o.shopSlug}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-3.5 py-3">
+                <span className="flex min-w-0 flex-col"><span className="flex items-center gap-1.5 truncate text-[13.5px] font-extrabold">{s.name}<VerifiedMark size={14} /></span><span className="text-[11.5px] font-semibold text-muted">Confiance {trustFor(s)}/100 · ≈ {o.etaMinutes} min{o.inStock === false ? ' · rupture' : ''}</span></span>
+                <span className="flex shrink-0 flex-col items-end gap-1"><Price className="text-[14.5px]">{formatGnf(o.priceGnf)}</Price>{o.shopSlug === recommended?.shopSlug && <Badge tone="lime">Recommandée</Badge>}</span>
+              </Link>
+            );
+          })}
+        </section>
+      )}
 
       {others.length > 0 && (
         <section aria-label="Autres produits de la boutique" className="flex flex-col gap-2.5 px-[18px]">
