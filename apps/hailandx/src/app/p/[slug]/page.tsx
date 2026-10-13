@@ -3,22 +3,23 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { PRODUCTS, badgesOf, productBySlug, shopBySlug, trustOf } from '@/data/sample';
+import { badgesOf, trustOf } from '@/data/sample';
+import { getCatalog } from '@/lib/catalog';
 
 type Params = { params: Promise<{ slug: string }> };
 
-export function generateStaticParams() {
-  return PRODUCTS.map((p) => ({ slug: p.slug }));
-}
+export const revalidate = 60;
 
 /**
  * Aperçu riche (titre, description, image) lu par WhatsApp, TikTok et Facebook quand un vendeur partage ce lien :
  * c'est la raison d'être du rendu côté serveur (HAILANDX.md §7).
  */
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const p = productBySlug((await params).slug);
+  const { slug } = await params;
+  const cat = await getCatalog();
+  const p = cat.products.find((x) => x.slug === slug);
   if (!p) return { title: 'Produit introuvable' };
-  const shop = shopBySlug(p.shopSlug)!;
+  const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
   const title = `${p.name} — ${formatGnf(p.priceGnf)}`;
   const description = `Vendu par ${shop.name}, vendeur certifié Hailand. Livré à votre porte en ≈ ${p.etaMinutes} min.`;
   return { title, description, openGraph: { title, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN' }, twitter: { card: 'summary_large_image', title, description } };
@@ -26,10 +27,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 /** Page d'un lien partagé : le produit mis en avant, puis le reste de la boutique (jamais un cul-de-sac). */
 export default async function ProductLinkPage({ params }: Params) {
-  const p = productBySlug((await params).slug);
+  const { slug } = await params;
+  const cat = await getCatalog();
+  const p = cat.products.find((x) => x.slug === slug);
   if (!p) notFound();
-  const shop = shopBySlug(p.shopSlug)!;
-  const others = PRODUCTS.filter((o) => o.shopSlug === shop.slug && o.slug !== p.slug);
+  const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
+  const others = cat.products.filter((o) => o.shopSlug === shop.slug && o.slug !== p.slug);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">

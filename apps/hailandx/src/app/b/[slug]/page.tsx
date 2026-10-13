@@ -3,26 +3,28 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { PRODUCTS, SHOPS, badgesOf, shopBySlug, trustOf } from '@/data/sample';
+import { badgesOf, trustOf } from '@/data/sample';
+import { getCatalog } from '@/lib/catalog';
 
 type Params = { params: Promise<{ slug: string }> };
 
-export function generateStaticParams() {
-  return SHOPS.map((s) => ({ slug: s.slug }));
-}
+export const revalidate = 60;
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
-  const s = shopBySlug((await params).slug);
+  const { slug } = await params;
+  const s = (await getCatalog()).shops.find((x) => x.slug === slug);
   if (!s) return { title: 'Boutique introuvable' };
-  const description = `${s.tagline} · ${s.place}. Vendeur certifié Hailand, livré par la Flotte Hailand.`;
+  const description = `${[s.tagline, s.place].filter(Boolean).join(' · ')}. Vendeur certifié Hailand, livré par la Flotte Hailand.`;
   return { title: s.name, description, openGraph: { title: s.name, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN' } };
 }
 
 /** Boutique d'un vendeur : tous ses produits, comme si l'on entrait dans sa boutique depuis la rue. */
 export default async function ShopPage({ params }: Params) {
-  const s = shopBySlug((await params).slug);
+  const { slug } = await params;
+  const cat = await getCatalog();
+  const s = cat.shops.find((x) => x.slug === slug);
   if (!s) notFound();
-  const products = PRODUCTS.filter((p) => p.shopSlug === s.slug);
+  const products = cat.products.filter((p) => p.shopSlug === s.slug);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 pb-10">
@@ -31,7 +33,7 @@ export default async function ShopPage({ params }: Params) {
         <span className="flex h-[76px] w-[76px] items-center justify-center rounded-3xl border-4 border-bg bg-ink font-display text-2xl font-bold" style={{ color: s.color }}>{s.initials}</span>
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-[22px] font-semibold tracking-tight">{s.name}<VerifiedMark size={20} /></h1>
-          <span className="text-[13px] font-semibold text-muted">{s.tagline} · {s.place}</span>
+          <span className="text-[13px] font-semibold text-muted">{[s.tagline, s.place].filter(Boolean).join(' · ')}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">★ {s.stats.rating.toFixed(1).replace('.', ',')}</div><div className="text-[11.5px] font-semibold text-muted">{s.stats.reviewCount} avis vérifiés</div></div>
