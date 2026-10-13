@@ -6,10 +6,12 @@ import { formatGnf, slugify } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { mediaUrl, uploadPhoto } from '@/lib/media';
+import { SOURCES } from '@/lib/source';
 
-interface Shop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null }
+interface Shop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null }
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
-interface Offer { id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; catalog_products: { name: string; slug: string } | null }
+interface Offer { id: string; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Link { id: string; code: string; kind: string; source: string | null; clicks: number; offer_ids: string[] }
 interface Cat { id: string; name: string }
 
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
@@ -26,6 +28,8 @@ export default function SellerPage() {
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [offers, setOffers] = useState<Offer[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
+  const [links, setLinks] = useState<Link[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -33,7 +37,7 @@ export default function SellerPage() {
     if (!sb || !uid) return;
     const [c, s, d] = await Promise.all([
       sb.from('categories').select('id,name').order('position'),
-      sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id').eq('owner_id', uid).limit(1).maybeSingle(),
+      sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path').eq('owner_id', uid).limit(1).maybeSingle(),
       sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
     setCats((c.data as Cat[]) ?? []);
@@ -44,8 +48,10 @@ export default function SellerPage() {
     await Promise.all(list.map(async (x) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id }); lv[x.id] = typeof r.data === 'number' ? r.data : x.detected_level; }));
     setLevels(lv);
     if (s.data) {
-      const o = await sb.from('offers').select('id,price_gnf,active,photo_paths,catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
+      const o = await sb.from('offers').select('id,price_gnf,active,photo_paths,offer_variants(id,stock),catalog_products(name,slug)').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
       setOffers((o.data as unknown as Offer[]) ?? []);
+      const l = await sb.from('share_links').select('id,code,kind,source,clicks,offer_ids').eq('shop_id', (s.data as Shop).id).order('created_at', { ascending: false });
+      setLinks((l.data as Link[]) ?? []);
     }
     setLoading(false);
   }, [sb, uid]);
@@ -87,6 +93,38 @@ export default function SellerPage() {
     return 'Produit ajouté.';
   }
 
+  async function setShopImage(kind: 'logo' | 'cover', f: FormData) {
+    const file = f.get('file');
+    if (!(file instanceof File) || file.size === 0) throw new Error('Choisissez une image.');
+    const path = await uploadPhoto(sb!, uid!, file);
+    const { error } = await sb!.from('shops').update(kind === 'logo' ? { logo_path: path } : { cover_path: path }).eq('id', shop!.id);
+    fail(error);
+    return kind === 'logo' ? 'Logo mis à jour.' : 'Bandeau mis à jour.';
+  }
+
+  async function saveOffer(o: Offer, f: FormData) {
+    const price = Number(String(f.get('price') ?? '').replace(/\s/g, ''));
+    const stock = Math.max(0, Math.floor(Number(f.get('stock') ?? 0)));
+    if (!Number.isFinite(price) || price < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
+    const photo = f.get('photo');
+    const photoPath = photo instanceof File && photo.size > 0 ? await uploadPhoto(sb!, uid!, photo) : null;
+    const { error } = await sb!.from('offers').update({ price_gnf: Math.round(price), active: f.get('active') === 'on', ...(photoPath ? { photo_paths: [photoPath, ...(o.photo_paths ?? [])].slice(0, 5) } : {}) }).eq('id', o.id);
+    fail(error);
+    const v = o.offer_variants?.[0];
+    if (v) { const r = await sb!.from('offer_variants').update({ stock }).eq('id', v.id); fail(r.error); }
+    setEditing(null);
+    return 'Produit mis à jour.';
+  }
+
+  async function addLink(f: FormData) {
+    const source = String(f.get('source') ?? 'autre');
+    const offer = String(f.get('offer') ?? '');
+    const code = `${source.slice(0, 2)}${Math.random().toString(36).slice(2, 8)}`;
+    const { error } = await sb!.from('share_links').insert({ code, shop_id: shop!.id, kind: offer ? 'produit' : 'boutique', offer_ids: offer ? [offer] : [], source });
+    fail(error);
+    return 'Lien créé.';
+  }
+
   if (session === undefined || loading) return <Shell><p className="text-[14px] font-semibold text-muted">Chargement…</p></Shell>;
   if (!sb) return <Shell><p className="text-[14px] font-semibold text-muted">La base n’est pas configurée.</p></Shell>;
   if (!session) {
@@ -107,7 +145,7 @@ export default function SellerPage() {
   return (
     <Shell>
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-[26px] font-semibold tracking-tight">Mon espace vendeur</h1>
+        <h1 className="font-display text-[22px] font-semibold tracking-tight">Mon espace vendeur</h1>
         <button onClick={() => sb.auth.signOut()} className="h-11 px-2 text-[13px] font-bold text-muted">Déconnexion</button>
       </div>
       {msg && <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${msg.tone === 'err' ? 'bg-[#fde8e4] text-[#8a2a1c]' : 'bg-ok-soft text-ok'}`}>{msg.text}</p>}
@@ -142,6 +180,16 @@ export default function SellerPage() {
             {shop.status !== 'ouverte' && shop.status !== 'suspendue' && level === 3 && (
               <Button disabled={busy} variant="lime" onClick={() => run(async () => { const { error } = await sb.rpc('fn_shop_open', { p_shop: shop.id }); fail(error); return 'Votre boutique est ouverte à la vente.'; })}>Ouvrir la vente</Button>
             )}
+            <div className="grid grid-cols-2 gap-2">
+              {(['logo', 'cover'] as const).map((k) => (
+                <form key={k} action={(f) => run(() => setShopImage(k, f))} className="flex flex-col gap-1.5 rounded-2xl border border-line-soft p-2.5">
+                  <span className="text-[12px] font-extrabold">{k === 'logo' ? 'Logo' : 'Bandeau'}</span>
+                  {mediaUrl(k === 'logo' ? shop.logo_path : shop.cover_path) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl(k === 'logo' ? shop.logo_path : shop.cover_path)!} alt="" className={`w-full rounded-xl object-cover ${k === 'logo' ? 'h-14' : 'h-14'}`} />}
+                  <input name="file" type="file" accept="image/jpeg,image/png,image/webp" className="w-full text-[12px] font-medium file:mr-2 file:h-9 file:rounded-xl file:border-0 file:bg-sand file:px-3 file:text-[12px] file:font-bold" />
+                  <button type="submit" disabled={busy} className="h-10 rounded-xl border border-line text-[12.5px] font-bold">Envoyer</button>
+                </form>
+              ))}
+            </div>
             <div className="flex flex-wrap gap-2">
               <ShareButtons url={`${origin}/b/${shop.slug}`} text={`Ma boutique ${shop.name} sur HailandX`} />
             </div>
@@ -167,9 +215,40 @@ export default function SellerPage() {
             <h2 className="font-display text-lg font-semibold">Mes produits ({offers.length})</h2>
             {offers.length === 0 && <p className="text-[13.5px] font-medium text-muted">Aucun produit pour l’instant.</p>}
             {offers.map((o) => (
-              <div key={o.id} className="flex flex-col gap-2 rounded-2xl border border-line-soft bg-card px-4 py-3">
-                <div className="flex items-center gap-3">{mediaUrl(o.photo_paths?.[0]) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl(o.photo_paths?.[0])!} alt="" className="h-12 w-12 rounded-xl object-cover" />}<div className="flex min-w-0 flex-1 items-baseline justify-between gap-3"><span className="truncate text-[14px] font-bold">{o.catalog_products?.name}</span><span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(o.price_gnf)}</span></div></div>
+              <div key={o.id} className={`flex flex-col gap-2 rounded-2xl border border-line-soft bg-card px-4 py-3 ${o.active ? '' : 'opacity-60'}`}>
+                <div className="flex items-center gap-3">{mediaUrl(o.photo_paths?.[0]) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={mediaUrl(o.photo_paths?.[0])!} alt="" className="h-12 w-12 rounded-xl object-cover" />}<div className="flex min-w-0 flex-1 items-baseline justify-between gap-3"><span className="truncate text-[14px] font-bold">{o.catalog_products?.name}{o.active ? '' : ' (masqué)'}</span><span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(o.price_gnf)}</span></div></div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-semibold text-muted">Stock : {o.offer_variants?.[0]?.stock ?? '—'}</span>
+                  <button type="button" onClick={() => setEditing(editing === o.id ? null : o.id)} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-bold">{editing === o.id ? 'Fermer' : 'Modifier'}</button>
+                </div>
+                {editing === o.id && (
+                  <form action={(f) => run(() => saveOffer(o, f))} className="flex flex-col gap-2.5 rounded-2xl bg-sand p-3">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <input name="price" required inputMode="numeric" defaultValue={o.price_gnf} aria-label="Prix (GNF)" className={input} />
+                      <input name="stock" required inputMode="numeric" defaultValue={o.offer_variants?.[0]?.stock ?? 0} aria-label="Stock" className={input} />
+                    </div>
+                    <label className="flex items-center gap-2 text-[13.5px] font-bold"><input name="active" type="checkbox" defaultChecked={o.active} className="h-5 w-5" /> Visible dans la boutique</label>
+                    <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" aria-label="Nouvelle photo" className="text-[13px] font-medium file:mr-2 file:h-10 file:rounded-xl file:border-0 file:bg-card file:px-3 file:text-[12.5px] file:font-bold" />
+                    <Button type="submit" disabled={busy} className="h-12">Enregistrer</Button>
+                  </form>
+                )}
                 {o.catalog_products && <ShareButtons url={`${origin}/p/${o.catalog_products.slug}`} text={`${o.catalog_products.name} — ${formatGnf(o.price_gnf)}`} />}
+              </div>
+            ))}
+          </section>
+
+          <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
+            <h2 className="font-display text-lg font-semibold">Liens suivis</h2>
+            <p className="text-[12.5px] font-medium text-muted">Un lien par réseau : vous voyez combien de personnes cliquent, et d’où viennent vos commandes.</p>
+            <form action={(f) => run(() => addLink(f))} className="flex flex-col gap-2.5">
+              <select name="source" className={input} defaultValue="tiktok" aria-label="Réseau">{SOURCES.map((s) => <option key={s} value={s}>{s === 'tiktok' ? 'TikTok' : s === 'whatsapp' ? 'WhatsApp' : s === 'facebook' ? 'Facebook' : 'Autre'}</option>)}</select>
+              <select name="offer" className={input} defaultValue="" aria-label="Page visée"><option value="">Toute la boutique</option>{offers.map((o) => <option key={o.id} value={o.id}>{o.catalog_products?.name}</option>)}</select>
+              <Button type="submit" variant="secondary" disabled={busy}>Créer un lien</Button>
+            </form>
+            {links.map((l) => (
+              <div key={l.id} className="flex flex-col gap-1.5 rounded-2xl border border-line-soft px-3.5 py-3">
+                <div className="flex items-center justify-between"><span className="text-[13px] font-bold">{l.source === 'tiktok' ? 'TikTok' : l.source === 'whatsapp' ? 'WhatsApp' : l.source === 'facebook' ? 'Facebook' : 'Autre'} · {l.kind === 'produit' ? 'produit' : 'boutique'}</span><Badge>{l.clicks} clic{l.clicks > 1 ? 's' : ''}</Badge></div>
+                <ShareButtons url={`${origin}/s/${l.code}`} text={shop.name} />
               </div>
             ))}
           </section>

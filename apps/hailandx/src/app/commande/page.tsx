@@ -7,6 +7,7 @@ import { formatGnf, formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { useSession } from '@/lib/useSession';
+import { currentSource } from '@/lib/source';
 
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
@@ -47,7 +48,7 @@ export default function CheckoutPage() {
     if (!decl) return setError('Choisissez une adresse de livraison.');
     setBusy(true);
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
-    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: 'livraison', p_source: 'application' });
+    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: 'livraison', p_source: currentSource() });
     setBusy(false);
     if (err) return setError(err.message.replace(/^.*?:\s*/, '').slice(0, 200) || 'La commande n’a pas pu être passée.');
     clearCart();

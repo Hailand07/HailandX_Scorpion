@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { badgesOf, trustOf } from '@/data/sample';
-import { getCatalog } from '@/lib/catalog';
+import { badgesOf } from '@/data/sample';
+import { getCatalog, trustFor } from '@/lib/catalog';
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -28,9 +28,9 @@ export default async function ShopPage({ params }: Params) {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 pb-10">
-      <div className="h-[132px]" style={{ background: s.color }} />
+      <div className="h-[132px] bg-cover bg-center" style={{ background: s.coverUrl ? `center / cover url(${s.coverUrl})` : s.color }} />
       <section className="-mt-9 flex flex-col gap-3 px-5">
-        <span className="flex h-[76px] w-[76px] items-center justify-center rounded-3xl border-4 border-bg bg-ink font-display text-2xl font-bold" style={{ color: s.color }}>{s.initials}</span>
+        <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-3xl border-4 border-bg bg-ink font-display text-2xl font-bold" style={{ color: s.color }}>{s.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.logoUrl} alt="" className="h-full w-full object-cover" /> : s.initials}</span>
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 font-display text-[22px] font-semibold tracking-tight">{s.name}<VerifiedMark size={20} /></h1>
           <span className="text-[13px] font-semibold text-muted">{[s.tagline, s.place].filter(Boolean).join(' · ')}</span>
@@ -38,7 +38,7 @@ export default async function ShopPage({ params }: Params) {
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">★ {s.stats.rating.toFixed(1).replace('.', ',')}</div><div className="text-[11.5px] font-semibold text-muted">{s.stats.reviewCount} avis vérifiés</div></div>
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">{Math.round(s.stats.reliability * 100)} %</div><div className="text-[11.5px] font-semibold text-muted">livrés sans litige</div></div>
-          <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">{trustOf(s)}</div><div className="text-[11.5px] font-semibold text-muted">indice de confiance</div></div>
+          <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">{trustFor(s)}</div><div className="text-[11.5px] font-semibold text-muted">indice de confiance</div></div>
         </div>
         <div className="flex flex-wrap gap-1.5">{badgesOf(s).map((b) => <Badge key={b}>{b}</Badge>)}</div>
       </section>

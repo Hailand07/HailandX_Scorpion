@@ -1,7 +1,7 @@
 'use client';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, Wordmark } from '@hailandx/ui';
+import { Badge, QrScanner, Wordmark } from '@hailandx/ui';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
@@ -26,6 +26,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [codes, setCodes] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const [scanFor, setScanFor] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!sb) return;
@@ -62,6 +63,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><Link href="/commandes" className="text-[13px] font-bold text-blue-ink">Mes commandes</Link></div>
       <h1 className="font-display text-[22px] font-semibold tracking-tight">Suivi de commande</h1>
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
+      {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
       {!order ? <p className="text-[14px] font-medium text-muted">Chargement…</p> : (
         <>
           {parcels.map((p) => {
@@ -82,6 +84,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                     <span className="font-display text-[34px] font-semibold tracking-[0.3em]" aria-label={`Code ${codes[p.id]!.split('').join(' ')}`}>{codes[p.id]}</span>
                   </div>
                 )}
+                {p.status === 'retire' && <button type="button" onClick={() => setScanFor(p.id)} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Livreur arrivé : scanner le colis</button>}
                 {p.status === 'attente_vendeur' && <button type="button" onClick={() => act(() => sb!.rpc('fn_parcel_cancel', { p_parcel: p.id }), 'Colis annulé.')} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Annuler ce colis</button>}
                 {p.status === 'remis' && <Review parcel={p.id} onDone={() => load()} />}
               </section>

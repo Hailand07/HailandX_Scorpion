@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { deliveryFeeGnf } from '../../packages/commerce/src/money';
+import { trustScore } from '../../packages/commerce/src/trust';
 import { as, freshDb, refused, U } from './harness';
 
 /**
@@ -34,6 +35,8 @@ describe('boutique : niveau 3 requis pour vendre', () => {
     expect((await one<{ status: string }>('select status from shops where id = $1', [shopId])).status).toBe('preparation');
     expect(await q('select role from shop_members where shop_id = $1 and user_id = $2', [shopId, U.vendeur])).toEqual([{ role: 'proprietaire' }]);
     expect(await q('select 1 from shop_scores where shop_id = $1', [shopId])).toHaveLength(1);
+    // L'indice d'une boutique neuve est déjà calculé (réputation neutre), pas à 0.
+    expect((await one<{ trust: number }>('select trust from shop_scores where shop_id = $1', [shopId])).trust).toBeGreaterThan(20);
   });
 
   it('refuse : propriétaire différent, statut « ouverte » à la création, adresse d’un autre compte', async () => {
@@ -82,8 +85,8 @@ describe('catalogue : fiche commune, offres et visiteurs', () => {
 
   it('un lien partagé se résout sans compte et compte les clics', async () => {
     await as(db, U.vendeur, () => db.query(`insert into share_links (code, shop_id, kind, source) values ('kw-hirondelles', $1, 'produit', 'tiktok')`, [shopId]));
-    const r = await as(db, 'anon', () => q('select * from fn_resolve_share_link($1)', ['KW-Hirondelles']));
-    expect(r).toEqual([{ kind: 'produit', shop_slug: 'kadi-wax', offer_ids: [] }]);
+    const r = await as(db, 'anon', () => q('select * from fn_open_share_link($1)', ['KW-Hirondelles']));
+    expect(r).toEqual([{ kind: 'produit', shop_slug: 'kadi-wax', offer_ids: [], source: 'tiktok', product_slug: null }]);
     expect((await one<{ clicks: number }>(`select clicks from share_links where code = 'kw-hirondelles'`)).clicks).toBe(1);
   });
 });
@@ -239,6 +242,20 @@ describe('Flotte : préparation, mission, QR, retrait', () => {
   });
 });
 
+describe('mission : informations réservées au livreur attribué', () => {
+  it('le livreur attribué reçoit le téléphone et les points ; personne d’autre ne reçoit rien', async () => {
+    const info = await as(db, U.livreur, () => q<Record<string, unknown>>('select * from fn_mission_info($1)', [parcelId]));
+    expect(info).toHaveLength(1);
+    expect(info[0]).toMatchObject({ status: 'retire', shop_name: 'Kadi Wax', buyer_phone: '+224 620 00 00 00' });
+    expect(Number(info[0]!.buyer_lat)).toBeCloseTo(BUYER.lat, 4);
+    expect(Number(info[0]!.shop_lat)).toBeCloseTo(SELLER.lat, 4);
+    for (const who of [U.livreur2, U.vendeur, U.acheteur, U.acheteur2]) {
+      expect(await as(db, who, () => q('select * from fn_mission_info($1)', [parcelId]))).toHaveLength(0);
+    }
+    expect(await as(db, 'anon', () => refused(db.query('select * from fn_mission_info($1)', [parcelId])))).toMatch(/permission denied/);
+  });
+});
+
 describe('remise : contrôle de proximité, scan de l’acheteur ou code, verrouillage', () => {
   it('sans position récente du livreur, ou trop loin de l’adresse, la remise est refusée', async () => {
     const code = (await as(db, U.acheteur, () => one<{ fn_my_handover_code: string }>('select fn_my_handover_code($1)', [parcelId]))).fn_my_handover_code;
@@ -285,6 +302,29 @@ describe('avis vérifiés', () => {
     await as(db, U.acheteur, () => db.query('select fn_submit_review($1, 5, $2)', [parcelId, 'Très beau pagne, livraison rapide']));
     expect(await as(db, U.acheteur, () => refused(db.query('select fn_submit_review($1, 4, $2)', [parcelId, 'encore'])))).toMatch(/duplicate|unique/);
     expect(await as(db, 'anon', () => q('select rating from reviews'))).toEqual([{ rating: 5 }]);
+  });
+
+  it('l’indice de confiance de la boutique est recalculé (mêmes pondérations que le code partagé)', async () => {
+    const s = await one<{ trust: number; rating: string; review_count: number; reliability: string; sales: number }>('select * from shop_scores where shop_id = $1', [shopId]);
+    expect(s.review_count).toBe(1);
+    expect(Number(s.rating)).toBe(5);
+    expect(s.sales).toBe(1);
+    const shop = await one<{ logo_path: string | null; cover_path: string | null; tagline: string | null; created_at: string }>('select logo_path, cover_path, tagline, created_at from shops where id = $1', [shopId]);
+    const offers = await q<{ photo_paths: string[]; price_gnf: number; product_id: string }>('select photo_paths, price_gnf, product_id from offers where shop_id = $1 and active', [shopId]);
+    const quality = (shop.logo_path ? 0.2 : 0) + (shop.cover_path ? 0.2 : 0) + (shop.tagline?.trim() ? 0.2 : 0) + 0.4 * (offers.length ? offers.filter((o) => o.photo_paths.length).length / offers.length : 0);
+    const expected = trustScore({ rating: 5, reviewCount: 1, reliability: Number(s.reliability), sales: 1, ageDays: Math.max(0, (Date.now() - new Date(shop.created_at).getTime()) / 86_400_000), quality, priceScore: 0.6 });
+    expect(Math.abs(s.trust - expected)).toBeLessThanOrEqual(1);
+    // Fiabilité : (remises + 3,5) / (remises + problèmes + 5) ; problèmes = litiges et annulations faites par la boutique.
+    const bad = Number((await one<{ n: string }>(`select count(*) as n from delivery_events e join parcels p on p.id = e.parcel_id where p.shop_id = $1 and e.kind = 'annule'
+      and exists (select 1 from shop_members m where m.shop_id = $1 and m.user_id = e.actor_id)`, [shopId])).n);
+    expect(Number(s.reliability)).toBeCloseTo((1 + 3.5) / (1 + bad + 5), 3);
+  });
+
+  it('règlement des espèces : réservé à l’équipe, le solde du livreur baisse', async () => {
+    const bal = (await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf;
+    expect(bal).toBeGreaterThan(0);
+    expect(await as(db, U.livreur, () => refused(db.query('select fn_courier_cash_settle($1, $2)', [U.livreur, bal])))).toMatch(/réservé à l'équipe/);
+    expect((await as(db, U.admin, () => one<{ fn_courier_cash_settle: number }>('select fn_courier_cash_settle($1, $2)', [U.livreur, bal]))).fn_courier_cash_settle).toBe(0);
   });
 
   it('on ne peut pas noter un colis non remis', async () => {

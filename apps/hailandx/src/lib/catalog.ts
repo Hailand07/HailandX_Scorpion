@@ -1,9 +1,9 @@
-import { type ShopStats } from '@hailandx/commerce';
+import { trustScore, type ShopStats } from '@hailandx/commerce';
 import { PRODUCTS as SAMPLE_PRODUCTS, SHOPS as SAMPLE_SHOPS, type SampleProduct, type SampleShop } from '@/data/sample';
 import { mediaUrl } from './media';
 import { serverClient } from './supabase';
 
-export type ShopView = SampleShop;
+export type ShopView = SampleShop & { logoUrl?: string | null; coverUrl?: string | null; trust?: number };
 export type ProductView = SampleProduct & { offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean };
 
 export interface Catalog {
@@ -25,9 +25,12 @@ export const initialsOf = (name: string): string =>
 
 const DAY = 86_400_000;
 
+/** Indice de confiance affiché : celui calculé par la base quand il existe, sinon le calcul du code partagé (boutiques d'exemple). */
+export const trustFor = (s: ShopView): number => s.trust ?? trustScore(s.stats);
+
 interface ShopRow {
-  slug: string; name: string; tagline: string | null; created_at: string;
-  shop_scores: { rating: number; review_count: number; reliability: number; sales: number; prep_minutes: number | null } | null;
+  slug: string; name: string; tagline: string | null; created_at: string; logo_path: string | null; cover_path: string | null;
+  shop_scores: { trust: number; rating: number; review_count: number; reliability: number; sales: number; prep_minutes: number | null } | null;
 }
 interface OfferRow {
   id: string; price_gnf: number; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null;
@@ -42,7 +45,7 @@ function shopFromRow(r: ShopRow): ShopView {
     rating: Number(sc?.rating ?? 0), reviewCount: sc?.review_count ?? 0, reliability: Number(sc?.reliability ?? 0),
     sales: sc?.sales ?? 0, ageDays, quality: 0.7, priceScore: 0.6, prepMinutes: sc?.prep_minutes ?? 30,
   };
-  return { slug: r.slug, name: r.name, initials: initialsOf(r.name), color: colorOf(r.slug), place: '', tagline: r.tagline ?? '', stats, isNew: ageDays < 30 };
+  return { slug: r.slug, name: r.name, initials: initialsOf(r.name), color: colorOf(r.slug), place: '', tagline: r.tagline ?? '', stats, isNew: ageDays < 30, trust: sc?.trust, logoUrl: mediaUrl(r.logo_path), coverUrl: mediaUrl(r.cover_path) };
 }
 
 /** Lit la vitrine : boutiques ouvertes à la vente et leurs offres actives. Repli sur les exemples si la base est vide ou injoignable. */
@@ -51,7 +54,7 @@ export async function getCatalog(): Promise<Catalog> {
   if (!sb) return { shops: SAMPLE_SHOPS, products: SAMPLE_PRODUCTS, source: 'exemple' };
   try {
     const [s, o] = await Promise.all([
-      sb.from('shops').select('slug,name,tagline,created_at,shop_scores(rating,review_count,reliability,sales,prep_minutes)').eq('status', 'ouverte').order('created_at', { ascending: false }).limit(60),
+      sb.from('shops').select('slug,name,tagline,created_at,logo_path,cover_path,shop_scores(trust,rating,review_count,reliability,sales,prep_minutes)').eq('status', 'ouverte').order('created_at', { ascending: false }).limit(60),
       sb.from('offers').select('id,price_gnf,photo_paths,offer_variants(id,label,stock),catalog_products(slug,name,category_id,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
     ]);
     if (s.error || o.error) throw s.error ?? o.error;
