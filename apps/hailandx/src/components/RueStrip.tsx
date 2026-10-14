@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
+import { browserClient, useSession } from '@hailandx/kit';
 
 interface ShopChip { slug: string; name: string; initials: string; color: string; logoUrl: string | null; isNew: boolean }
 

@@ -2,17 +2,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
-import { maskPhone } from '@/lib/seller';
-import { GroupTitle, Icon, ListRow, Screen } from '@/components/Screen';
+import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL } from '@hailandx/kit';
+import { maskPhone } from '@hailandx/commerce';
 
-/** Compte (v2) : moi, et rien d'autre. Trois groupes courts ; la boutique a son onglet, les commandes aussi. */
+/** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
 export default function AccountPage() {
   const session = useSession();
   const router = useRouter();
   const [counts, setCounts] = useState<{ fav: number; addr: number; unread: number } | null>(null);
-  const [staff, setStaff] = useState(false);
 
   useEffect(() => {
     const sb = browserClient(); const uid = session?.user.id;
@@ -20,9 +17,8 @@ export default function AccountPage() {
     Promise.all([
       sb.from('product_favorites').select('product_id', { count: 'exact', head: true }).eq('user_id', uid),
       sb.from('declarations').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'active'),
-      sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null),
-    ]).then(([f, a, n]) => setCounts({ fav: f.count ?? 0, addr: a.count ?? 0, unread: n.count ?? 0 }));
-    sb.rpc('is_admin').then(({ data }) => setStaff(data === true));
+      unreadNotifications(sb, 'acheteur'),
+    ]).then(([f, a, n]) => setCounts({ fav: f.count ?? 0, addr: a.count ?? 0, unread: n }));
   }, [session]);
 
   if (session === undefined) return <Screen className="pt-6"><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
@@ -70,13 +66,11 @@ export default function AccountPage() {
         </div>
       </section>
 
-      {staff && (
-        <Link href="/admin" className="flex min-h-[58px] items-center gap-3 rounded-[20px] bg-ink px-4 text-white">
-          <Icon name="shield" className="text-lime" />
-          <span className="flex-1 text-[15px] font-bold">Console de l’équipe Hailand</span>
-          <Icon name="chevron" size={16} stroke={2} className="text-white/60" />
-        </Link>
-      )}
+      <a href={VENDEUR_URL} className="flex items-center gap-3.5 rounded-[22px] bg-ink p-4 text-white">
+        <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[15px] bg-lime text-ink"><Icon name="shop" size={22} /></span>
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="font-display text-[16px] font-semibold">Vendre sur HailandX</span><span className="text-[12.5px] font-semibold text-white/70">Ouvrez votre boutique avec l’application HailandX Vendeur</span></span>
+        <span aria-hidden="true" className="text-[20px] font-extrabold text-lime">↗</span>
+      </a>
 
       <div className="flex flex-col items-center gap-1.5">
         <button type="button" onClick={async () => { await browserClient()?.auth.signOut(); router.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>

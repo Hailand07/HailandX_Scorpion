@@ -3,7 +3,7 @@ import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
 import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
 import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 import { DeliverTo } from '@/components/DeliverTo';
-import { NotificationBell } from '@/components/NotificationBell';
+import { NotificationBell, VENDEUR_URL } from '@hailandx/kit';
 import { RueStrip } from '@/components/RueStrip';
 import { CartButton } from '@/components/CartButton';
 
@@ -73,7 +73,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         <section className="mx-5 flex flex-col gap-2 rounded-[22px] border border-line bg-card p-4">
           <h2 className="font-display text-[16px] font-semibold">Les boutiques ci-dessus sont des exemples</h2>
           <p className="text-[13px] font-medium text-muted">Aucune boutique n’est encore ouverte à la vente. Soyez le premier vendeur de votre quartier.</p>
-          <Link href="/vendeur" className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Ouvrir ma boutique</Link>
+          <a href={VENDEUR_URL} className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Ouvrir ma boutique avec HailandX Vendeur</a>
         </section>
       )}
     </main>

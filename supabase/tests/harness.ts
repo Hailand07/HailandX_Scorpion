@@ -19,7 +19,7 @@ export const U = {
 const DECORS = `
 create role anon nologin; create role authenticated nologin;
 create schema auth;
-create table auth.users (id uuid primary key);
+create table auth.users (id uuid primary key, phone text);
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
@@ -30,10 +30,11 @@ create table public.buildings (id text primary key, status text, is_validated bo
 create table public.quartiers (id text primary key, nom text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
-  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz);
+  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text, hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz);
 create function public.trg_decl_stub() returns trigger language plpgsql as $f$ begin if new.certification_status = 'demandee' and old.certification_status is distinct from 'demandee' then new.certification_requested_at := now(); end if; return new; end $f$;
 create trigger decl_stub before update on public.declarations for each row execute function public.trg_decl_stub();
-create table public.agents (id uuid primary key, role text not null, active boolean not null default true);
+create table public.agents (id uuid primary key, full_name text, role text not null, active boolean not null default true, created_at timestamptz not null default now());
+create table public.communes (id text primary key, nom text);
 create table public.profiles (id text primary key, full_name text, phone text);
 create function public.is_admin() returns boolean language sql stable security definer as $$ select exists (select 1 from public.agents a where a.id = auth.uid() and a.role = 'admin' and a.active) $$;
 revoke execute on function public.is_admin() from public, anon; grant execute on function public.is_admin() to authenticated;
@@ -45,6 +46,7 @@ grant all on all tables in schema public to anon, authenticated;
 insert into auth.users (id) values ${Object.values(U).map((u) => `('${u}')`).join(', ')};
 insert into public.agents (id, role) values ('${U.admin}', 'admin');
 insert into public.quartiers (id, nom) values ('qtr-coleah', 'Coleah Domino');
+insert into public.communes (id, nom) values ('cm-matam', 'Matam');
 `;
 
 export async function freshDb(): Promise<PGlite> {
@@ -66,6 +68,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-10-18_hailandx_preuves.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-19_hailandx_compte.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-19_hailandx_compte_suppression.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-20_hailand_console.sql', import.meta.url), 'utf8'));
   return db;
 }
 

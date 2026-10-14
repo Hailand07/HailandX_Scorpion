@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { Badge, VerifiedMark } from '@hailandx/ui';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor } from '@/lib/catalog';
-import { serverClient } from '@/lib/supabase';
+import { serverClient } from '@hailandx/kit';
 import { FollowButton } from '@/components/FollowButton';
 import { ShopProducts, type Section } from '@/components/ShopProducts';
 

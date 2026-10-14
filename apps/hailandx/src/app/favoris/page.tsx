@@ -2,11 +2,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { PhotoSlot, Price } from '@hailandx/ui';
-import { BackHeader } from '@/components/Screen';
+import { BackHeader, browserClient, mediaUrl, useSession } from '@hailandx/kit';
 import { formatGnf } from '@hailandx/commerce';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
-import { mediaUrl } from '@/lib/media';
 import { colorOf } from '@/lib/catalog';
 
 interface Fav { catalog_products: { slug: string; name: string; offers: { price_gnf: number; photo_paths: string[] | null; active: boolean; shops: { slug: string; status: string } | null }[] } | null }

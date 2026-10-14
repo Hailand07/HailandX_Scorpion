@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import '../../../../packages/ui/src/tokens.css';
 @source '../../../../packages/ui/src';
+@source '../../../../packages/kit/src';
 
 /* Écran d'ouverture : halos et apparition en cascade (désactivés si l'utilisateur réduit les animations). */
 .hx-glow { background: radial-gradient(closest-side, rgba(51, 70, 240, .55), rgba(51, 70, 240, 0)); }

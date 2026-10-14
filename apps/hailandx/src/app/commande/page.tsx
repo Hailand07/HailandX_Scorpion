@@ -4,9 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button, Wordmark } from '@hailandx/ui';
 import { formatGnf, formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
-import { browserClient } from '@/lib/supabase';
+import { browserClient, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
-import { useSession } from '@/lib/useSession';
 import { currentSource } from '@/lib/source';
 
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }

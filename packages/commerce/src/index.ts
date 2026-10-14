@@ -4,3 +4,4 @@ export * from './trust';
 export * from './rules';
 export * from './feed';
 export * from './phone';
+export * from './dashboard';

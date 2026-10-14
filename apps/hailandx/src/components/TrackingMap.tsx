@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { browserClient } from '@/lib/supabase';
+import { browserClient } from '@hailandx/kit';
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 interface Tracking { status: string; shop_lng: number | null; shop_lat: number | null; dest_lng: number | null; dest_lat: number | null; courier_lng: number | null; courier_lat: number | null; courier_seen_at: string | null }

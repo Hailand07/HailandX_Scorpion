@@ -1,6 +1,6 @@
 /** Provenance d'une visite (TikTok, WhatsApp, Facebook…) : conservée dans le navigateur jusqu'à la commande. */
-export const SOURCES = ['tiktok', 'whatsapp', 'facebook', 'autre'] as const;
-export type Source = (typeof SOURCES)[number];
+import { SOURCES, type Source } from '@hailandx/kit';
+export { SOURCES, type Source };
 const KEY = 'hx.src';
 
 export const isSource = (s: unknown): s is Source => typeof s === 'string' && (SOURCES as readonly string[]).includes(s);
