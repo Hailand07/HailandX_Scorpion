@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf } from '@hailandx/commerce';
-import { browserClient } from '@/lib/supabase';
+import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
 import { meters, type LngLat } from '@/lib/nav';
@@ -108,7 +108,7 @@ export default function Home() {
   const Head = (
     <header className="flex items-center justify-between">
       <div><div className="font-display text-xl font-bold tracking-[-0.03em]">Hailand <span className="text-lime">Flotte</span></div><div className="text-xs font-semibold text-night-muted">Application des livreurs</div></div>
-      {session && <button type="button" onClick={() => sb?.auth.signOut()} className="h-11 px-2 text-[13px] font-bold text-night-muted">Déconnexion</button>}
+      {session && <button type="button" onClick={() => void signOutFlotte()} className="h-11 px-2 text-[13px] font-bold text-night-muted">Déconnexion</button>}
     </header>
   );
   const Shell = ({ children }: { children: React.ReactNode }) => <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3.5 px-5 pb-16 pt-5">{Head}{children}</main>;

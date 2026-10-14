@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { maskPhone } from '@hailandx/commerce';
-import { browserClient, GroupTitle, HAILANDX_URL, Icon, ListRow, Screen, unreadNotifications } from '@hailandx/kit';
+import { browserClient, GroupTitle, HAILANDX_URL, Icon, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
 
 /** Plus : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
@@ -49,7 +49,7 @@ export default function PlusPage() {
       </section>
 
       <div className="flex flex-col items-center gap-1.5">
-        <button type="button" onClick={async () => { await browserClient()?.auth.signOut(); router.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
+        <button type="button" onClick={async () => { await signOutHailand(browserClient()); window.location.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
         <Link href="/compte/supprimer" className="flex h-11 items-center text-[13px] font-bold text-[#a3321f]">Supprimer mon compte</Link>
       </div>
     </Screen>

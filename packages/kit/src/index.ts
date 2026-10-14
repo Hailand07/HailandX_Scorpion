@@ -10,3 +10,4 @@ export * from './NotificationBell';
 export * from './links';
 export * from './ProofPhoto';
 export * from './DisputeThread';
+export * from './account';

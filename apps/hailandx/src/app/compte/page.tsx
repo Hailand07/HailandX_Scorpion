@@ -1,14 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL } from '@hailandx/kit';
+
+import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
 import { maskPhone } from '@hailandx/commerce';
 
 /** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
 export default function AccountPage() {
   const session = useSession();
-  const router = useRouter();
   const [counts, setCounts] = useState<{ fav: number; addr: number; unread: number } | null>(null);
 
   useEffect(() => {
@@ -73,7 +72,7 @@ export default function AccountPage() {
       </a>
 
       <div className="flex flex-col items-center gap-1.5">
-        <button type="button" onClick={async () => { await browserClient()?.auth.signOut(); router.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
+        <button type="button" onClick={async () => { await signOutHailand(browserClient()); window.location.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
         <Link href="/compte/supprimer" className="flex h-11 items-center text-[13px] font-bold text-[#a3321f]">Supprimer mon compte</Link>
       </div>
     </Screen>
