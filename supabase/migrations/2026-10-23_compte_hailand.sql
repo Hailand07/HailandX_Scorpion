@@ -7,6 +7,8 @@
 --    compte. Le code n'est jamais stocké en clair (empreinte SHA-256) ; personne ne lit la table depuis une application.
 -- 2. RÉSUMÉ DU COMPTE : après le code SMS, l'écran « Ce numéro a déjà un compte Hailand » montre ce que le compte contient
 --    déjà (adresses, boutique, livreur, équipe), uniquement pour la personne connectée.
+--
+-- APPLIQUÉE EN PRODUCTION le 2026-10-14 (accord du fondateur), en deux migrations : compte_hailand_table, compte_hailand_fonctions.
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 create table if not exists public.account_passages (
@@ -40,10 +42,9 @@ begin
   if p_cible is null or p_cible not in ('navigationx', 'hailandx', 'vendeur', 'console', 'flotte') then
     raise exception 'Application Hailand inconnue : %', p_cible;
   end if;
-  -- Ménage : les codes expirés ou utilisés de ce compte ne servent plus à rien.
-  delete from public.account_passages where user_id = v_uid and (utilise_le is not null or expire_le < now());
-  -- Garde-fou contre les abus : au plus 10 codes encore valides par compte.
-  if (select count(*) from public.account_passages where user_id = v_uid) >= 10 then
+  -- Garde-fou contre les abus : au plus 10 codes encore valides par compte. (Pas de ménage automatique : le connecteur de
+  -- production bloque les migrations qui contiennent une suppression ; les lignes usées ou expirées sont sans effet.)
+  if (select count(*) from public.account_passages where user_id = v_uid and utilise_le is null and expire_le > now()) >= 10 then
     raise exception 'Trop de passages en attente. Patientez deux minutes.';
   end if;
   v_code := translate(encode(gen_random_bytes(24), 'base64'), '+/', '-_');
@@ -73,11 +74,7 @@ as $$
   returning user_id
 $$;
 revoke execute on function public.fn_passage_consommer(text, text) from public, anon, authenticated;
-do $$ begin
-  if exists (select 1 from pg_roles where rolname = 'service_role') then
-    grant execute on function public.fn_passage_consommer(text, text) to service_role;
-  end if;
-end $$;
+grant execute on function public.fn_passage_consommer(text, text) to service_role;
 
 /** Ce que le compte connecté contient déjà, toutes applications confondues (écran « Ce numéro a déjà un compte Hailand »). */
 create or replace function public.fn_compte_resume()

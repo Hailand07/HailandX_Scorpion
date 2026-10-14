@@ -52,12 +52,11 @@ describe('passage de session', () => {
     expect(await refused(as(db, U.vendeur2, () => db.query("select fn_passage_consommer($1, 'console')", [code])))).toMatch(/permission denied/);
     expect(await refused(as(db, 'anon', () => db.query("select fn_passage_consommer($1, 'console')", [code])))).toMatch(/permission denied/);
   });
-  it('au plus 10 passages en attente par compte ; les codes usés sont nettoyés', async () => {
+  it('au plus 10 passages en attente par compte ; les codes usés ou expirés ne comptent plus', async () => {
     for (let i = 0; i < 10; i++) await creer(U.livreur2, 'flotte');
     expect(await refused(creer(U.livreur2, 'flotte'))).toMatch(/Trop de passages/);
     await db.exec(`update account_passages set utilise_le = now() where user_id = '${U.livreur2}'`);
-    await creer(U.livreur2, 'flotte');
-    expect((await one<{ n: number }>(`select count(*)::int n from account_passages where user_id = '${U.livreur2}'`)).n).toBe(1);
+    expect(await creer(U.livreur2, 'flotte')).toMatch(/^[A-Za-z0-9_-]{32}$/);
   });
 });
 
