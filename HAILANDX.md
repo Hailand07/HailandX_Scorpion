@@ -518,6 +518,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-14 | **Étape 1** (§28) : application **HailandX Vendeur** (`apps/vendeur`, Vercel `hailandx-vendeur`, https://hailandx-vendeur-gn.vercel.app) ; HailandX à 3 onglets ; notifications séparées ; paquet commun `@hailandx/kit` ; lien console retiré de Compte. |
 | 2026-10-14 | **Étape 2** (§29) : application **Hailand Console** (`apps/console`, Vercel `hailand-console`, https://hailand-console-gn.vercel.app) ; rôles fondateur / opérateur, journal des actions, paramètres réservés au fondateur avec motif ; circuit des certifications vendeur → console → HailandMap ; `/admin` retiré de HailandX. Migration `hailand_console` **appliquée en production**. 202 tests. |
 | 2026-10-14 | **Étape 3** (§30) : **Hailand Flotte, navigation plein écran** — carte Mapbox (style Hailand) dès l'acceptation, fiche retrait / dépôt (quartier, commune, code, repère, appel), guidage virage par virage avec voix française et recalcul hors route, écran maintenu allumé, arrivée à moins de 50 m avec contour du bâtiment, carte des missions disponibles ; plus aucun lien Google. Migration `flotte_navigation` appliquée en production. 218 tests. |
+| 2026-10-14 | **Étape 4** (technique) : reconstruction sélective ajoutée aux projets Vercel `hailandx-scorpion` et `hailandx-flotte` (déjà en place pour `hailandx-vendeur` et `hailand-console`). Reste : essais en ligne. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -653,7 +654,7 @@ Décisions du fondateur (2026-10-14, toutes les propositions acceptées) :
 | 1 | `apps/vendeur` (espace vendeur v2 déplacé, barre : Tableau de bord, Commandes, Produits, Plus) ; HailandX à 3 onglets (Accueil, Commandes, Compte) + invitation à vendre ; « Voir ma boutique » ouvre la page publique dans HailandX | ✅ 2026-10-14 (§28) |
 | 2 | `apps/console` + rôles, journal, circuit des certifications ; retrait de `/admin` ; HailandMap ne voit que les demandes confirmées | ✅ 2026-10-14 (§29) |
 | 3 | Flotte : navigation plein écran | ✅ 2026-10-14 (§30) |
-| 4 | Mise en ligne : projets Vercel `hailandx-vendeur` et `hailand-console`, variables, documentation, essais | en partie : les deux projets existent (§28, §29) ; reconstruction sélective de `hailandx` et `flotte`, essais en ligne à faire |
+| 4 | Mise en ligne : projets Vercel `hailandx-vendeur` et `hailand-console`, variables, documentation, essais | ✅ technique (2026-10-14) : les 4 projets Vercel (`hailandx-scorpion`, `hailandx-vendeur`, `hailand-console`, `hailandx-flotte`) se déploient depuis `main` et **ne se reconstruisent que si leur dossier, `packages/` ou `package-lock.json` changent** ; ⚠️ essais en ligne par le fondateur |
 
 Une PR par étape, testée, documentée, vérifiée à l'écran.
 
