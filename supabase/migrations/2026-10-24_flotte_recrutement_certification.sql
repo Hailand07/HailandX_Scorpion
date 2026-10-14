@@ -10,6 +10,7 @@
 --    `certified_building_id` renseigné), le vendeur dont la boutique en préparation est à cette adresse est prévenu dans
 --    HailandX Vendeur : « vous pouvez ouvrir la vente ».
 -- Ajouts seulement ; aucune donnée existante n'est modifiée.
+-- APPLIQUÉE EN PRODUCTION le 2026-10-14 (accord du fondateur), en deux migrations : flotte_recrutement_table, flotte_recrutement_fonctions.
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 -- ── 1. Invitations de livreurs ───────────────────────────────────────────────────────────────────────────────────────────
