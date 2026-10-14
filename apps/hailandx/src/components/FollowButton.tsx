@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
+import { browserClient, useSession } from '@hailandx/kit';
 
 /** « Suivre » une boutique : l'abonné retrouve ses boutiques dans « Commandes ». Visiteur : renvoi vers la connexion. */
 export function FollowButton({ shopId, shopSlug, initialCount }: { shopId: string; shopSlug: string; initialCount: number }) {

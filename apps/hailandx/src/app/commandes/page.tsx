@@ -1,12 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatGnf, type ParcelStatus } from '@hailandx/commerce';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
-import { mediaUrl } from '@/lib/media';
-import { BUYER_STEPS, isOrderActive, orderStep, STEP_HEADLINE } from '@/lib/seller';
-import { Screen, Segmented } from '@/components/Screen';
+import { BUYER_STEPS, formatGnf, isOrderActive, orderStep, type ParcelStatus, STEP_HEADLINE } from '@hailandx/commerce';
+import { browserClient, mediaUrl, Screen, Segmented, useSession } from '@hailandx/kit';
 
 interface Item { name_snapshot: string; quantity: number; offers: { photo_paths: string[] | null; catalog_products: { slug: string } | null } | null }
 interface Parcel { id: string; status: ParcelStatus; delivered_at: string | null; shops: { name: string; slug: string } | null; order_items: Item[] }

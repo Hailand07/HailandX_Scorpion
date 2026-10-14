@@ -1,5 +1,5 @@
 import { SUPPORT_WHATSAPP } from '@/lib/links';
-import { BackHeader, Screen } from '@/components/Screen';
+import { BackHeader, Screen } from '@hailandx/kit';
 
 export const metadata = { title: 'Aide' };
 
@@ -8,7 +8,7 @@ const FAQ: [string, string][] = [
   ['À quoi sert le code à 4 chiffres ?', 'Vous le donnez au livreur seulement quand vous avez le colis en main. C’est ce qui confirme la remise.'],
   ['Comment se passe le paiement ?', 'Orange Money : l’argent est bloqué par Hailand et versé au vendeur à la remise. Espèces : vous payez le livreur à la remise.'],
   ['Un problème avec un colis ?', 'Ouvrez la commande, puis « Signaler un problème ». L’équipe Hailand lit les deux versions et tranche.'],
-  ['Comment vendre sur HailandX ?', 'Onglet « Vendre » : votre adresse, votre boutique, puis la certification par un agent Hailand. Vos produits s’ajoutent ensuite dans « Ma boutique ».'],
+  ['Comment vendre sur HailandX ?', 'Avec l’application HailandX Vendeur (Compte, « Vendre sur HailandX ») : votre adresse, votre boutique, puis la certification par un agent Hailand. Vos produits s’ajoutent ensuite dans votre tableau de bord.'],
   ['Comment supprimer mon compte ?', 'Compte, puis « Supprimer mon compte » en bas de l’écran. Votre numéro est alors libéré.'],
 ];
 

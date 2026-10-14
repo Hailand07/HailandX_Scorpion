@@ -515,6 +515,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-13 | Parcours vendeur recentré (produits seulement tableau de bord, boutique ouverte, adresse d'abord) et suppression de compte dans Paramètres (§25). Migration `compte` appliquée ; fonction de suppression à exécuter par le fondateur. |
 | 2026-10-14 | **Interface v2** validée par le fondateur et codée (§26) : 4 onglets (Accueil, Commandes, Vendre / Ma boutique, Compte), recherche ouverte depuis l'accueil, ouverture de boutique en trois étapes, tableau de bord vendeur et six pages rangées, éditeur de produit plein écran, Compte simplifié, aide. 189 tests. |
 | 2026-10-14 | **Plan validé** (§27) : séparer HailandX (acheteurs) et HailandX Vendeur, créer Hailand Console (équipe, rôles, journal, circuit des certifications vers HailandMap), Flotte avec navigation Mapbox plein écran ; tout dans ce dépôt. |
+| 2026-10-14 | **Étape 1** (§28) : application **HailandX Vendeur** (`apps/vendeur`, Vercel `hailandx-vendeur`, https://hailandx-vendeur-gn.vercel.app) ; HailandX à 3 onglets ; notifications séparées ; paquet commun `@hailandx/kit` ; lien console retiré de Compte. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -646,10 +647,22 @@ Décisions du fondateur (2026-10-14, toutes les propositions acceptées) :
 
 | Étape | Contenu | État |
 |---|---|---|
-| 0 | Maquettes de la Console et de la navigation Flotte (artefact « HailandX — Maquettes », page v3) | en cours |
-| 1 | `apps/vendeur` (espace vendeur v2 déplacé, barre : Tableau de bord, Commandes, Produits, Plus) ; HailandX à 3 onglets (Accueil, Commandes, Compte) + invitation à vendre ; « Voir ma boutique » ouvre la page publique dans HailandX | à faire |
+| 0 | Maquettes de la Console et de la navigation Flotte (artefact « HailandX — Maquettes », page v3) | ✅ 2026-10-14 (10 écrans) |
+| 1 | `apps/vendeur` (espace vendeur v2 déplacé, barre : Tableau de bord, Commandes, Produits, Plus) ; HailandX à 3 onglets (Accueil, Commandes, Compte) + invitation à vendre ; « Voir ma boutique » ouvre la page publique dans HailandX | ✅ 2026-10-14 (§28) |
 | 2 | `apps/console` + rôles, journal, circuit des certifications ; retrait de `/admin` ; HailandMap ne voit que les demandes confirmées | à faire |
 | 3 | Flotte : navigation plein écran | à faire |
 | 4 | Mise en ligne : projets Vercel `hailandx-vendeur` et `hailand-console`, variables, documentation, essais | à faire |
 
 Une PR par étape, testée, documentée, vérifiée à l'écran.
+
+## 28. Étape 1 : HailandX Vendeur séparé de HailandX (2026-10-14) ✅ code, tests, captures (base simulée) ; ⚠️ à essayer en ligne
+
+- **Nouvelle application `apps/vendeur`** (paquet `@hailandx/vendeur`, `npm run dev:vendeur`, port 3002), projet Vercel **`hailandx-vendeur`** (racine `apps/vendeur`, adresse **https://hailandx-vendeur-gn.vercel.app** — `hailandx-vendeur.vercel.app` était déjà pris ; variables `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_HAILANDX_URL` ; protection Vercel désactivée pour un accès public ; reconstruit seulement si `apps/vendeur`, `packages/` ou `package-lock.json` changent).
+  - Tout l'espace vendeur v2 y est déplacé (§26) avec des adresses courtes : `/` (découverte → ouverture en trois étapes → tableau de bord), `/ouvrir`, `/commandes` (+ `/commandes/etiquette`), `/produits` (+ `/produits/nouveau`, `/produits/[id]`), `/argent`, `/statistiques`, `/avis`, `/reglages`, et nouveau : **`/plus`** (pages rangées + compte du vendeur), `/notifications` (celles de la boutique), `/aide` (aide aux vendeurs), `/connexion`, `/compte/supprimer`.
+  - **Barre du bas** : Tableau de bord, Commandes (pastille des colis à préparer), Produits, Plus — **affichée seulement une fois la vente ouverte** ; avant, l'application est un seul parcours (découverte puis « Ouvrir ma boutique »), avec « Mon compte » en haut.
+  - Étape 1 de l'ouverture : **repérer son bâtiment avec NavigationX** (même numéro), puis « J'ai repéré mon bâtiment : actualiser ». Le repérage sur la carte de HailandX (« Où livrer ? ») reste réservé aux acheteurs.
+  - Les pages publiques restent dans HailandX : « Voir ma boutique », partages et liens suivis pointent vers `NEXT_PUBLIC_HAILANDX_URL` (par défaut https://hailandx-hdxk.vercel.app).
+- **HailandX (acheteurs)** : barre à **3 onglets** (Accueil, Commandes, Compte) ; carte « **Vendre sur HailandX** » dans Compte, écran d'ouverture et accueil (boutiques d'exemple) renvoient vers HailandX Vendeur ; **lien vers la console de l'équipe retiré de Compte** (la page `/admin` reste jusqu'à la console, étape 2) ; `/vendeur/*` redirige vers HailandX Vendeur.
+- **Notifications séparées** : celles dont le lien commence par `/vendeur` (nouvelle commande, avis, litige côté boutique) ne s'affichent que dans HailandX Vendeur (liens réécrits sans `/vendeur`), les autres seulement dans HailandX ; « Tout marquer lu » ne touche que celles de l'application ouverte. Aucune modification de la base.
+- **Code partagé** : nouveau paquet **`packages/kit`** (`@hailandx/kit`) : client de la base, session, images, briques d'écran (`Screen`, `BackHeader`, `ListRow`…), connexion par téléphone (`PhoneLogin`), suppression du compte, notifications et cloche, preuve de remise, fil de litige, adresses des applications (`HAILANDX_URL`, `VENDEUR_URL`, `FLOTTE_URL`, `NAVIGATIONX_URL`). La logique pure (ventes, onglets des colis, étapes de commande) passe dans `packages/commerce` (`dashboard.ts`, 9 tests).
+- **Vérification** : `npm run lint` (7 projets), `npm test` (**189 tests**), builds HailandX et HailandX Vendeur, 10 écrans ouverts dans Chromium (390×844, base simulée) sans erreur.

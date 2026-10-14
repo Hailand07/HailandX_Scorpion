@@ -2,13 +2,9 @@
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, QrScanner } from '@hailandx/ui';
-import { BackHeader } from '@/components/Screen';
+import { BackHeader, browserClient, DisputeThread, ProofPhoto, useSession } from '@hailandx/kit';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
-import { DisputeThread } from '@/components/DisputeThread';
-import { ProofPhoto } from '@/components/ProofPhoto';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
 interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }

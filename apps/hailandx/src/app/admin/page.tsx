@@ -3,10 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Wordmark } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { DisputeThread } from '@/components/DisputeThread';
-import { ProofPhoto } from '@/components/ProofPhoto';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
+import { browserClient, DisputeThread, ProofPhoto, useSession } from '@hailandx/kit';
 
 interface Courier { user_id: string; full_name: string; vehicle: string; status: string; cash_balance_gnf: number; cash_limit_gnf: number; created_at: string }
 interface Shop { id: string; name: string; slug: string; status: string }

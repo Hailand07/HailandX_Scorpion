@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { browserClient } from '@/lib/supabase';
-import { useSession } from '@/lib/useSession';
+import { browserClient, useSession } from '@hailandx/kit';
 
 /** Cœur « favori » d'un produit. Visiteur : renvoi vers la connexion, puis retour sur la fiche. */
 export function FavoriteButton({ productId, next }: { productId: string; next: string }) {

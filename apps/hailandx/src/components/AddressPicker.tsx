@@ -5,7 +5,7 @@ import {
   CONFIDENCE_LABELS, SCAN_RADIUS_M, certifiedBuildingsNear, describeGeoError, detectAtTap, detectBuilding, fmtM, isInAppBrowser, levelLabel, osmPolygonsAround, proposalFromDetection, proposalFromTap,
   shouldStop, summarize, type BuildingsClient, type CandidateInput, type GpsSample, type GpsSummary, type Proposal,
 } from '@hailandx/scorpion';
-import { browserClient } from '@/lib/supabase';
+import { browserClient } from '@hailandx/kit';
 import type { ConfirmedBuilding } from '@/lib/address';
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;

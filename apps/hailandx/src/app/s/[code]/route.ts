@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { serverClient } from '@/lib/supabase';
+import { serverClient } from '@hailandx/kit';
 
 /** Lien suivi court : /s/<code> → compte le clic, puis ouvre la boutique ou le produit en gardant la source (?src=). */
 export async function GET(req: Request, { params }: { params: Promise<{ code: string }> }) {

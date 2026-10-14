@@ -1,0 +1,17 @@
+{
+  "name": "@hailandx/kit",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "peerDependencies": {
+    "next": "^16.4.0",
+    "react": "^19.0.0"
+  },
+  "dependencies": {
+    "@hailandx/commerce": "*",
+    "@hailandx/ui": "*",
+    "@supabase/supabase-js": "^2.117.3"
+  }
+}

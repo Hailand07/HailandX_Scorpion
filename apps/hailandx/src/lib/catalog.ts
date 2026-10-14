@@ -1,8 +1,7 @@
 import { unstable_cache } from 'next/cache';
 import { trustScore, type ShopStats } from '@hailandx/commerce';
 import { PRODUCTS as SAMPLE_PRODUCTS, SHOPS as SAMPLE_SHOPS, type SampleProduct, type SampleShop } from '@/data/sample';
-import { mediaUrl } from './media';
-import { serverClient } from './supabase';
+import { colorOf, mediaUrl, serverClient } from '@hailandx/kit';
 
 export type ShopView = SampleShop & { logoUrl?: string | null; coverUrl?: string | null; trust?: number; whatsapp?: string | null };
 export type ProductView = SampleProduct & { offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean; productId?: string; sectionId?: string | null; variants?: { id: string; label: string; stock: number }[] };
@@ -14,13 +13,7 @@ export interface Catalog {
   source: 'base' | 'exemple';
 }
 
-const PALETTE = ['#f6d8bd', '#dbe4ff', '#f9d6e3', '#d7f0dc', '#e8dcf5', '#fbeec1', '#d3edd9', '#f3d3e0'];
-/** Couleur stable dérivée du nom (en attendant les vraies photos). */
-export const colorOf = (key: string): string => {
-  let h = 0;
-  for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return PALETTE[h % PALETTE.length];
-};
+export { colorOf };
 export const initialsOf = (name: string): string =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?';
 
