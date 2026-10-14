@@ -53,3 +53,13 @@ describe('lien vers une autre application', () => {
     expect(await adresseAvecSession(null, 'vendeur', 'https://v.example/')).toBe('https://v.example/');
   });
 });
+
+describe('parcours d’enregistrement dans NavigationX', () => {
+  it('adresse profonde avec application et chemin de retour (jamais une adresse libre)', async () => {
+    const { lienEnregistrement, NAVIGATIONX_URL } = await import('./links');
+    const u = new URL(lienEnregistrement('vendeur', '/ouvrir'));
+    expect(u.origin).toBe(new URL(NAVIGATIONX_URL).origin);
+    expect(Object.fromEntries(u.searchParams)).toEqual({ enregistrer: '1', retour: 'vendeur', chemin: '/ouvrir' });
+    expect(new URL(lienEnregistrement('hailandx', '//pirate.example')).searchParams.get('chemin')).toBe('/');
+  });
+});
