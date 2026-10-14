@@ -1,31 +1,66 @@
 'use client';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { browserClient } from '@/lib/supabase';
+import { useSession } from '@/lib/useSession';
+import { Icon } from './Screen';
 
-const HIDDEN = ['/p/', '/commande', '/connexion', '/bienvenue', '/admin'];
-const icon = (d: React.ReactNode) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
+/** Écrans plein écran : une barre d'action y remplace la barre du bas. */
+const HIDDEN = ['/p/', '/commande', '/connexion', '/bienvenue', '/admin', '/vendeur/produits/', '/vendeur/commandes/etiquette', '/compte/supprimer'];
+
 const TABS = [
-  { href: '/', label: 'Accueil', match: (p: string) => p === '/' || p.startsWith('/b/'), svg: icon(<><path d="M3 11 12 3l9 8" /><path d="M5 10v10h14V10" /></>) },
-  { href: '/recherche', label: 'Chercher', match: (p: string) => p.startsWith('/recherche'), svg: icon(<><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></>) },
-  { href: '/vendeur', label: 'Vendre', match: (p: string) => p.startsWith('/vendeur'), svg: icon(<><path d="M4 9h16l-1.4-5H5.4z" /><path d="M5 9v11h14V9" /><path d="M10 20v-5h4v5" /></>) },
-  { href: '/compte', label: 'Compte', match: (p: string) => ['/compte', '/commandes', '/panier', '/favoris', '/notifications', '/adresse', '/parametres'].some((x) => p.startsWith(x)), svg: icon(<><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>) },
-];
+  { href: '/', id: 'accueil', icon: 'home', match: (p: string) => p === '/' || ['/recherche', '/b/', '/panier'].some((x) => p.startsWith(x)) },
+  { href: '/commandes', id: 'commandes', icon: 'box', match: (p: string) => p.startsWith('/commandes') },
+  { href: '/vendeur', id: 'boutique', icon: 'shop', match: (p: string) => p.startsWith('/vendeur') },
+  { href: '/compte', id: 'compte', icon: 'user', match: (p: string) => ['/compte', '/favoris', '/notifications', '/adresse', '/aide', '/parametres'].some((x) => p.startsWith(x)) },
+] as const;
 
-/** Barre de navigation du bas : Accueil, Chercher, Vendre, Commandes. Masquée là où une barre d'action la remplace. */
+/** Barre du bas (v2) : Accueil, Commandes, Vendre / Ma boutique, Compte. Une pastille signale ce qui attend une action. */
 export function BottomNav() {
   const path = usePathname() ?? '/';
+  const session = useSession();
+  const [open, setOpen] = useState(false);
+  const [toPrepare, setToPrepare] = useState(0);
+  const [inProgress, setInProgress] = useState(0);
+
+  const refresh = useCallback(async () => {
+    const sb = browserClient(); const uid = session?.user.id;
+    if (!sb || !uid) { setOpen(false); setToPrepare(0); setInProgress(0); return; }
+    const [shop, mine] = await Promise.all([
+      sb.from('shops').select('id,status').eq('owner_id', uid).limit(1).maybeSingle(),
+      sb.from('parcels').select('id, orders!inner(buyer_id)', { count: 'exact', head: true }).eq('orders.buyer_id', uid).not('status', 'in', '(remis,annule)'),
+    ]);
+    const s = shop.data as { id: string; status: string } | null;
+    setOpen(s?.status === 'ouverte');
+    setInProgress(mine.count ?? 0);
+    if (s) {
+      const { count } = await sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', s.id).eq('status', 'attente_vendeur');
+      setToPrepare(count ?? 0);
+    } else setToPrepare(0);
+  }, [session]);
+
+  useEffect(() => { void refresh(); }, [refresh, path]);
+  useEffect(() => { const t = setInterval(refresh, 60_000); return () => clearInterval(t); }, [refresh]);
+
   if (HIDDEN.some((h) => (h.endsWith('/') ? path.startsWith(h) : path === h || path.startsWith(`${h}/`)))) return null;
   return (
     <>
-      <div aria-hidden="true" className="h-[84px]" />
-      <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-40 mx-auto flex max-w-md items-stretch justify-around border-t border-line-soft bg-card/95 px-2 pb-[max(10px,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur">
+      <div aria-hidden="true" className="h-[88px]" />
+      <nav aria-label="Navigation principale" className="fixed inset-x-0 bottom-0 z-40 mx-auto grid max-w-md grid-cols-4 border-t border-line bg-card/[0.97] px-2 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         {TABS.map((t) => {
           const active = t.match(path);
-          const vendre = t.href === '/vendeur';
+          const badge = t.id === 'commandes' ? inProgress : t.id === 'boutique' ? toPrepare : 0;
+          const label = t.id === 'accueil' ? 'Accueil' : t.id === 'commandes' ? 'Commandes' : t.id === 'compte' ? 'Compte' : open ? 'Ma boutique' : 'Vendre';
+          const shopTab = t.id === 'boutique';
           return (
-            <Link key={t.href} href={t.href} aria-current={active ? 'page' : undefined} className={`flex min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 py-1.5 text-[11px] font-bold ${active ? 'text-blue' : 'text-muted'}`}>
-              <span className={vendre ? `flex h-8 w-11 items-center justify-center rounded-full ${active ? 'bg-blue text-white' : 'bg-lime text-ink'}` : ''}>{t.svg}</span>
-              {t.label}
+            <Link key={t.id} href={t.href} aria-current={active ? 'page' : undefined} aria-label={badge ? `${label}, ${badge} en attente` : undefined}
+              className={`relative flex min-h-[52px] flex-col items-center justify-center gap-[3px] text-[11px] ${active ? 'font-extrabold text-blue' : 'font-bold text-muted'}`}>
+              {shopTab
+                ? <span className={`flex h-7 w-[46px] items-center justify-center rounded-full ${active ? 'bg-blue text-white' : 'bg-lime text-ink'}`}><Icon name="shop" /></span>
+                : <Icon name={t.icon} size={22} stroke={active ? 2 : 1.8} />}
+              {label}
+              {badge > 0 && <span aria-hidden="true" className={`absolute top-0 left-[58%] flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-card px-1 text-[10.5px] font-extrabold text-white ${shopTab ? 'bg-ink' : 'bg-blue'}`}>{badge > 9 ? '9+' : badge}</span>}
             </Link>
           );
         })}

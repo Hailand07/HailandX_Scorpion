@@ -5,6 +5,7 @@ import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 import { DeliverTo } from '@/components/DeliverTo';
 import { NotificationBell } from '@/components/NotificationBell';
 import { RueStrip } from '@/components/RueStrip';
+import { CartButton } from '@/components/CartButton';
 
 /** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
 export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string; compte?: string }> }) {
@@ -23,35 +24,27 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-4">
       {compte === 'supprime' && <p role="status" className="mx-5 mt-5 rounded-2xl bg-ok-soft px-4 py-3 text-[13.5px] font-bold text-ok">Votre compte a été supprimé. Vous pouvez recommencer avec le même numéro quand vous voulez.</p>}
-      <header className="flex flex-col gap-3.5 px-5 pb-1 pt-5">
+      <header className="flex flex-col gap-2.5 px-5 pb-1 pt-5">
         <div className="flex items-center justify-between">
           <Wordmark />
-          <span className="flex items-center gap-2"><NotificationBell />
-          <Link href="/panier" aria-label="Panier" className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ink">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" /><path d="M3 6h18" /><path d="M16 10a4 4 0 0 1-8 0" /></svg>
-          </Link></span>
+          <span className="flex items-center gap-2"><NotificationBell /><CartButton /></span>
         </div>
         <DeliverTo />
-        <Link href="/recherche" className="flex h-12 items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14.5px] font-medium text-muted">
+        <Link href="/recherche" className="flex h-[50px] items-center gap-2.5 rounded-2xl border border-line bg-card px-4 text-[14.5px] font-medium text-muted">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12141c" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
           Rechercher un produit, une boutique…
         </Link>
       </header>
 
-      <nav aria-label="Catégories" className="flex gap-2 overflow-x-auto px-5 pb-1">
+      <nav aria-label="Catégories" className="flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">
         {['Tout', ...CATEGORIES].map((c) => {
           const active = c === 'Tout' ? !cat || !CATEGORIES.includes(cat) : c === cat;
           return <Link key={c} href={c === 'Tout' ? '/' : `/?cat=${encodeURIComponent(c)}`} aria-current={active ? 'true' : undefined} className={`flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] font-bold ${active ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{c}</Link>;
         })}
       </nav>
 
-      <Link href="/vendeur" className="mx-5 flex items-center gap-3.5 rounded-[22px] bg-night px-4 py-4 text-night-text active:opacity-90">
-        <span aria-hidden="true" className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-lime text-ink"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 9h16l-1.4-5H5.4z" /><path d="M5 9v11h14V9" /><path d="M10 20v-5h4v5" /></svg></span>
-        <span className="flex flex-1 flex-col"><span className="font-display text-[16px] font-semibold tracking-tight">Vous vendez ? Ouvrez votre boutique</span><span className="text-[12.5px] font-medium text-night-muted">Gratuit, avec votre numéro de téléphone.</span></span>
-        <span aria-hidden="true" className="text-[20px] font-bold text-lime">›</span>
-      </Link>
-
       <section aria-label="La rue" className="flex flex-col gap-2.5 px-5">
-        <h2 className="font-display text-lg font-semibold tracking-tight">La rue</h2>
+        <div className="flex items-baseline justify-between"><h2 className="font-display text-lg font-semibold tracking-tight">La rue</h2><span className="text-[12.5px] font-semibold text-muted">Livrées en moins d’1 h</span></div>
         <RueStrip shops={SHOPS.map((x) => ({ slug: x.slug, name: x.name, initials: x.initials, color: x.color, logoUrl: x.logoUrl ?? null, isNew: x.isNew }))} real={source === 'base'} />
       </section>
 

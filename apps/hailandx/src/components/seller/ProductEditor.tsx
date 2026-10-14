@@ -1,0 +1,237 @@
+'use client';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { formatGnf, slugify } from '@hailandx/commerce';
+import { browserClient } from '@/lib/supabase';
+import { mediaUrl, uploadPhoto } from '@/lib/media';
+import type { MyShop } from '@/lib/useMyShop';
+import { BackHeader, errText, Icon, Notice, Screen, Switch } from '../Screen';
+
+interface Variant { key: number; id: string; label: string; stock: number }
+interface Section { id: string; name: string }
+interface Cat { id: string; name: string }
+interface Existing { id: string; price_gnf: number; section_id: string | null; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+
+const MAX_PHOTOS = 5;
+const rand = () => Math.random().toString(36).slice(2, 6);
+
+/**
+ * Ajouter ou modifier un produit (v2), en plein écran : photos, nom (fiche commune si le produit existe déjà), prix,
+ * variantes et stock, rayon. Seulement boutique ouverte (la base l'impose aussi : déclencheur offers_require_open_shop).
+ */
+export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: string; offerId?: string }) {
+  const router = useRouter();
+  const sb = browserClient();
+  const editing = Boolean(offerId);
+  const [existing, setExisting] = useState<Existing | null | undefined>(editing ? undefined : null);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [cats, setCats] = useState<Cat[]>([]);
+  const [name, setName] = useState('');
+  const [linked, setLinked] = useState<{ id: string; name: string } | null>(null);
+  const [sugg, setSugg] = useState<{ id: string; name: string }[]>([]);
+  const [price, setPrice] = useState('');
+  const [variants, setVariants] = useState<Variant[]>([{ key: 0, id: '', label: '', stock: 1 }]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  const [section, setSection] = useState<string | null>(null);
+  const [cat, setCat] = useState<string | null>(shop.category_id);
+  const [active, setActive] = useState(true);
+  const [kept, setKept] = useState<string[]>([]);
+  const [files, setFiles] = useState<File[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const [published, setPublished] = useState<{ slug: string; name: string } | null>(null);
+  const [nextKey, setNextKey] = useState(1);
+
+  useEffect(() => {
+    if (!sb) return;
+    sb.from('shop_sections').select('id,name').eq('shop_id', shop.id).order('position').order('name').then(({ data }) => setSections((data as Section[]) ?? []));
+    sb.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? []));
+    if (!offerId) return;
+    sb.from('offers').select('id,price_gnf,section_id,active,photo_paths,offer_variants(id,label,stock),catalog_products(name,slug)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
+      const o = (data as unknown as Existing | null) ?? null;
+      setExisting(o);
+      if (!o) return;
+      setPrice(String(o.price_gnf)); setSection(o.section_id); setActive(o.active); setKept(o.photo_paths ?? []);
+      const vs = (o.offer_variants ?? []).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+      if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: v.id, label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
+    });
+  }, [sb, shop.id, offerId]);
+
+  // Fiche commune : si quelqu'un vend déjà ce produit, on y ajoute son offre (même fiche, plusieurs vendeurs).
+  useEffect(() => {
+    const term = name.trim().replace(/[%_,()]/g, ' ').trim();
+    if (!sb || editing || linked || term.length < 3) { setSugg([]); return; }
+    const t = setTimeout(async () => {
+      const { data } = await sb.from('catalog_products').select('id,name').ilike('name', `%${term}%`).eq('status', 'actif').limit(4);
+      setSugg((data as { id: string; name: string }[]) ?? []);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [name, linked, editing, sb]);
+
+  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
+  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
+
+  const setVar = (key: number, patch: Partial<Variant>) => setVariants((vs) => vs.map((v) => (v.key === key ? { ...v, ...patch } : v)));
+  const priceN = Number(price.replace(/\s/g, ''));
+
+  async function save() {
+    setMsg(null);
+    const rows = variants.map((v) => ({ ...v, label: v.label.trim() || (variants.length === 1 ? 'Standard' : '') }));
+    try {
+      if (!editing && name.trim().length < 2) throw new Error('Donnez un nom au produit.');
+      if (!Number.isFinite(priceN) || priceN < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
+      if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
+      if (new Set(rows.map((r) => r.label.toLowerCase())).size !== rows.length) throw new Error('Deux variantes portent le même nom.');
+      setBusy(true);
+      const uploaded: string[] = [];
+      for (const f of files) uploaded.push(await uploadPhoto(sb!, uid, f));
+      const photos = [...kept, ...uploaded].slice(0, MAX_PHOTOS);
+
+      if (!editing) {
+        let productId = linked?.id;
+        let slug = '';
+        if (!productId) {
+          slug = `${slugify(name) || 'produit'}-${rand()}`;
+          const { data, error } = await sb!.from('catalog_products').insert({ slug, name: name.trim(), category_id: cat, created_by: uid }).select('id').single();
+          if (error) throw new Error(errText(error));
+          productId = (data as { id: string }).id;
+        } else {
+          const { data } = await sb!.from('catalog_products').select('slug').eq('id', productId).maybeSingle();
+          slug = (data as { slug: string } | null)?.slug ?? '';
+        }
+        const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop.id, product_id: productId, section_id: section, price_gnf: Math.round(priceN), photo_paths: photos }).select('id').single();
+        if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans la liste.');
+        if (e2) throw new Error(errText(e2));
+        const { error: e3 } = await sb!.from('offer_variants').insert(rows.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
+        if (e3) throw new Error(errText(e3));
+        setPublished({ slug, name: linked?.name ?? name.trim() });
+      } else {
+        const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), section_id: section, active, photo_paths: photos }).eq('id', offerId!);
+        if (error) throw new Error(errText(error));
+        for (const id of removed) {
+          const r = await sb!.from('offer_variants').delete().eq('id', id);
+          if (r.error?.code === '23503') throw new Error('Une variante déjà commandée ne se supprime pas : mettez plutôt son stock à 0.');
+          if (r.error) throw new Error(errText(r.error));
+        }
+        for (const v of rows.filter((x) => x.id)) { const r = await sb!.from('offer_variants').update({ label: v.label, stock: v.stock }).eq('id', v.id); if (r.error) throw new Error(r.error.code === '23505' ? 'Deux variantes portent le même nom.' : errText(r.error)); }
+        const fresh = rows.filter((x) => !x.id);
+        if (fresh.length) { const r = await sb!.from('offer_variants').insert(fresh.map((v) => ({ offer_id: offerId, label: v.label, stock: v.stock }))); if (r.error) throw new Error(r.error.code === '23505' ? 'Deux variantes portent le même nom.' : errText(r.error)); }
+        router.push('/vendeur/produits');
+        return;
+      }
+    } catch (e) {
+      setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'Une erreur est survenue.' });
+    }
+    setBusy(false);
+  }
+
+  if (published) {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/p/${published.slug}?b=${shop.slug}` : '';
+    return (
+      <Screen className="items-center justify-center gap-3.5 px-7 pb-20 text-center">
+        <span role="status" className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-lime"><Icon name="check" size={30} stroke={2.4} /></span>
+        <h1 className="font-display text-[22px] font-semibold">Produit en vente</h1>
+        <p className="text-[14.5px] font-semibold leading-relaxed text-muted">Il apparaît dans votre boutique. Partagez-le pour vos premières ventes.</p>
+        <a href={`https://wa.me/?text=${encodeURIComponent(`${published.name} — ${formatGnf(Math.round(priceN))} ${url}`)}`} target="_blank" rel="noreferrer" className="flex h-[50px] w-full items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Partager sur WhatsApp</a>
+        <button type="button" onClick={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setBusy(false); }} className="flex h-12 w-full items-center justify-center rounded-2xl border border-line text-[14px] font-extrabold">Ajouter un autre produit</button>
+        <Link href="/vendeur/produits" className="flex h-11 items-center text-[14px] font-extrabold">Retour aux produits</Link>
+      </Screen>
+    );
+  }
+  if (existing === undefined) return <Screen><BackHeader icon="close" href="/vendeur/produits" title="Modifier le produit" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (editing && existing === null) return <Screen><BackHeader icon="close" href="/vendeur/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
+
+  const nPhotos = kept.length + files.length;
+  const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
+  return (
+    <Screen className="gap-3 pb-32">
+      <BackHeader icon="close" href="/vendeur/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'} />
+      <Notice msg={msg} />
+
+      <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
+        {nPhotos < MAX_PHOTOS && (
+          <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[18px] bg-ink text-[11.5px] font-extrabold text-white">
+            <Icon name="camera" size={22} stroke={1.8} />Photo
+            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(e) => { const list = Array.from(e.target.files ?? []); setFiles((f) => [...f, ...list].slice(0, MAX_PHOTOS - kept.length)); e.target.value = ''; }} />
+          </label>
+        )}
+        {kept.map((p) => <Thumb key={p} src={mediaUrl(p)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
+        {previews.map((u, i) => <Thumb key={u} src={u} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
+        {nPhotos === 0 && <span className="self-center pl-1 text-[11.5px] font-bold leading-snug text-muted">Jusqu’à 5 photos réelles :<br />elles font vendre.</span>}
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
+        {editing ? (
+          <div className="flex flex-col gap-0.5"><span className="text-[13px] font-extrabold">Nom du produit</span><span className="text-[15px] font-bold">{existing?.catalog_products?.name}</span><span className="text-[11.5px] font-semibold text-muted">Le nom vient de la fiche commune du produit.</span></div>
+        ) : (
+          <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nom du produit
+            <input value={name} onChange={(e) => { setName(e.target.value); setLinked(null); }} autoComplete="off" maxLength={120} placeholder="Ex. Pagne wax 6 yards" className="h-[50px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
+          </label>
+        )}
+        {!editing && !linked && sugg.map((s) => (
+          <button key={s.id} type="button" onClick={() => { setLinked(s); setName(s.name); setSugg([]); }} className="rounded-[14px] bg-blue-soft px-3 py-2.5 text-left text-[12.5px] font-bold leading-snug text-blue-ink">Déjà vendu sur HailandX : « {s.name} ». Toucher pour y ajouter votre offre.</button>
+        ))}
+        {linked && <p className="flex items-center justify-between gap-2 rounded-[14px] bg-ok-soft px-3 py-2.5 text-[12.5px] font-extrabold text-ok">Votre offre s’ajoute à la fiche existante.<button type="button" onClick={() => setLinked(null)} className="underline">Annuler</button></p>}
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix
+          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
+            <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="185 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
+            <span className="text-[13px] font-extrabold text-muted">GNF</span>
+          </span>
+        </label>
+      </section>
+
+      <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <div className="flex items-baseline justify-between"><h2 className="text-[14px] font-extrabold">Variantes et stock</h2><span className="text-[12px] font-bold text-muted">Taille, couleur…</span></div>
+        {variants.map((v, i) => (
+          <div key={v.key} className="flex items-center gap-2">
+            <input value={v.label} onChange={(e) => setVar(v.key, { label: e.target.value })} maxLength={40} placeholder={variants.length === 1 ? 'Standard (ou ex. Bleu)' : 'ex. L · Rouge'} aria-label={`Nom de la variante ${i + 1}`} className="h-11 min-w-0 flex-1 rounded-xl bg-bg px-3 text-[15px] font-bold outline-none focus:ring-2 focus:ring-blue" />
+            <span className="flex h-11 items-center rounded-xl border border-line">
+              <button type="button" aria-label={`Retirer une unité, variante ${i + 1}`} onClick={() => setVar(v.key, { stock: Math.max(0, v.stock - 1) })} className="h-[42px] w-9 text-[18px] font-extrabold">−</button>
+              <input value={v.stock} onChange={(e) => setVar(v.key, { stock: Math.max(0, Math.min(9999, Math.floor(Number(e.target.value.replace(/\D/g, '')) || 0))) })} inputMode="numeric" aria-label={`Stock de la variante ${i + 1}`} className="w-9 bg-transparent text-center text-[15px] font-extrabold outline-none" />
+              <button type="button" aria-label={`Ajouter une unité, variante ${i + 1}`} onClick={() => setVar(v.key, { stock: v.stock + 1 })} className="h-[42px] w-9 text-[18px] font-extrabold">+</button>
+            </span>
+            {variants.length > 1 && <button type="button" aria-label={`Supprimer la variante ${i + 1}`} onClick={() => { if (v.id) setRemoved((r) => [...r, v.id]); setVariants((vs) => vs.filter((x) => x.key !== v.key)); }} className="flex h-11 w-8 items-center justify-center text-muted"><Icon name="close" size={16} stroke={2.2} /></button>}
+          </div>
+        ))}
+        <button type="button" onClick={() => { setVariants((vs) => [...vs, { key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); }} className="h-11 rounded-xl border border-dashed border-[#c9c4b6] text-[13px] font-extrabold">+ Ajouter une variante</button>
+      </section>
+
+      <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <h2 className="text-[14px] font-extrabold">Rayon</h2>
+        <div className="flex flex-wrap gap-2">
+          {sections.map((s) => <button key={s.id} type="button" aria-pressed={section === s.id} onClick={() => setSection(s.id)} className={pill(section === s.id)}>{s.name}</button>)}
+          <button type="button" aria-pressed={section === null} onClick={() => setSection(null)} className={pill(section === null)}>Sans rayon</button>
+        </div>
+        {sections.length === 0 && <p className="text-[12px] font-semibold text-muted">Créez vos rayons depuis la liste des produits (« + Rayon »).</p>}
+      </section>
+
+      {!editing && !linked && (
+        <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+          <h2 className="text-[14px] font-extrabold">Catégorie</h2>
+          <div className="flex flex-wrap gap-2">{cats.map((c) => <button key={c.id} type="button" aria-pressed={cat === c.id} onClick={() => setCat(c.id)} className={pill(cat === c.id)}>{c.name}</button>)}</div>
+        </section>
+      )}
+
+      {editing && (
+        <section className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card px-3.5 py-3">
+          <span className="flex flex-col"><span className="text-[14px] font-extrabold">Visible dans la boutique</span><span className="text-[12px] font-semibold text-muted">Masqué, il reste dans votre liste.</span></span>
+          <Switch on={active} onChange={setActive} label="Visible dans la boutique" />
+        </section>
+      )}
+
+      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md bg-gradient-to-b from-transparent to-bg to-30% px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3">
+        <button type="button" disabled={busy} onClick={save} className="h-14 w-full rounded-[18px] bg-ink text-[16px] font-extrabold text-white disabled:opacity-60">{busy ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Publier le produit'}</button>
+      </div>
+    </Screen>
+  );
+}
+
+function Thumb({ src, onRemove }: { src: string | null; onRemove: () => void }) {
+  return (
+    <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[18px] bg-sand">
+      {src && /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" className="h-full w-full object-cover" />}
+      <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
+    </span>
+  );
+}
