@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { maskPhone } from '@hailandx/commerce';
-import { browserClient, GroupTitle, HAILANDX_URL, Icon, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
+import { browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
 
 /** Plus : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
@@ -29,9 +29,9 @@ export default function PlusPage() {
             {open && <ListRow href="/statistiques" icon="chart" label="Statistiques et liens suivis" />}
             {open && <ListRow href="/avis" icon="star" label="Avis des clients" />}
             <ListRow href="/reglages" icon="sliders" label="Réglages de la boutique" />
-            <a href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" rel="noreferrer" className="flex min-h-[58px] items-center gap-3 px-4">
+            <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex min-h-[58px] items-center gap-3 px-4">
               <Icon name="eye" /><span className="flex-1 text-[15px] font-bold">Voir ma boutique sur HailandX</span><span aria-hidden="true" className="font-extrabold text-[#9a9db0]">↗</span>
-            </a>
+            </LienHailand>
           </div>
         </section>
       )}

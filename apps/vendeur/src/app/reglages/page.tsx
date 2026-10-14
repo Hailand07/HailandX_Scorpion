@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, mediaUrl, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, LienHailand, mediaUrl, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
 import { declLabel } from '@/lib/useMyShop';
 import { SellerGate, type SellerCtx } from '@/components/SellerGate';
 
@@ -101,10 +101,10 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
             {decls.filter((x) => x.id !== decl?.id).map((x) => <button key={x.id} type="button" disabled={busy} onClick={() => changeAddress(x.id)} className="flex min-h-12 items-center justify-between rounded-[14px] border border-line bg-card px-3.5 text-[14px] font-bold"><span className="truncate">{declLabel(x)}</span><span className="text-[12px] text-muted">niveau {x.level}</span></button>)}
           </div>
         )}
-        <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">Vous déménagez ? Repérez le nouveau bâtiment avec <a href={NAVIGATIONX_URL} className="font-extrabold text-blue-ink">NavigationX</a>, puis demandez sa certification. Changer d’adresse referme la vente jusqu’à la nouvelle certification.</p>
+        <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">Vous déménagez ? Repérez le nouveau bâtiment avec <LienHailand app="navigationx" href={NAVIGATIONX_URL} className="font-extrabold text-blue-ink">NavigationX</LienHailand>, puis demandez sa certification. Changer d’adresse referme la vente jusqu’à la nouvelle certification.</p>
       </section>
 
-      <a href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" rel="noreferrer" className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-line bg-card text-[14.5px] font-extrabold"><Icon name="eye" size={18} />Voir ma boutique sur HailandX</a>
+      <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-line bg-card text-[14.5px] font-extrabold"><Icon name="eye" size={18} />Voir ma boutique sur HailandX</LienHailand>
     </Screen>
   );
 }

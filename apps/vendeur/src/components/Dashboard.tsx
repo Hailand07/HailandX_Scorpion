@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ago, barHeights, formatGnf, periodStats, type SalesDay, shortGnf } from '@hailandx/commerce';
-import { browserClient, HAILANDX_URL, Icon, ICONS, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
+import { browserClient, HAILANDX_URL, Icon, ICONS, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareRow } from './ShareRow';
 
@@ -82,7 +82,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
           <span className="flex items-center gap-1.5 text-[12px] font-bold text-[#0f7a5c]"><span className="h-[7px] w-[7px] rounded-full bg-[#0f7a5c]" />Ouverte · adresse certifiée</span>
         </span>
         <NotificationBell scope="vendeur" />
-        <a href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" rel="noreferrer" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-line bg-card"><Icon name="eye" /></a>
+        <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-line bg-card"><Icon name="eye" /></LienHailand>
       </header>
 
       <section aria-label="Mes ventes" className="flex flex-col gap-3.5 rounded-[24px] bg-ink p-4 text-white">
