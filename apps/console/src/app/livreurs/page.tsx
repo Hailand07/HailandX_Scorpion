@@ -8,33 +8,57 @@ interface Courier {
   user_id: string; full_name: string; phone: string | null; vehicle: string; status: string; available: boolean;
   cash_balance_gnf: number; cash_limit_gnf: number; last_seen_at: string | null; created_at: string;
 }
-type Tab = 'candidat' | 'valide' | 'especes' | 'suspendu';
+interface Invitation { phone: string; full_name: string; vehicle: string; created_at: string }
+type Tab = 'valide' | 'invitation' | 'candidat' | 'especes' | 'suspendu';
 const VEHICLE: Record<string, string> = { moto: 'Moto', velo: 'Vélo', voiture: 'Voiture', pied: 'À pied' };
-const keep: Record<Tab, (c: Courier) => boolean> = {
+const keep: Record<Exclude<Tab, 'invitation'>, (c: Courier) => boolean> = {
   candidat: (c) => c.status === 'candidat',
   valide: (c) => c.status === 'valide',
   especes: (c) => c.cash_balance_gnf > 0,
   suspendu: (c) => c.status === 'suspendu',
 };
-const TABS: { id: Tab; label: string }[] = [{ id: 'candidat', label: 'À valider' }, { id: 'valide', label: 'Validés' }, { id: 'especes', label: 'Espèces en main' }, { id: 'suspendu', label: 'Suspendus' }];
+// « Anciennes candidatures » : n'apparaît que s'il en reste (la candidature publique est fermée depuis la phase 5).
+const TABS: { id: Tab; label: string }[] = [{ id: 'valide', label: 'Validés' }, { id: 'invitation', label: 'Invitations en attente' }, { id: 'candidat', label: 'Anciennes candidatures' }, { id: 'especes', label: 'Espèces en main' }, { id: 'suspendu', label: 'Suspendus' }];
 const online = (c: Courier) => c.status === 'valide' && c.available && c.last_seen_at !== null && Date.now() - new Date(c.last_seen_at).getTime() < 15 * 60_000;
 
-/** Livreurs : valider les candidatures, suspendre, enregistrer les espèces reversées (tout est inscrit au journal). */
+/**
+ * Livreurs : Flotte n'est proposée à personne, l'équipe recrute et AJOUTE les livreurs ici par leur numéro (maquette F2).
+ * Numéro déjà connu → livreur validé tout de suite ; sinon invitation en attente, validée à sa première connexion à Flotte.
+ * Suspendre, réactiver, enregistrer les espèces reversées : tout est inscrit au journal.
+ */
 export default function CouriersPage() {
   const { sb } = useConsole();
   const { busy, msg, run } = useAction();
   const [rows, setRows] = useState<Courier[] | null>(null);
-  const [tab, setTab] = useState<Tab>('candidat');
+  const [invites, setInvites] = useState<Invitation[]>([]);
+  const [tab, setTab] = useState<Tab>('valide');
+  const [form, setForm] = useState({ phone: '', name: '', vehicle: 'moto' });
   const [confirm, setConfirm] = useState<string | null>(null);
   const [cash, setCash] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     const { data } = await sb.from('couriers').select('user_id,full_name,phone,vehicle,status,available,cash_balance_gnf,cash_limit_gnf,last_seen_at,created_at').order('created_at', { ascending: false });
     setRows((data as Courier[]) ?? []);
+    const inv = await sb.from('courier_invitations').select('phone,full_name,vehicle,created_at').is('accepted_at', null).order('created_at', { ascending: false });
+    setInvites((inv.data as Invitation[]) ?? []);
   }, [sb]);
   useEffect(() => { void load(); }, [load]);
 
-  const list = useMemo(() => (rows ?? []).filter(keep[tab]).sort((a, b) => (tab === 'especes' ? b.cash_balance_gnf - a.cash_balance_gnf : 0)), [rows, tab]);
+  const list = useMemo(() => (tab === 'invitation' ? [] : (rows ?? []).filter(keep[tab]).sort((a, b) => (tab === 'especes' ? b.cash_balance_gnf - a.cash_balance_gnf : 0))), [rows, tab]);
+  const count = (t: Tab) => (t === 'invitation' ? invites.length : (rows ?? []).filter(keep[t]).length);
+  const add = async (e: React.FormEvent) => {
+    e.preventDefault();
+    let result: string | null = null;
+    const ok = await run(
+      sb.rpc('fn_console_courier_add', { p_phone: form.phone, p_name: form.name, p_vehicle: form.vehicle }).then((r) => { result = r.data as string | null; return r; }),
+      `${form.name.trim()} est ajouté à la Flotte : validé si son numéro a déjà un compte Hailand, sinon invitation en attente jusqu’à sa première connexion.`,
+      load,
+    );
+    if (ok) {
+      setTab(result === 'invitation' ? 'invitation' : 'valide');
+      setForm({ phone: '', name: '', vehicle: 'moto' });
+    }
+  };
 
   const after = async () => { setConfirm(null); await load(); };
   const validate = (c: Courier) => run(sb.from('couriers').update({ status: 'valide' }).eq('user_id', c.user_id), `${c.full_name} est validé : il peut se mettre en service.`, after);
@@ -47,14 +71,43 @@ export default function CouriersPage() {
   return (
     <>
       <PageHead title="Livreurs" sub={rows ? `${rows.filter(online).length} en service maintenant · ${rows.filter((c) => c.status === 'valide').length} validés` : undefined} />
+      <div className="flex flex-col gap-5 lg:flex-row-reverse lg:items-start">
+      <form onSubmit={add} aria-label="Ajouter un livreur" className="flex flex-col gap-3 rounded-[22px] border-[1.5px] border-ink bg-card p-[18px] lg:w-[380px] lg:shrink-0">
+        <h2 className="font-display text-[17px] font-semibold">Ajouter un livreur</h2>
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Numéro de téléphone
+          <input value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} inputMode="tel" placeholder="+224 6XX XX XX XX" className="h-12 rounded-[14px] border border-line px-3.5 text-[15px] font-bold outline-none focus:border-blue" />
+        </label>
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nom
+          <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Prénom et nom" className="h-12 rounded-[14px] border border-line px-3.5 text-[15px] font-bold outline-none focus:border-blue" />
+        </label>
+        <div role="radiogroup" aria-label="Moyen de transport" className="grid grid-cols-4 gap-2">
+          {Object.entries(VEHICLE).map(([v, l]) => <button key={v} type="button" role="radio" aria-checked={form.vehicle === v} onClick={() => setForm((f) => ({ ...f, vehicle: v }))} className={`h-10 rounded-[12px] text-[13px] font-extrabold ${form.vehicle === v ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{l}</button>)}
+        </div>
+        <button type="submit" disabled={busy || form.phone.replace(/\D/g, '').length < 9 || form.name.trim().length < 2} className={btn.dark}>Ajouter à la Flotte</button>
+        <p className="text-[12.5px] font-semibold leading-snug text-muted">Le livreur se connecte à Hailand Flotte avec ce numéro. S’il n’a pas encore de compte Hailand, l’invitation reste « en attente » jusqu’à sa première connexion. Inscrit au journal.</p>
+      </form>
+      <div className="flex min-w-0 flex-1 flex-col gap-4">
       <div role="tablist" aria-label="Livreurs" className="flex gap-2 overflow-x-auto">
-        {TABS.map((t) => {
-          const n = (rows ?? []).filter(keep[t.id]).length;
+        {TABS.filter((t) => t.id !== 'candidat' || count('candidat') > 0).map((t) => {
+          const n = count(t.id);
           return <button key={t.id} type="button" role="tab" aria-selected={tab === t.id} onClick={() => setTab(t.id)} className={`h-9 shrink-0 rounded-full px-3.5 text-[13px] font-extrabold ${tab === t.id ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{t.label}{n ? ` · ${n}` : ''}</button>;
         })}
       </div>
       <Flash msg={msg} />
-      <Panel label="Liste des livreurs" className="overflow-hidden">
+      {tab === 'invitation' && (
+        <Panel label="Invitations en attente" className="overflow-hidden">
+          {invites.length === 0 && <p className="px-[18px] py-5 text-[14px] font-semibold text-muted">Aucune invitation en attente.</p>}
+          <ul>
+            {invites.map((v, i) => (
+              <li key={v.phone} className={`flex flex-wrap items-center gap-3 px-[18px] py-3.5 ${i ? 'border-t border-[#f0ede6]' : ''}`}>
+                <span className="flex min-w-0 flex-1 flex-col"><span className="text-[14.5px] font-extrabold">{v.full_name}</span><span className="text-[12.5px] font-semibold text-muted">{VEHICLE[v.vehicle] ?? v.vehicle} · {phoneText('+' + v.phone)} · invité {ago(v.created_at)}</span></span>
+                <span className="rounded-full bg-[#fff4db] px-2.5 py-1 text-[12px] font-extrabold text-[#7a5500]">Invitation en attente</span>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      {tab !== 'invitation' && <Panel label="Liste des livreurs" className="overflow-hidden">
         {rows && list.length === 0 && <p className="px-[18px] py-5 text-[14px] font-semibold text-muted">Personne dans cette liste.</p>}
         <ul>
           {list.map((c, i) => {
@@ -90,7 +143,9 @@ export default function CouriersPage() {
             );
           })}
         </ul>
-      </Panel>
+      </Panel>}
+      </div>
+      </div>
     </>
   );
 }

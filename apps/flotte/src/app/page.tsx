@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf } from '@hailandx/commerce';
+import { telMasque } from '@hailandx/kit';
 import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
@@ -18,8 +19,6 @@ interface Mission {
 }
 interface Mine { id: string; status: string; delivery_fee_gnf: number; shops: { name: string } | null }
 
-const VEHICLES: [string, string][] = [['moto', 'Moto'], ['velo', 'Vélo'], ['voiture', 'Voiture'], ['pied', 'À pied']];
-const field = 'h-12 w-full rounded-2xl border border-night-line bg-night-card px-4 text-[16px] font-medium outline-none focus:border-lime';
 const cta = 'flex h-[54px] w-full items-center justify-center rounded-2xl bg-lime text-[15px] font-extrabold text-ink disabled:opacity-40';
 const short = (n: number) => n.toLocaleString('fr-FR').replace(/ | /g, ' ');
 const where = (q: string | null, c: string | null) => [q, c].filter(Boolean).join(', ') || 'Zone de livraison';
@@ -43,6 +42,8 @@ export default function Home() {
 
   const loadCourier = useCallback(async () => {
     if (!sb || !uid) return;
+    // Livreurs recrutés par l'équipe (Hailand Console) : une invitation en attente pour ce numéro devient ici un livreur validé.
+    await sb.rpc('fn_flotte_rejoindre');
     const { data } = await sb.from('couriers').select('user_id,full_name,vehicle,status,available,cash_balance_gnf,cash_limit_gnf').eq('user_id', uid).maybeSingle();
     setCourier((data as Courier | null) ?? null);
   }, [sb, uid]);
@@ -70,13 +71,6 @@ export default function Home() {
   }, [sb, uid, courier?.status, courier?.available, fix]);
   useEffect(() => { void loadMissions(); const t = setInterval(loadMissions, 10_000); return () => clearInterval(t); }, [loadMissions]);
 
-  async function apply(f: FormData) {
-    setBusy(true); setMsg(null);
-    const { error } = await sb!.from('couriers').insert({ user_id: uid, full_name: String(f.get('name') ?? '').trim(), phone: session?.user.phone ? `+${session.user.phone.replace(/^\+/, '')}` : null, vehicle: String(f.get('vehicle')) });
-    setBusy(false);
-    if (error) return setMsg('Le dossier n’a pas pu être envoyé : ' + error.message);
-    await loadCourier();
-  }
   async function toggle() {
     if (!courier) return;
     const { error } = await sb!.from('couriers').update({ available: !courier.available }).eq('user_id', courier.user_id);
@@ -115,17 +109,21 @@ export default function Home() {
 
   if (session === undefined || session === null || courier === undefined) return <Shell><p className="text-[14px] font-medium text-night-muted">Chargement…</p></Shell>;
 
+  // Flotte n'est proposée à personne : sans dossier livreur, on explique simplement que l'équipe recrute (maquette F1).
   if (courier === null) {
     return (
       <Shell>
-        <h1 className="font-display text-[24px] font-semibold tracking-tight">Devenir livreur</h1>
-        <p className="text-[14px] font-medium text-night-muted">Livrez les commandes HailandX dans votre quartier. L’équipe Hailand valide votre dossier avant votre première mission.</p>
-        <form action={apply} className="flex flex-col gap-3 rounded-[22px] border border-night-line bg-night-card p-4">
-          <input name="name" required minLength={3} placeholder="Nom et prénom" className={field} />
-          <select name="vehicle" className={field} defaultValue="moto" aria-label="Véhicule">{VEHICLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <button type="submit" disabled={busy} className={cta}>Envoyer mon dossier</button>
-        </form>
-        {msg && <p role="alert" className="rounded-2xl bg-[#3a1a1a] px-4 py-3 text-[13.5px] font-semibold text-[#ffb4a8]">{msg}</p>}
+        <span className="mt-4 flex h-14 w-14 items-center justify-center rounded-[18px] bg-night-card text-lime" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7h13v10H3z" /><path d="M16 10h3l2 3v4h-5" /><circle cx="7" cy="18" r="2" /><circle cx="18" cy="18" r="2" /></svg></span>
+        <h1 className="font-display text-[24px] font-semibold leading-tight tracking-tight">Ce numéro n’est pas enregistré comme livreur Hailand</h1>
+        <p className="text-[14px] font-medium leading-relaxed text-night-muted">Les livreurs sont recrutés par l’équipe Hailand. Si vous avez été recruté, demandez à votre responsable d’ajouter ce numéro, puis revenez ici.</p>
+        <div className="flex flex-col gap-0.5 rounded-[18px] border border-night-line bg-night-card px-4 py-3">
+          <span className="text-[12px] font-bold text-night-muted">Connecté avec</span>
+          <span className="text-[15px] font-extrabold">{telMasque(session.user.phone) || 'votre numéro'}</span>
+        </div>
+        <div className="mt-auto flex flex-col gap-2.5">
+          <button type="button" disabled={busy} onClick={async () => { setBusy(true); await loadCourier(); setBusy(false); }} className={cta}>{busy ? 'Vérification…' : 'Vérifier à nouveau'}</button>
+          <button type="button" onClick={() => void signOutFlotte()} className="flex h-12 items-center justify-center text-[14px] font-extrabold text-night-muted">Changer de numéro</button>
+        </div>
       </Shell>
     );
   }
