@@ -514,6 +514,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-13 | Retrait de l'ancienne fonction de remise appliqué en production après déploiement (migration `hailandx_preuves_retrait_ancienne_remise`) ; vérifié par les droits d'exécution. |
 | 2026-10-13 | Parcours vendeur recentré (produits seulement tableau de bord, boutique ouverte, adresse d'abord) et suppression de compte dans Paramètres (§25). Migration `compte` appliquée ; fonction de suppression à exécuter par le fondateur. |
 | 2026-10-14 | **Interface v2** validée par le fondateur et codée (§26) : 4 onglets (Accueil, Commandes, Vendre / Ma boutique, Compte), recherche ouverte depuis l'accueil, ouverture de boutique en trois étapes, tableau de bord vendeur et six pages rangées, éditeur de produit plein écran, Compte simplifié, aide. 189 tests. |
+| 2026-10-14 | **Plan validé** (§27) : séparer HailandX (acheteurs) et HailandX Vendeur, créer Hailand Console (équipe, rôles, journal, circuit des certifications vers HailandMap), Flotte avec navigation Mapbox plein écran ; tout dans ce dépôt. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -632,3 +633,23 @@ Retour du fondateur après essai : l'espace vendeur était « une longue page en
 - **Compte** : profil (numéro masqué, date d'inscription), « Mes achats » (favoris, adresses), « Application » (notifications, **Aide et contact** `/aide`), console de l'équipe pour les administrateurs, « Se déconnecter », « Supprimer mon compte » (`/compte/supprimer` ; `/parametres` redirige). Sans connexion : « Votre numéro suffit ».
 - **Code** : briques d'écran communes `components/Screen.tsx`, composants vendeur `components/seller/*`, boutique du compte `lib/useMyShop.ts`, logique pure `lib/seller.ts` (9 tests). `VariantEditor` retiré (remplacé par l'éditeur de produit). Aucune modification de la base.
 - **Vérification** : `npm run lint`, build, `npm test` (**189 tests**), et les 25 écrans ouverts dans Chromium en 390×844 avec une base simulée (sans erreur). ⚠️ Pas encore essayé avec un vrai compte en ligne. 💡 Variable facultative `NEXT_PUBLIC_SUPPORT_WHATSAPP` (numéro de l'assistance) : sans elle, la page d'aide n'affiche pas de bouton WhatsApp. ⚠️ « Versé par Hailand sur votre Orange Money » (écran Argent) décrit le principe : le versement reste fait par l'équipe tant qu'Orange Money n'est pas branché (§19).
+
+## 27. Plan validé : une application par métier (2026-10-14) — 📄 plan de travail, à suivre dans l'ordre
+
+Décisions du fondateur (2026-10-14, toutes les propositions acceptées) :
+- **Séparer acheteur et vendeur** : deux applications distinctes. **HailandX** (acheteurs) ne garde que l'achat ; elle propose « Vendre sur HailandX », qui ouvre **HailandX Vendeur** (nouvelle application `apps/vendeur`) où se font la création du compte vendeur, l'ouverture, la certification et toute la gestion de la boutique.
+- **Une identité par numéro** (un seul compte Supabase), mais **chaque application ne montre que son rôle** ; un vendeur qui veut acheter utilise HailandX comme tout le monde.
+- **Hailand Console** (nouvelle application `apps/console`, adresse à part) remplace la page `/admin` de HailandX et gère tout l'écosystème : vue d'ensemble, **certifications** (demande du vendeur → console : vérifier, confirmer ou refuser → **seules les demandes confirmées remontent à HailandMap**), boutiques, livreurs (dossiers, espèces), litiges et avis signalés, argent (versements, remboursements), comptes et administrateurs, **paramètres sensibles réservés au rôle « fondateur »** (commission, part du livreur, frais) avec confirmation et **journal de chaque action**. Rôles : `fondateur`, `operateur`.
+- **Hailand Flotte** : la carte Mapbox (style Hailand, plus aucun lien Google) s'ouvre **en plein écran dès l'acceptation** d'une mission ; fiche à deux arrêts (retrait : boutique, quartier, commune, repère, appel ; dépôt : quartier, commune, code Hailand, précision, étage / porte / repère, appel, espèces) ; **navigation guidée** (consignes en français et voix, distance et heure d'arrivée, recalcul hors route, recentrage, écran allumé) ; « Je suis arrivé » à moins de 50 m (scan du QR, puis photo et code) ; contour du bâtiment de destination ; carte des missions disponibles. ⚠️ Web : pas de guidage écran verrouillé (application native plus tard).
+- **Dépôts** : tout reste dans `HailandX_Scorpion` (monorepo : code commun, migrations et tests uniques) ; un projet Vercel par application, reconstruit seulement si son code change. NavigationX et HailandMap restent dans leurs dépôts.
+- **Base** : migrations autorisées pour les étapes 2 et 3 (ajouts seulement : rôles, journal, statut des demandes de certification, informations de mission enrichies).
+
+| Étape | Contenu | État |
+|---|---|---|
+| 0 | Maquettes de la Console et de la navigation Flotte (artefact « HailandX — Maquettes », page v3) | en cours |
+| 1 | `apps/vendeur` (espace vendeur v2 déplacé, barre : Tableau de bord, Commandes, Produits, Plus) ; HailandX à 3 onglets (Accueil, Commandes, Compte) + invitation à vendre ; « Voir ma boutique » ouvre la page publique dans HailandX | à faire |
+| 2 | `apps/console` + rôles, journal, circuit des certifications ; retrait de `/admin` ; HailandMap ne voit que les demandes confirmées | à faire |
+| 3 | Flotte : navigation plein écran | à faire |
+| 4 | Mise en ligne : projets Vercel `hailandx-vendeur` et `hailand-console`, variables, documentation, essais | à faire |
+
+Une PR par étape, testée, documentée, vérifiée à l'écran.
