@@ -194,9 +194,10 @@ describe('Flotte : préparation, mission, QR, retrait', () => {
     expect((await one<{ r: string | null }>('select private.parse_qr($1)::text r', [qr])).r).toBe(parcelId);
   });
 
-  it('livreur : candidature, validation par l’équipe, disponibilité ; il ne peut pas se valider lui-même', async () => {
-    await as(db, U.livreur, () => db.query(`insert into couriers (user_id, full_name, phone) values ($1, 'Mamadou', '+224 610 00 00 00')`, [U.livreur]));
-    await as(db, U.livreur2, () => db.query(`insert into couriers (user_id, full_name) values ($1, 'Ibrahima')`, [U.livreur2]));
+  it('livreur : dossier « candidat », validation par l’équipe, disponibilité ; il ne peut pas se valider lui-même', async () => {
+    // Depuis la phase 5, plus de candidature publique (dossiers créés par l'équipe) : on part de dossiers « candidat » existants.
+    expect(await as(db, U.livreur, () => refused(db.query(`insert into couriers (user_id, full_name) values ($1, 'Moi')`, [U.livreur])))).toMatch(/row-level security|violates/);
+    await db.exec(`insert into couriers (user_id, full_name, phone) values ('${U.livreur}', 'Mamadou', '+224 610 00 00 00'), ('${U.livreur2}', 'Ibrahima', null)`);
     expect(await as(db, U.livreur, () => refused(db.query(`update couriers set status = 'valide' where user_id = $1`, [U.livreur])))).toMatch(/réservés à l'équipe/);
     expect(await as(db, U.livreur, () => refused(db.query(`update couriers set available = true where user_id = $1`, [U.livreur])))).toMatch(/non validé/);
     await as(db, U.admin, () => db.query(`update couriers set status = 'valide' where user_id in ($1, $2)`, [U.livreur, U.livreur2]));

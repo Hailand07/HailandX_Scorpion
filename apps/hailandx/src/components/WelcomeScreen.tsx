@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Wordmark } from '@hailandx/ui';
 import { LienHailand } from '@hailandx/kit';
-import { FLOTTE_URL, VENDEUR_URL } from '@/lib/links';
+import { VENDEUR_URL } from '@/lib/links';
 
 const POINTS = [
   ['Vendeurs certifiés', 'Chaque boutique est liée à une adresse vérifiée par Hailand.'],
@@ -39,7 +39,6 @@ export function WelcomeScreen({ onClose }: { onClose?: () => void }) {
         <div className="hx-rise-5 flex flex-col gap-2.5 pt-6">
           <Link href="/" onClick={go} className="flex h-[56px] items-center justify-center rounded-2xl bg-lime text-[16px] font-extrabold text-ink active:opacity-80">Explorer la rue</Link>
           <LienHailand app="vendeur" href={VENDEUR_URL} onClick={go} className="flex h-[56px] items-center justify-center rounded-2xl border border-night-line bg-night-card text-[15.5px] font-extrabold active:opacity-80">Vendre : HailandX Vendeur ↗</LienHailand>
-          <a href={FLOTTE_URL} className="flex h-12 items-center justify-center text-[14px] font-bold text-night-muted">Je veux livrer avec la Flotte Hailand →</a>
           <div className="flex justify-center pt-1 opacity-70"><Wordmark className="text-[15px] text-night-muted" /></div>
         </div>
       </div>

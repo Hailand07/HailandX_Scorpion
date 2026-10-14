@@ -7,7 +7,7 @@ import { useSession } from './useSession';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface N { id: number; kind: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string }
-const KIND: Record<string, string> = { commande: '🛍', suivi: '🚚', litige: '⚠️', avis: '★' };
+const KIND: Record<string, string> = { commande: '🛍', suivi: '🚚', litige: '⚠️', avis: '★', certification: '✅' };
 
 /** Les notifications du vendeur ont un lien « /vendeur… » ; chaque application ne montre que les siennes. */
 export const SELLER_PREFIX = '/vendeur';
