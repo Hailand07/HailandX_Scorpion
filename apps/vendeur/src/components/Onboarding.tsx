@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, lienEnregistrement, Notice, Screen, uploadPhoto } from '@hailandx/kit';
 import { declLabel, type MyCert, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { Brand } from './Brand';
 
@@ -13,13 +13,17 @@ interface Cat { id: string; name: string }
  * Ouvrir ma boutique (v2) : trois étapes sur un seul écran — adresse, boutique, certification.
  * Seule l'étape en cours est ouverte ; les étapes faites se replient ; aucun produit ici (ils s'ajoutent dans « Ma boutique »).
  */
-export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { shop: MyShop | null; decls: MyDecl[]; decl: MyDecl | null; cert: MyCert | null; uid: string; reload: () => Promise<void>; back?: string }) {
+export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue = null, depuis = null }: { shop: MyShop | null; decls: MyDecl[]; decl: MyDecl | null; cert: MyCert | null; uid: string; reload: () => Promise<void>; back?: string; recue?: string | null; depuis?: 'retour' | 'vente' | null }) {
   const router = useRouter();
   const sb = browserClient();
   const [cats, setCats] = useState<Cat[]>([]);
   const [name, setName] = useState('');
   const [cat, setCat] = useState<string | null>(null);
-  const [addr, setAddr] = useState<string | null>(decls[0]?.id ?? null);
+  // Adresse reçue de NavigationX (si elle appartient bien à ce compte), sinon la plus récente.
+  const initial = (recue && decls.some((d) => d.id === recue) ? recue : decls[0]?.id) ?? null;
+  const [addr, setAddr] = useState<string | null>(initial);
+  // Parcours d'enregistrement de NavigationX, avec retour ici à la fin.
+  const versNavigationX = lienEnregistrement('vendeur', '/ouvrir');
   const [logo, setLogo] = useState<File | null>(null);
   const logoUrl = useMemo(() => (logo ? URL.createObjectURL(logo) : null), [logo]);
   useEffect(() => () => { if (logoUrl) URL.revokeObjectURL(logoUrl); }, [logoUrl]);
@@ -27,7 +31,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { sho
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
   useEffect(() => { sb?.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? [])); }, [sb]);
-  useEffect(() => { if (!addr && decls[0]) setAddr(decls[0].id); }, [decls, addr]);
+  useEffect(() => { if (!addr && decls[0]) setAddr(recue && decls.some((d) => d.id === recue) ? recue : decls[0].id); }, [decls, addr, recue]);
 
   const step = !decls.length ? 1 : !shop ? 2 : 3;
   const certified = Boolean(shop && decl && decl.level === 3);
@@ -76,14 +80,19 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { sho
 
       {/* Étape 1 — adresse */}
       {step === 1 ? (
-        <Open n={1} title="Où se trouve votre boutique ?" text="Hailand certifie ce bâtiment. C’est ce qui rassure vos clients et guide le livreur.">
+        <Open n={1} title="Où se trouve votre boutique ?" text="Votre emplacement s’enregistre dans NavigationX, l’application officielle des adresses Hailand. Vous y êtes déjà connecté avec ce compte.">
           <MapArt />
-          <LienHailand app="navigationx" href={NAVIGATIONX_URL} className="flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Repérer mon bâtiment avec NavigationX</LienHailand>
-          <button type="button" onClick={() => void reload()} className="flex h-12 items-center justify-center rounded-2xl border border-line bg-card text-[14px] font-extrabold">J’ai repéré mon bâtiment : actualiser</button>
-          <p className="text-[12px] font-semibold text-muted">NavigationX s’ouvre avec votre Compte Hailand : l’adresse que vous y enregistrez apparaît ici.</p>
+          <LienHailand app="navigationx" href={versNavigationX} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Enregistrer mon emplacement avec NavigationX</LienHailand>
+          <p className="text-[12px] font-semibold text-muted">À la fin, un bouton vous ramène ici pour continuer.</p>
+          <button type="button" onClick={() => void reload()} className="flex h-11 items-center justify-center text-[13px] font-extrabold text-blue-ink">Déjà enregistré dans NavigationX ? Actualiser</button>
         </Open>
       ) : (
-        <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} href={NAVIGATIONX_URL} />
+        <>
+          {depuis && !shop && decls.some((d) => d.id === recue) && (
+            <p role="status" className="flex items-center gap-2.5 rounded-[18px] bg-blue-soft px-4 py-3 text-[13.5px] font-extrabold text-blue-ink"><Icon name="pin" size={18} />{depuis === 'vente' ? 'Point de vente choisi dans NavigationX' : 'Adresse reçue de NavigationX : vous continuez ici.'}</p>
+          )}
+          <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} href={versNavigationX} />
+        </>
       )}
 
       {/* Étape 2 — boutique */}
@@ -181,7 +190,7 @@ function Done({ title, sub, href }: { title: string; sub: string; href: string }
     <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">
       <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#0f7a5c] text-white"><Icon name="check" size={15} stroke={3} /></span>
       <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14.5px] font-extrabold">{title}</span><span className="truncate text-[12.5px] font-semibold text-muted">{sub}</span></span>
-      <LienHailand app="navigationx" href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Modifier</LienHailand>
+      <LienHailand app="navigationx" href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</LienHailand>
     </section>
   );
 }

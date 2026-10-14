@@ -19,3 +19,16 @@ export const colorOf = (key: string): string => {
 };
 /** Hailand Console : l'outil interne de l'équipe (jamais proposé aux utilisateurs). */
 export const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL ?? 'https://hailand-console-gn.vercel.app';
+
+/**
+ * Parcours d'enregistrement d'une adresse dans NavigationX (seul endroit où l'on enregistre un emplacement), ouvert directement
+ * à la bonne étape. À la fin, NavigationX propose « Revenir à … » et renvoie vers `chemin` de l'application `retour`, avec
+ * `?adresse=<identifiant>` (seules les applications Hailand sont acceptées comme retour : jamais une adresse libre).
+ */
+export function lienEnregistrement(retour: 'vendeur' | 'hailandx', chemin: string): string {
+  const u = new URL(NAVIGATIONX_URL);
+  u.searchParams.set('enregistrer', '1');
+  u.searchParams.set('retour', retour);
+  u.searchParams.set('chemin', chemin.startsWith('/') && !chemin.startsWith('//') ? chemin : '/');
+  return u.toString();
+}

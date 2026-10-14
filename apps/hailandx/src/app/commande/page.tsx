@@ -1,19 +1,23 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Wordmark } from '@hailandx/ui';
 import { formatGnf, formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
-import { browserClient, useSession } from '@hailandx/kit';
+import { browserClient, Icon, LienHailand, lienEnregistrement, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { currentSource } from '@/lib/source';
 
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
 
-/** Commande : adresse (niveau 1 au minimum), téléphone, paiement à la livraison. Le serveur recalcule prix, stock et frais. */
-export default function CheckoutPage() {
+/**
+ * Commande : adresse (niveau 1 au minimum), téléphone, paiement à la livraison. Le serveur recalcule prix, stock et frais.
+ * Sans adresse : enregistrement dans NavigationX, retour ici avec `?adresse=<id>` (le panier est resté sur l'appareil).
+ */
+function Checkout() {
   const router = useRouter();
+  const recue = useSearchParams().get('adresse');
   const session = useSession();
   const sb = browserClient();
   const lines = useCart();
@@ -36,14 +40,14 @@ export default function CheckoutPage() {
       const [m, a] = await Promise.all([sb.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(), sb.rpc('is_admin')]);
       const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
       setOmAvailable({ ok: mode === 'orange_money' || a.data === true, trial: mode !== 'orange_money' });
-      const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).order('created_at', { ascending: false });
+      const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false });
       const list = (data as Decl[]) ?? [];
       const lv: Record<string, number> = {};
       await Promise.all(list.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); lv[d.id] = typeof r.data === 'number' ? r.data : d.detected_level; }));
       const ok = list.filter((d) => (lv[d.id] ?? 0) >= 1);
-      setDecls(ok); setLevels(lv); setDecl(ok[0]?.id ?? ''); setReady(true);
+      setDecls(ok); setLevels(lv); setDecl((recue && ok.some((d) => d.id === recue) ? recue : ok[0]?.id) ?? ''); setReady(true);
     })();
-  }, [sb, session]);
+  }, [sb, session, recue]);
 
   async function place(e: React.FormEvent) {
     e.preventDefault();
@@ -84,13 +88,13 @@ export default function CheckoutPage() {
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
           {!ready ? <p className="text-[13.5px] font-medium text-muted">Chargement de vos adresses…</p> : decls.length === 0 ? (
-            <div className="flex flex-col gap-2"><p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">Aucune adresse enregistrée : c’est elle qui guide le livreur jusqu’à votre porte.</p><Link href="/adresse?next=/commande" className="flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Où livrer ? Enregistrer mon adresse</Link></div>
+            <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Pour être livré jusqu’à votre porte, enregistrez votre adresse une fois dans <b className="font-extrabold text-ink">NavigationX</b>. Elle servira pour toutes vos commandes.</p><LienHailand app="navigationx" href={lienEnregistrement('hailandx', '/commande')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-ink text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Enregistrer mon adresse avec NavigationX</LienHailand><p className="text-[12px] font-semibold text-muted">Votre panier vous attend ici : vous revenez à cette étape à la fin.</p></div>
           ) : (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
               {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
             </select>
           )}
-          {ready && decls.length > 0 && <Link href="/adresse?next=/commande" className="text-[13px] font-bold text-blue-ink">+ Ajouter une autre adresse</Link>}
+          {ready && decls.length > 0 && <LienHailand app="navigationx" href={lienEnregistrement('hailandx', '/commande')} className="text-[13px] font-bold text-blue-ink">+ Ajouter une autre adresse (NavigationX)</LienHailand>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
@@ -115,3 +119,5 @@ export default function CheckoutPage() {
     </main>
   );
 }
+
+export default function CheckoutPage() { return <Suspense><Checkout /></Suspense>; }
