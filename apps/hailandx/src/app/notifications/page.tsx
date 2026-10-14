@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Wordmark } from '@hailandx/ui';
+import { BackHeader } from '@/components/Screen';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 
@@ -33,9 +33,8 @@ export default function NotificationsPage() {
   const unread = (list ?? []).filter((n) => !n.read_at).length;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-6">
-      <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><Link href="/compte" className="text-[13px] font-bold text-blue-ink">Mon compte</Link></div>
-      <div className="flex items-center justify-between"><h1 className="font-display text-[22px] font-semibold tracking-tight">Notifications</h1>{unread > 0 && <button type="button" onClick={readAll} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-bold">Tout marquer lu</button>}</div>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-4">
+      <BackHeader href="/compte" title="Notifications" label="Retour au compte" right={unread > 0 ? <button type="button" onClick={readAll} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-bold">Tout marquer lu</button> : null} />
       {session === null && <Link href="/connexion?next=/notifications" className="font-bold text-blue-ink">Se connecter</Link>}
       {perm === 'default' && <button type="button" onClick={async () => setPerm(await Notification.requestPermission())} className="rounded-2xl bg-blue-soft px-4 py-3 text-left text-[13px] font-bold text-blue-ink">Activer les alertes du navigateur (tant que cette page reste ouverte)</button>}
       {list?.length === 0 && <p className="text-[14px] font-medium text-muted">Rien pour l’instant. Vous serez prévenu ici des commandes, du suivi de vos colis, des avis et des litiges.</p>}

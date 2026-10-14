@@ -1,7 +1,8 @@
 'use client';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, QrScanner, Wordmark } from '@hailandx/ui';
+import { Badge, QrScanner } from '@hailandx/ui';
+import { BackHeader } from '@/components/Screen';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 import { DisputeThread } from '@/components/DisputeThread';
@@ -62,9 +63,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   if (missing) return <main className="mx-auto max-w-md px-5 pt-6"><p className="text-[14px] font-medium text-muted">Commande introuvable.</p><Link href="/commandes" className="font-bold text-blue-ink">Mes commandes</Link></main>;
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-6">
-      <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><Link href="/commandes" className="text-[13px] font-bold text-blue-ink">Mes commandes</Link></div>
-      <h1 className="font-display text-[22px] font-semibold tracking-tight">Suivi de commande</h1>
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-4">
+      <BackHeader href="/commandes" title="Suivi de commande" label="Retour à mes commandes" />
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
       {order && order.payment_method === 'orange_money' && <PaymentBox order={order} onDone={() => load()} />}
       {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover_proof', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}

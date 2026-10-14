@@ -1,41 +1,87 @@
 'use client';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Wordmark } from '@hailandx/ui';
+import { useRouter } from 'next/navigation';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
-import { NotificationBell } from '@/components/NotificationBell';
+import { maskPhone } from '@/lib/seller';
+import { GroupTitle, Icon, ListRow, Screen } from '@/components/Screen';
 
-const ITEMS = [
-  ['/commandes', 'Mes commandes', 'Suivre mes colis, signaler un problème, donner un avis'],
-  ['/favoris', 'Mes favoris', 'Les produits que j’ai mis de côté'],
-  ['/adresse', 'Mes adresses', 'Où me livrer'],
-  ['/notifications', 'Notifications', 'Commandes, suivi, avis, litiges'],
-  ['/vendeur', 'Mon espace vendeur', 'Boutique, produits, ventes'],
-  ['/parametres', 'Paramètres', 'Mon compte, suppression du compte'],
-] as const;
-
-/** Mon compte : tout ce qui concerne la personne, au même endroit. */
+/** Compte (v2) : moi, et rien d'autre. Trois groupes courts ; la boutique a son onglet, les commandes aussi. */
 export default function AccountPage() {
   const session = useSession();
-  return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-6">
-      <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><NotificationBell /></div>
-      <h1 className="font-display text-[26px] font-semibold tracking-tight">Mon compte</h1>
-      {session === null && (
-        <div className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-5">
-          <p className="text-[14px] font-medium text-muted">Connectez-vous avec votre téléphone pour retrouver vos commandes, vos favoris et vos adresses.</p>
-          <Link href="/connexion?next=/compte" className="inline-flex h-[54px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Me connecter</Link>
+  const router = useRouter();
+  const [counts, setCounts] = useState<{ fav: number; addr: number; unread: number } | null>(null);
+  const [staff, setStaff] = useState(false);
+
+  useEffect(() => {
+    const sb = browserClient(); const uid = session?.user.id;
+    if (!sb || !uid) return;
+    Promise.all([
+      sb.from('product_favorites').select('product_id', { count: 'exact', head: true }).eq('user_id', uid),
+      sb.from('declarations').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'active'),
+      sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null),
+    ]).then(([f, a, n]) => setCounts({ fav: f.count ?? 0, addr: a.count ?? 0, unread: n.count ?? 0 }));
+    sb.rpc('is_admin').then(({ data }) => setStaff(data === true));
+  }, [session]);
+
+  if (session === undefined) return <Screen className="pt-6"><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+
+  if (session === null) {
+    return (
+      <Screen className="justify-center gap-6 px-6 pb-28">
+        <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-ink text-lime"><Icon name="phone" size={30} stroke={1.8} /></span>
+        <div className="flex flex-col gap-2">
+          <h1 className="font-display text-[26px] font-semibold leading-tight tracking-tight">Votre numéro suffit</h1>
+          <p className="text-[15px] font-semibold leading-relaxed text-muted">Un code par SMS, et vous retrouvez vos commandes, vos favoris et vos adresses. Pas de mot de passe.</p>
         </div>
+        <Link href="/connexion?next=/compte" className="flex h-14 items-center justify-center rounded-[18px] bg-ink text-[16px] font-extrabold text-white">Me connecter</Link>
+        <Link href="/aide" className="flex h-11 items-center self-center text-[13.5px] font-bold text-muted">Aide et contact</Link>
+      </Screen>
+    );
+  }
+
+  const since = new Date(session.user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  return (
+    <Screen className="gap-[18px] pt-6">
+      <h1 className="font-display text-[26px] font-semibold tracking-tight">Compte</h1>
+
+      <section aria-label="Mon profil" className="flex items-center gap-3.5 rounded-[22px] border border-line-soft bg-card p-4">
+        <span className="flex h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-blue-soft text-blue"><Icon name="user" size={24} /></span>
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-display text-[17px] font-semibold">{maskPhone(session.user.phone)}</span>
+          <span className="text-[12.5px] font-semibold text-muted">Client depuis {since}</span>
+        </span>
+      </section>
+
+      <section aria-label="Mes achats" className="flex flex-col gap-2">
+        <GroupTitle>Mes achats</GroupTitle>
+        <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
+          <ListRow href="/favoris" icon="heart" label="Favoris" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.fav}</span> : null} />
+          <ListRow href="/adresse" icon="pin" label="Adresses de livraison" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.addr}</span> : null} last />
+        </div>
+      </section>
+
+      <section aria-label="Application" className="flex flex-col gap-2">
+        <GroupTitle>Application</GroupTitle>
+        <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
+          <ListRow href="/notifications" icon="bell" label="Notifications" value={counts?.unread ? <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-extrabold text-blue">{counts.unread} nouvelle{counts.unread > 1 ? 's' : ''}</span> : null} />
+          <ListRow href="/aide" icon="help" label="Aide et contact" last />
+        </div>
+      </section>
+
+      {staff && (
+        <Link href="/admin" className="flex min-h-[58px] items-center gap-3 rounded-[20px] bg-ink px-4 text-white">
+          <Icon name="shield" className="text-lime" />
+          <span className="flex-1 text-[15px] font-bold">Console de l’équipe Hailand</span>
+          <Icon name="chevron" size={16} stroke={2} className="text-white/60" />
+        </Link>
       )}
-      {session && <p className="text-[13px] font-semibold text-muted">Connecté : {session.user.phone ? `+${session.user.phone.replace(/^\+/, '')}` : 'compte HailandX'}</p>}
-      <nav aria-label="Mon compte" className="flex flex-col gap-2">
-        {ITEMS.map(([href, t, d]) => (
-          <Link key={href} href={session ? href : `/connexion?next=${encodeURIComponent(href)}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-4 py-3.5">
-            <span className="flex flex-col"><span className="text-[14.5px] font-extrabold">{t}</span><span className="text-[12.5px] font-medium text-muted">{d}</span></span><span aria-hidden="true" className="text-[18px] font-bold text-muted">›</span>
-          </Link>
-        ))}
-      </nav>
-      {session && <button type="button" onClick={() => browserClient()?.auth.signOut()} className="h-12 rounded-2xl border border-line text-[14px] font-bold">Me déconnecter</button>}
-    </main>
+
+      <div className="flex flex-col items-center gap-1.5">
+        <button type="button" onClick={async () => { await browserClient()?.auth.signOut(); router.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
+        <Link href="/compte/supprimer" className="flex h-11 items-center text-[13px] font-bold text-[#a3321f]">Supprimer mon compte</Link>
+      </div>
+    </Screen>
   );
 }
