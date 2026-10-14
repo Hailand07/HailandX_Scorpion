@@ -20,6 +20,7 @@ const DECORS = `
 create role anon nologin; create role authenticated nologin;
 create schema auth;
 create table auth.users (id uuid primary key, phone text);
+create role service_role nologin;
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
@@ -32,7 +33,7 @@ create function public.st_asgeojson(g text) returns text language sql immutable 
 create table public.quartiers (id text primary key, nom text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
-  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text, hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz, osm_polygon_geom text);
+  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text, hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz, osm_polygon_geom text, status text not null default 'active');
 create function public.trg_decl_stub() returns trigger language plpgsql as $f$ begin if new.certification_status = 'demandee' and old.certification_status is distinct from 'demandee' then new.certification_requested_at := now(); end if; return new; end $f$;
 create trigger decl_stub before update on public.declarations for each row execute function public.trg_decl_stub();
 create table public.agents (id uuid primary key, full_name text, role text not null, active boolean not null default true, created_at timestamptz not null default now());
@@ -72,6 +73,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-10-19_hailandx_compte_suppression.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-20_hailand_console.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-21_flotte_navigation.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-23_compte_hailand.sql', import.meta.url), 'utf8'));
   return db;
 }
 

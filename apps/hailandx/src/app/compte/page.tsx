@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
+import { browserClient, GroupTitle, Icon, LienHailand, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
 import { maskPhone } from '@hailandx/commerce';
 
 /** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
@@ -65,11 +65,11 @@ export default function AccountPage() {
         </div>
       </section>
 
-      <a href={VENDEUR_URL} className="flex items-center gap-3.5 rounded-[22px] bg-ink p-4 text-white">
+      <LienHailand app="vendeur" href={VENDEUR_URL} className="flex items-center gap-3.5 rounded-[22px] bg-ink p-4 text-white">
         <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-[15px] bg-lime text-ink"><Icon name="shop" size={22} /></span>
         <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="font-display text-[16px] font-semibold">Vendre sur HailandX</span><span className="text-[12.5px] font-semibold text-white/70">Ouvrez votre boutique avec l’application HailandX Vendeur</span></span>
         <span aria-hidden="true" className="text-[20px] font-extrabold text-lime">↗</span>
-      </a>
+      </LienHailand>
 
       <div className="flex flex-col items-center gap-1.5">
         <button type="button" onClick={async () => { await signOutHailand(browserClient()); window.location.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
 import { declLabel, type MyCert, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { Brand } from './Brand';
 
@@ -78,9 +78,9 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { sho
       {step === 1 ? (
         <Open n={1} title="Où se trouve votre boutique ?" text="Hailand certifie ce bâtiment. C’est ce qui rassure vos clients et guide le livreur.">
           <MapArt />
-          <a href={NAVIGATIONX_URL} className="flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Repérer mon bâtiment avec NavigationX</a>
+          <LienHailand app="navigationx" href={NAVIGATIONX_URL} className="flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Repérer mon bâtiment avec NavigationX</LienHailand>
           <button type="button" onClick={() => void reload()} className="flex h-12 items-center justify-center rounded-2xl border border-line bg-card text-[14px] font-extrabold">J’ai repéré mon bâtiment : actualiser</button>
-          <p className="text-[12px] font-semibold text-muted">Connectez-vous à NavigationX avec le même numéro : l’adresse que vous y enregistrez apparaît ici.</p>
+          <p className="text-[12px] font-semibold text-muted">NavigationX s’ouvre avec votre Compte Hailand : l’adresse que vous y enregistrez apparaît ici.</p>
         </Open>
       ) : (
         <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} href={NAVIGATIONX_URL} />
@@ -144,7 +144,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { sho
             <Timeline state={pending ? 'todo' : 'now'} title="Visite de l’agent" sub={pending ? undefined : 'Il vous appelle avant de passer.'} />
             <Timeline state="todo" title="Adresse certifiée, vente ouverte" last />
           </ol>
-          <a href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" rel="noreferrer" className="flex h-[46px] items-center justify-center rounded-[14px] border border-line text-[13.5px] font-extrabold">Voir ma boutique sur HailandX</a>
+          <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[46px] items-center justify-center rounded-[14px] border border-line text-[13.5px] font-extrabold">Voir ma boutique sur HailandX</LienHailand>
           <button type="button" onClick={() => void reload()} className="h-10 text-[13px] font-bold text-muted">Actualiser</button>
         </Open>
       )}
@@ -181,7 +181,7 @@ function Done({ title, sub, href }: { title: string; sub: string; href: string }
     <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">
       <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#0f7a5c] text-white"><Icon name="check" size={15} stroke={3} /></span>
       <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14.5px] font-extrabold">{title}</span><span className="truncate text-[12.5px] font-semibold text-muted">{sub}</span></span>
-      <Link href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Modifier</Link>
+      <LienHailand app="navigationx" href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Modifier</LienHailand>
     </section>
   );
 }
