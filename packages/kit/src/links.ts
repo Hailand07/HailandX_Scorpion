@@ -17,3 +17,5 @@ export const colorOf = (key: string): string => {
   for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
   return PALETTE[h % PALETTE.length]!;
 };
+/** Hailand Console : l'outil interne de l'équipe (jamais proposé aux utilisateurs). */
+export const CONSOLE_URL = process.env.NEXT_PUBLIC_CONSOLE_URL ?? 'https://hailand-console-gn.vercel.app';

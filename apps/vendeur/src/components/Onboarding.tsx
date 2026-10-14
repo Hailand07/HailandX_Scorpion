@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, NAVIGATIONX_URL, Notice, Screen, uploadPhoto } from '@hailandx/kit';
-import { declLabel, type MyDecl, type MyShop } from '@/lib/useMyShop';
+import { declLabel, type MyCert, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { Brand } from './Brand';
 
 interface Cat { id: string; name: string }
@@ -13,7 +13,7 @@ interface Cat { id: string; name: string }
  * Ouvrir ma boutique (v2) : trois étapes sur un seul écran — adresse, boutique, certification.
  * Seule l'étape en cours est ouverte ; les étapes faites se replient ; aucun produit ici (ils s'ajoutent dans « Ma boutique »).
  */
-export function Onboarding({ shop, decls, decl, uid, reload, back }: { shop: MyShop | null; decls: MyDecl[]; decl: MyDecl | null; uid: string; reload: () => Promise<void>; back?: string }) {
+export function Onboarding({ shop, decls, decl, cert, uid, reload, back }: { shop: MyShop | null; decls: MyDecl[]; decl: MyDecl | null; cert: MyCert | null; uid: string; reload: () => Promise<void>; back?: string }) {
   const router = useRouter();
   const sb = browserClient();
   const [cats, setCats] = useState<Cat[]>([]);
@@ -31,6 +31,10 @@ export function Onboarding({ shop, decls, decl, uid, reload, back }: { shop: MyS
 
   const step = !decls.length ? 1 : !shop ? 2 : 3;
   const certified = Boolean(shop && decl && decl.level === 3);
+  // Circuit : le vendeur demande → l'équipe vérifie (Hailand Console) → la demande remonte à l'agent de terrain (HailandMap).
+  const atHailandMap = decl?.certification_status === 'demandee';
+  const pending = !atHailandMap && cert?.status === 'a_verifier';
+  const refused = !atHailandMap && (cert?.status === 'refusee' || decl?.certification_status === 'refusee');
   const short = name.trim().length < 3 || slugify(name).length < 3;
 
   async function run(fn: () => Promise<string | void>) {
@@ -53,7 +57,7 @@ export function Onboarding({ shop, decls, decl, uid, reload, back }: { shop: MyS
   });
 
   const attach = (id: string) => run(async () => { const { error } = await sb!.from('shops').update({ declaration_id: id }).eq('id', shop!.id); if (error) throw new Error(errText(error)); });
-  const ask = () => run(async () => { const { error } = await sb!.rpc('fn_request_priority_certification', { p_shop: shop!.id }); if (error) throw new Error(errText(error)); return 'Demande envoyée à Hailand, en priorité.'; });
+  const ask = () => run(async () => { const { error } = await sb!.rpc('fn_request_priority_certification', { p_shop: shop!.id }); if (error) throw new Error(errText(error)); return 'Demande envoyée : l’équipe Hailand la vérifie.'; });
   const open = () => run(async () => {
     const { error } = await sb!.rpc('fn_shop_open', { p_shop: shop!.id });
     if (error) throw new Error(errText(error));
@@ -126,16 +130,18 @@ export function Onboarding({ shop, decls, decl, uid, reload, back }: { shop: MyS
           {decls.map((d) => <button key={d.id} type="button" disabled={busy} onClick={() => attach(d.id)} className="flex min-h-12 items-center justify-between rounded-[14px] border border-line px-3.5 text-[14px] font-bold"><span className="truncate">{declLabel(d)}</span><span className="text-[12px] text-muted">niveau {d.level}</span></button>)}
         </Open>
       )}
-      {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && decl.certification_status !== 'demandee' && (
-        <Open n={3} title="Faites certifier votre adresse" text={decl.certification_status === 'refusee' ? 'Votre dernière demande a été refusée : corrigez votre adresse dans NavigationX, puis redemandez.' : 'Un agent Hailand vérifie que votre boutique est bien dans ce bâtiment. Il vous appelle avant de passer. C’est gratuit.'}>
+      {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && !atHailandMap && !pending && (
+        <Open n={3} title="Faites certifier votre adresse" text={refused ? 'Votre dernière demande a été refusée : corrigez votre adresse dans NavigationX, puis redemandez.' : 'L’équipe Hailand vérifie votre demande, puis un agent passe confirmer que votre boutique est bien dans ce bâtiment. Il vous appelle avant. C’est gratuit.'}>
+          {refused && cert?.console_note && <p className="rounded-[14px] bg-[#fbeae5] px-3.5 py-3 text-[13px] font-semibold leading-snug text-[#a3321f]"><span className="font-extrabold">Motif : </span>{cert.console_note}</p>}
           <button type="button" disabled={busy} onClick={ask} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50">Demander la certification</button>
         </Open>
       )}
-      {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && decl.certification_status === 'demandee' && (
+      {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && (atHailandMap || pending) && (
         <Open n={3} title="Certification en cours">
           <ol className="flex flex-col">
-            <Timeline state="done" title="Demande envoyée en priorité" sub="L’équipe Hailand l’a reçue." />
-            <Timeline state="now" title="Visite de l’agent" sub="Il vous appelle avant de passer." />
+            <Timeline state="done" title="Demande envoyée" sub="Elle est prioritaire : votre boutique attend cette adresse." />
+            <Timeline state={pending ? 'now' : 'done'} title="Vérification par l’équipe Hailand" sub={pending ? 'Généralement sous 24 h.' : 'Demande confirmée et transmise à l’agent.'} />
+            <Timeline state={pending ? 'todo' : 'now'} title="Visite de l’agent" sub={pending ? undefined : 'Il vous appelle avant de passer.'} />
             <Timeline state="todo" title="Adresse certifiée, vente ouverte" last />
           </ol>
           <a href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" rel="noreferrer" className="flex h-[46px] items-center justify-center rounded-[14px] border border-line text-[13.5px] font-extrabold">Voir ma boutique sur HailandX</a>

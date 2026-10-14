@@ -9,10 +9,11 @@
   "scripts": {
     "dev": "npm run dev -w @hailandx/app",
     "dev:flotte": "npm run dev -w @hailandx/flotte",
-    "build": "npm run build -w @hailandx/app && npm run build -w @hailandx/vendeur && npm run build -w @hailandx/flotte",
-    "lint": "tsc --noEmit -p apps/hailandx && tsc --noEmit -p apps/vendeur && tsc --noEmit -p apps/flotte && tsc --noEmit -p packages/commerce && tsc --noEmit -p packages/scorpion && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/kit",
+    "build": "npm run build -w @hailandx/app && npm run build -w @hailandx/vendeur && npm run build -w @hailandx/flotte && npm run build -w @hailandx/console",
+    "lint": "tsc --noEmit -p apps/hailandx && tsc --noEmit -p apps/vendeur && tsc --noEmit -p apps/console && tsc --noEmit -p apps/flotte && tsc --noEmit -p packages/commerce && tsc --noEmit -p packages/scorpion && tsc --noEmit -p packages/ui && tsc --noEmit -p packages/kit",
     "test": "vitest run",
-    "dev:vendeur": "npm run dev -w @hailandx/vendeur"
+    "dev:vendeur": "npm run dev -w @hailandx/vendeur",
+    "dev:console": "npm run dev -w @hailandx/console"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.9",

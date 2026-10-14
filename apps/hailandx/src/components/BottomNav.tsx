@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { browserClient, Icon, useSession } from '@hailandx/kit';
 
 /** Écrans plein écran : une barre d'action y remplace la barre du bas. */
-const HIDDEN = ['/p/', '/commande', '/connexion', '/bienvenue', '/admin', '/compte/supprimer'];
+const HIDDEN = ['/p/', '/commande', '/connexion', '/bienvenue', '/compte/supprimer'];
 
 const TABS = [
   { href: '/', label: 'Accueil', icon: 'home', match: (p: string) => p === '/' || ['/recherche', '/b/', '/panier'].some((x) => p.startsWith(x)) },

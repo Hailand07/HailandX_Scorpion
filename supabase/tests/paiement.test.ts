@@ -158,11 +158,11 @@ describe('reversements et lecture', () => {
     expect(await as(db, 'anon', () => refused(db.query('select * from payments')))).toMatch(/permission denied/);
   });
 
-  it('les réglages (taux) se lisent connecté et ne se modifient que par l’équipe', async () => {
+  it('les réglages (taux) se lisent connecté ; ni un vendeur ni un simple opérateur ne les modifient (voir console.test.ts)', async () => {
     expect((await as(db, U.acheteur, () => q<{ key: string }>('select key from settings order by key'))).map((r) => r.key)).toEqual(['commission_bps', 'courier_share_bps', 'payment_mode']);
     await as(db, U.vendeur, () => db.query(`update settings set value = '0' where key = 'commission_bps'`));
     expect((await one<{ value: string }>(`select value from settings where key = 'commission_bps'`)).value).toBe('800');
-    await as(db, U.admin, () => db.query(`update settings set value = '1000' where key = 'commission_bps'`));
-    expect((await one<{ value: string }>(`select value from settings where key = 'commission_bps'`)).value).toBe('1000');
+    expect(await as(db, U.admin, () => refused(db.query(`update settings set value = '1000' where key = 'commission_bps'`)))).toMatch(/réservé au fondateur/);
+    expect((await one<{ value: string }>(`select value from settings where key = 'commission_bps'`)).value).toBe('800');
   });
 });

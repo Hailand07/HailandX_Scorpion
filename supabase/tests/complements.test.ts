@@ -38,13 +38,16 @@ beforeAll(async () => {
 }, 60000);
 
 describe('certification prioritaire', () => {
-  it('le vendeur de la boutique demande la certification : demande enregistrée et priorité notée', async () => {
+  it('le vendeur demande la certification : l’équipe vérifie d’abord (console), puis la demande remonte à HailandMap', async () => {
     await refused(as(db, U.acheteur, () => db.query('select fn_request_priority_certification($1)', [shopId])));
-    expect((await as(db, U.vendeur, () => one<{ fn_request_priority_certification: string }>('select fn_request_priority_certification($1)', [shopId]))).fn_request_priority_certification).toBe('demandee');
+    expect((await as(db, U.vendeur, () => one<{ fn_request_priority_certification: string }>('select fn_request_priority_certification($1)', [shopId]))).fn_request_priority_certification).toBe('a_verifier');
+    // Tant que la console n'a pas confirmé, HailandMap ne voit rien.
+    expect((await one<{ certification_status: string | null }>('select certification_status from declarations where id = $1', [sellerDecl])).certification_status).not.toBe('demandee');
+    expect(await q('select shop_id, status from certification_priorities where declaration_id = $1', [sellerDecl])).toEqual([{ shop_id: shopId, status: 'a_verifier' }]);
+    expect((await as(db, U.admin, () => one<{ r: string }>('select fn_console_certification_decide($1, true) r', [sellerDecl]))).r).toBe('transmise');
     const d = await one<{ certification_status: string; certification_requested_at: string | null }>('select certification_status, certification_requested_at from declarations where id = $1', [sellerDecl]);
     expect(d.certification_status).toBe('demandee');
     expect(d.certification_requested_at).not.toBeNull();
-    expect(await q('select shop_id from certification_priorities where declaration_id = $1', [sellerDecl])).toEqual([{ shop_id: shopId }]);
   });
   it('l’équipe voit la priorité, un autre compte non ; on ne s’accorde pas la priorité soi-même', async () => {
     expect(await as(db, U.admin, () => q('select 1 from certification_priorities'))).toHaveLength(1);
@@ -84,7 +87,7 @@ describe('favoris', () => {
 describe('notifications', () => {
   it('une commande prévient le vendeur ; un livreur qui retire prévient l’acheteur', async () => {
     const n = await newParcel(); parcel = n.p; order = n.o;
-    expect(await as(db, U.vendeur, () => q<{ title: string }>('select title from notifications order by id'))).toEqual([{ title: 'Nouvelle commande' }]);
+    expect(await as(db, U.vendeur, () => q<{ title: string }>(`select title from notifications where kind <> 'certification' order by id`))).toEqual([{ title: 'Nouvelle commande' }]);
     await deliver(parcel);
     expect((await as(db, U.acheteur, () => q<{ title: string; link: string }>('select title, link from notifications order by id'))).map((r) => r.title)).toEqual(['Un livreur a accepté votre colis', 'Votre colis est en route']);
     expect((await as(db, U.acheteur, () => one<{ link: string }>('select link from notifications order by id limit 1'))).link).toBe(`/commandes/${order}`);
