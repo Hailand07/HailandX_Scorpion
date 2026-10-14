@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { browserClient, Icon, ICONS, useSession } from '@hailandx/kit';
+import { browserClient, Icon, ICONS, useSession, signOutHailand } from '@hailandx/kit';
 import { phoneText } from '@/lib/format';
 
 /** Chiffres de la vue d'ensemble (fn_console_overview) : servent aussi aux pastilles de la barre latérale. */
@@ -72,7 +72,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   if (access === 'refuse') {
     return (
       <Center title="Réservé à l’équipe Hailand" text="Ce numéro n’a pas accès à la console. Si vous faites partie de l’équipe, demandez au fondateur de vous ajouter.">
-        <button type="button" onClick={async () => { await sb.auth.signOut(); router.replace('/connexion'); }} className="h-12 rounded-2xl border border-line bg-card px-5 text-[14px] font-extrabold">Changer de numéro</button>
+        <button type="button" onClick={async () => { await signOutHailand(sb); window.location.replace('/connexion'); }} className="h-12 rounded-2xl border border-line bg-card px-5 text-[14px] font-extrabold">Changer de numéro</button>
       </Center>
     );
   }
@@ -103,7 +103,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <div className="mt-auto hidden flex-col gap-0.5 rounded-[14px] bg-night-card p-3 lg:flex">
             <span className="text-[13px] font-extrabold">{phoneText(phone)}</span>
             <span className="text-[11.5px] font-bold text-lime">Rôle : {role === 'fondateur' ? 'fondateur' : 'opérateur'}</span>
-            <button type="button" onClick={async () => { await sb.auth.signOut(); router.replace('/connexion'); }} className="mt-1.5 h-9 self-start rounded-lg text-[12.5px] font-bold text-night-muted hover:text-white">Se déconnecter</button>
+            <button type="button" onClick={async () => { await signOutHailand(sb); window.location.replace('/connexion'); }} className="mt-1.5 h-9 self-start rounded-lg text-[12.5px] font-bold text-night-muted hover:text-white">Se déconnecter</button>
           </div>
         </nav>
         <main className="flex min-w-0 flex-1 flex-col gap-5 px-4 py-5 lg:px-8 lg:py-7">{children}</main>

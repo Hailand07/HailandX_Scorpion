@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { signOutHailand } from './account';
+
 import { browserClient } from './supabase';
 import { useSession } from './useSession';
 import { BackHeader, Icon, Screen } from './Screen';
@@ -14,7 +15,6 @@ const CHECKS = ['Aucune commande en cours', 'Aucun argent en attente', 'Pas de l
  * La base vérifie d'abord ce qui l'empêche (fn_account_delete_check), puis efface tout et libère le numéro (fn_delete_my_account).
  */
 export function DeleteAccount({ backHref, doneHref }: { backHref: string; doneHref: string }) {
-  const router = useRouter();
   const session = useSession();
   const sb = browserClient();
   const [reasons, setReasons] = useState<Reason[] | null>(null);
@@ -47,9 +47,8 @@ export function DeleteAccount({ backHref, doneHref }: { backHref: string; doneHr
       setBusy(false);
       return setError(e.code === 'PGRST202' || /Could not find the function/i.test(e.message) ? 'La suppression de compte n’est pas encore activée sur la base. Réessayez bientôt.' : e.message.replace(/^.*?:\s*/, ''));
     }
-    await sb.auth.signOut();
-    try { localStorage.removeItem('hx.cart'); } catch { /* ignoré */ }
-    router.replace(doneHref);
+    await signOutHailand(sb);
+    window.location.replace(doneHref);
   }
 
   const blocked = (reasons ?? []).length > 0;
