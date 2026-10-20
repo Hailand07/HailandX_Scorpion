@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf } from '@hailandx/commerce';
 import { telMasque } from '@hailandx/kit';
+import { AppMark } from '@hailandx/ui';
 import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
@@ -101,7 +102,7 @@ export default function Home() {
 
   const Head = (
     <header className="flex items-center justify-between">
-      <div><div className="font-display text-xl font-bold tracking-[-0.03em]">Hailand <span className="text-lime">Flotte</span></div><div className="text-xs font-semibold text-night-muted">Application des livreurs</div></div>
+      <div className="flex items-center gap-2.5"><AppMark app="flotte" size={38} /><div><div className="font-display text-xl font-bold tracking-[-0.03em]">Hailand <span className="text-lime">Flotte</span></div><div className="text-xs font-semibold text-night-muted">Application des livreurs</div></div></div>
       {session && <button type="button" onClick={() => void signOutFlotte()} className="h-11 px-2 text-[13px] font-bold text-night-muted">Déconnexion</button>}
     </header>
   );
