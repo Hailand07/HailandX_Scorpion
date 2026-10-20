@@ -8,7 +8,7 @@ import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
 import { telHref, useHeight, useVoice, useWakeLock } from '@/lib/device';
 import { uploadProof } from '@/lib/proof';
-import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, turnOf, type LngLat, type Route } from '@/lib/nav';
+import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, followZoom, speedKmh, turnOf, type LngLat, type Route } from '@/lib/nav';
 import { FlotteMap, hasMap, type Line, type Pin, type View } from '@/components/FlotteMap';
 import { NUIT } from '@/lib/hailandNuit';
 import { Ico, TurnIcon } from '@/components/Icons';
@@ -49,6 +49,8 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
   const [route, setRoute] = useState<Route | null>(null);
   const [rerouting, setRerouting] = useState(false);
   const [follow, setFollow] = useState(true);
+  /** Vue d'ensemble du trajet restant pendant le guidage (bouton à droite) ; « Recentrer » revient au suivi. */
+  const [survol, setSurvol] = useState(false);
   const [scan, setScan] = useState(false);
   const [code, setCode] = useState('');
   const [shot, setShot] = useState<File | null>(null);
@@ -144,7 +146,7 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
   }, [mode, near, leg, voice]);
 
   function start() {
-    setMsg(null); setFollow(true); setRoute(null); lastAlong.current = 0;
+    setMsg(null); setFollow(true); setSurvol(false); setRoute(null); lastAlong.current = 0;
     if (near) { setMode('arrivee'); return; }
     setMode('guidage');
     if (me && targetAt) void fetchRoute(me, targetAt);
@@ -225,7 +227,10 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
 
   const view: View | null = useMemo(() => {
     if (!info || !targetAt) return null;
-    if (mode === 'guidage') return follow && me ? { mode: 'follow', at: me, bearing: fix?.heading ?? null, padding: { top: 190, bottom: 140 } } : null;
+    if (mode === 'guidage') {
+      if (survol && route) return { mode: 'fit', points: [...(me ? [me] : []), ...route.geometry.coordinates.filter((_, i, a) => i % Math.max(1, Math.floor(a.length / 40)) === 0), targetAt], padding: { top: 230, bottom: 170, left: 70, right: 80 } };
+      return follow && me ? { mode: 'follow', at: me, bearing: fix?.heading ?? null, zoom: followZoom(fix?.speed), padding: { top: 300, bottom: 150 } } : null;
+    }
     const bottom = wide ? 60 : (sheetH || 360) + 30;
     if (mode === 'arrivee') {
       // Arrivée : le bâtiment (contour surligné) et le livreur, au plus près.
@@ -234,7 +239,7 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
     }
     const pts: LngLat[] = [...(me ? [me] : []), ...(info.status === 'accepte' ? [[info.pickup.lng, info.pickup.lat] as LngLat] : []), [info.dropoff.lng, info.dropoff.lat]];
     return { mode: 'fit', points: pts, padding: { top: 90, bottom, left: 50, right: 50 } };
-  }, [info, mode, follow, me?.[0], me?.[1], fix?.heading, targetAt?.[0], targetAt?.[1], sheetH, wide]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [info, mode, follow, survol, route, me?.[0], me?.[1], fix?.heading, fix?.speed, targetAt?.[0], targetAt?.[1], sheetH, wide]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── États simples ──────────────────────────────────────────────────────────────────────────────────────────────────────
   if (session === null) return <main className="mx-auto max-w-md px-5 pt-6"><Link href="/connexion" className="font-bold text-lime">Se connecter</Link></main>;
@@ -296,32 +301,53 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
       {/* ── Guidage virage par virage ───────────────────────────────────────────────── */}
       {mode === 'guidage' && (
         <>
+          {/* Ordinateur : le panneau de gauche rappelle la mission pendant le guidage. */}
+          <aside className={`${SHEET} hidden lg:flex`} aria-label="Mission en cours">
+            <SheetHead />
+            <span className="text-[12.5px] font-extrabold tracking-[0.04em] text-night-muted">NAVIGATION EN COURS</span>
+            <span className="flex items-center gap-3"><StopBadge letter={leg === 'pickup' ? 'R' : 'D'} size={32} /><span className="flex min-w-0 flex-col"><span className="truncate font-display text-[18px] font-semibold">{leg === 'pickup' ? `Retrait · ${info.pickup.name ?? 'Boutique'}` : 'Dépôt chez le client'}</span><span className="truncate text-[12.5px] font-bold text-night-muted">{place(target)}</span></span></span>
+            {info.cod_amount_gnf > 0 && <p className={WARN}>{Ico.wallet(18)}Espèces à encaisser : {formatGnf(info.cod_amount_gnf)}</p>}
+          </aside>
+          {/* Bandeau de manœuvre (maquette v5 F4) : pictogramme, distance, consigne ; virage suivant en dessous. */}
           <div className="absolute inset-x-0 top-0 z-20 mx-auto flex max-w-md flex-col gap-2 px-3 pt-[max(12px,env(safe-area-inset-top))] lg:left-[420px] lg:max-w-lg">
-            <div className="flex items-center gap-3.5 rounded-[22px] bg-lime px-4 py-3.5 text-ink shadow-[0_8px_24px_rgba(0,0,0,.35)]" aria-live="polite">
-              <TurnIcon turn={turnOf(prog?.next ?? null)} />
-              <div className="flex min-w-0 flex-col">
-                <span className="font-display text-[28px] font-semibold leading-none">{prog ? meters(prog.toManeuver) : me ? '…' : 'GPS…'}</span>
-                <span className="mt-1 text-[14px] font-extrabold leading-snug">{prog?.next?.instruction ?? (me ? (rerouting ? 'Calcul de l’itinéraire…' : 'Suivez la ligne verte') : 'Recherche de votre position…')}</span>
+            <section aria-live="polite" aria-label="Prochaine manœuvre" className="overflow-hidden rounded-[24px] shadow-[0_12px_30px_rgba(0,0,0,.5)]">
+              <div className="flex items-center gap-3.5 rounded-t-[24px] border border-b-0 border-night-line bg-night-card px-4 py-3.5">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[18px] bg-lime text-ink"><TurnIcon turn={turnOf(prog?.next ?? null)} size={38} /></span>
+                <span className="flex min-w-0 flex-col">
+                  <span className="font-display text-[32px] font-bold leading-none tracking-[-0.03em]">{prog ? <>{meters(prog.toManeuver).replace(/\s?(k?m)$/, '')}<span className="ml-1 text-[18px] text-night-muted">{/km$/.test(meters(prog.toManeuver)) ? 'km' : 'm'}</span></> : me ? '…' : 'GPS…'}</span>
+                  <span className="mt-1 line-clamp-2 text-[15.5px] font-extrabold leading-snug">{prog?.next ? (prog.nextName && !prog.next.instruction.toLowerCase().includes(prog.nextName.toLowerCase()) ? `${prog.next.instruction.replace(/\.$/, '')} · ${prog.nextName}` : prog.next.instruction.replace(/\.$/, '')) : me ? (rerouting ? 'Calcul de l’itinéraire…' : 'Suivez la ligne verte') : 'Recherche de votre position…'}</span>
+                </span>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {prog?.then && <span className="rounded-xl border border-night-line bg-night-card/95 px-3 py-2 text-[12.5px] font-bold">Puis : {prog.then.maneuver.instruction.replace(/\.$/, '')} · {meters(prog.then.distance)}</span>}
-              {rerouting && route && <span className="rounded-xl bg-[#3a2f12] px-3 py-2 text-[12.5px] font-bold text-amber">Nouvel itinéraire…</span>}
-            </div>
+              <div className={`flex items-center gap-2 border border-night-line bg-[#1b2138] px-4 py-2.5 text-[13px] font-extrabold rounded-b-[24px] text-night-muted`}>
+                {rerouting && route ? <span className="text-[#f3dc8a]">Nouvel itinéraire…</span>
+                  : prog?.then ? <>Puis <span className="text-night-text"><TurnIcon turn={turnOf(prog.then.maneuver)} size={17} /></span><span className="truncate text-night-text">{prog.then.maneuver.instruction.replace(/\.$/, '')}</span><span className="shrink-0">· {meters(prog.then.distance)}</span></>
+                  : <>{leg === 'pickup' ? 'Retrait' : 'Dépôt'} · {stopName}</>}
+              </div>
+            </section>
             {Msg}
           </div>
-          <div className="absolute right-3 top-1/2 z-20 flex -translate-y-1/2 flex-col gap-2.5">
-            {voice.supported && <button type="button" onClick={voice.toggle} aria-pressed={voice.on} aria-label={voice.on ? 'Couper la voix' : 'Activer la voix'} className="flex h-12 w-12 items-center justify-center rounded-2xl border border-night-line bg-night-card/95">{voice.on ? Ico.sound() : Ico.mute()}</button>}
-            {!follow && <button type="button" onClick={() => setFollow(true)} aria-label="Recentrer sur ma position" className="flex h-12 w-12 items-center justify-center rounded-2xl border border-night-line bg-night-card/95 text-lime">{Ico.locate()}</button>}
+          <div className="absolute right-3 top-[44%] z-20 flex -translate-y-1/2 flex-col gap-2.5">
+            {voice.supported && <button type="button" onClick={voice.toggle} aria-pressed={voice.on} aria-label={voice.on ? 'Couper la voix' : 'Activer la voix'} className={FLOAT_BTN}>{voice.on ? Ico.sound() : Ico.mute()}</button>}
+            <button type="button" onClick={() => { setSurvol((v) => !v); setFollow(false); }} aria-pressed={survol} aria-label="Vue d’ensemble du trajet" className={`${FLOAT_BTN} ${survol ? 'text-lime' : ''}`}>{Ico.overview()}</button>
+            {(!follow || survol) && <button type="button" onClick={() => { setSurvol(false); setFollow(true); }} aria-label="Recentrer sur ma position" className={`${FLOAT_BTN} text-lime`}>{Ico.locate()}</button>}
           </div>
-          <div className="absolute inset-x-0 bottom-0 z-20 mx-auto flex max-w-md items-center gap-3 rounded-t-[24px] border-t border-night-line bg-night-card px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3.5 lg:left-[420px] lg:max-w-lg lg:rounded-[24px] lg:border lg:mb-4">
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="font-display text-[22px] font-semibold"><span className="text-lime">{prog ? minutes(prog.remainingSeconds) : '–'}</span> · {prog ? meters(prog.remaining) : distTarget !== null ? meters(distTarget) : '–'}</span>
-              <span className="truncate text-[12.5px] font-bold text-night-muted">{prog ? `Arrivée ${arrivalClock(new Date(), prog.remainingSeconds)} · ` : ''}{leg === 'pickup' ? 'Retrait' : 'Dépôt'} chez {stopName}</span>
+          {speedKmh(fix?.speed) !== null && (
+            <span aria-label={`Vitesse ${speedKmh(fix?.speed)} kilomètres par heure`} className="absolute bottom-[136px] left-3.5 z-20 flex h-16 w-16 flex-col items-center justify-center rounded-full border-2 border-night-line bg-night-card/95 shadow-[0_6px_18px_rgba(0,0,0,.35)] lg:left-[436px]">
+              <span className="font-display text-[22px] font-bold leading-none">{speedKmh(fix?.speed)}</span><span className="text-[10px] font-extrabold text-night-muted">km/h</span>
+            </span>
+          )}
+          {/* Barre du bas : progression, temps et distance restants, heure d'arrivée, étape de la mission. */}
+          <div className="absolute inset-x-0 bottom-0 z-20 mx-auto flex max-w-md flex-col gap-3 rounded-t-[26px] border-t border-night-line bg-night-card px-4 pb-[max(16px,env(safe-area-inset-bottom))] pt-3.5 shadow-[0_-12px_30px_rgba(0,0,0,.45)] lg:left-[420px] lg:mb-4 lg:max-w-lg lg:rounded-[24px] lg:border">
+            <span className="h-1 overflow-hidden rounded-full bg-night-line" role="progressbar" aria-label="Trajet parcouru" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round((prog?.fraction ?? 0) * 100)}><span className="block h-1 rounded-full bg-lime transition-[width] duration-700" style={{ width: `${Math.round((prog?.fraction ?? 0) * 100)}%` }} /></span>
+            <div className="flex items-center gap-3">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <span className="font-display text-[24px] font-semibold"><span className="text-lime">{prog ? minutes(prog.remainingSeconds) : '–'}</span> · {prog ? meters(prog.remaining) : distTarget !== null ? meters(distTarget) : '–'}</span>
+                <span className="truncate text-[12.5px] font-bold text-night-muted">{prog ? `Arrivée ${arrivalClock(new Date(), prog.remainingSeconds)} · ` : ''}{info.status === 'accepte' ? `Étape 1 sur 2 : retrait chez ${info.pickup.name ?? 'la boutique'}` : `Étape 2 sur 2 : dépôt chez ${stopName}`}</span>
+              </div>
+              {near
+                ? <button type="button" onClick={() => setMode('arrivee')} className="h-[52px] shrink-0 rounded-2xl bg-lime px-4 text-[14px] font-extrabold text-ink">Je suis arrivé</button>
+                : <button type="button" onClick={() => { setMode('apercu'); setSurvol(false); if (voice.supported) window.speechSynthesis.cancel(); }} aria-label="Arrêter le guidage" className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#3a1a1a] text-[#ffb4a8]">{Ico.close(22)}</button>}
             </div>
-            {near
-              ? <button type="button" onClick={() => setMode('arrivee')} className="h-12 shrink-0 rounded-2xl bg-lime px-4 text-[14px] font-extrabold text-ink">Je suis arrivé</button>
-              : <button type="button" onClick={() => { setMode('apercu'); if (voice.supported) window.speechSynthesis.cancel(); }} className="h-12 shrink-0 rounded-2xl bg-[#3a1a1a] px-4 text-[14px] font-extrabold text-[#ffb4a8]">Arrêter</button>}
           </div>
         </>
       )}

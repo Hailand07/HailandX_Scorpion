@@ -14,6 +14,7 @@ export const Ico = {
   nav: (s = 20) => <svg width={s} height={s} viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 21 12 16 4 21z" fill="currentColor" /></svg>,
   scan: (s = 20) => svg(<><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3" /><path d="M7 12h10" /></>, s),
   check: (s = 20) => svg(<path d="m5 12 5 5 9-10" />, s, 2.6),
+  overview: (s = 20) => svg(<><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" /><path d="M9 4v14M15 6v14" /></>, s),
   menu: (s = 20) => svg(<path d="M4 7h16M4 12h16M4 17h10" />, s, 2.2),
   close: (s = 20) => svg(<path d="M6 6l12 12M18 6 6 18" />, s, 2.2),
   bolt: (s = 20) => svg(<path d="M13 2 4 14h7l-1 8 9-12h-7z" />, s, 2.1),
