@@ -1,15 +1,16 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { LngLat } from '@/lib/nav';
+import { HAILAND_NUIT, NUIT } from '@/lib/hailandNuit';
 
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
-/** Style de carte Hailand (le même que NavigationX) ; repli sur un style sombre de Mapbox si celui-ci ne se charge pas. */
-export const HAILAND_STYLE = process.env.NEXT_PUBLIC_MAPBOX_STYLE || 'mapbox://styles/hailand/cmqbiiccq000b01qr7ckjeut1';
+/** Carte « Hailand Nuit » (style écrit dans `lib/hailandNuit.ts`) ; repli sur le style sombre de Mapbox si elle ne se charge pas. */
 const FALLBACK_STYLE = 'mapbox://styles/mapbox/dark-v11';
 export const hasMap = Boolean(TOKEN);
 
 export interface Pin { id: string; at: LngLat; kind: 'me' | 'pickup' | 'dropoff' | 'fee'; label?: string; heading?: number | null; active?: boolean; onClick?: () => void }
-export interface Line { id: string; coords: LngLat[]; color: string; dashed?: boolean; width?: number }
+/** Tracé. `glow` : halo lumineux (itinéraire à suivre) ; `dashed` : pointillé (étape suivante, trajet indicatif). */
+export interface Line { id: string; coords: LngLat[]; color: string; dashed?: boolean; width?: number; glow?: boolean }
 export interface Area { id: string; geometry: GeoJSON.Geometry }
 export type View =
   | { mode: 'fit'; points: LngLat[]; padding?: { top: number; bottom: number; left: number; right: number }; maxZoom?: number }
@@ -62,22 +63,23 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
       await import('mapbox-gl/dist/mapbox-gl.css');
       if (cancelled || !box.current) return;
       m.accessToken = TOKEN; mb.current = m;
-      const mp = new m.Map({ container: box.current, style: HAILAND_STYLE, center: [-13.6773, 9.537], zoom: 13, attributionControl: false, pitchWithRotate: false });
+      const mp = new m.Map({ container: box.current, style: HAILAND_NUIT, center: [-13.6773, 9.537], zoom: 13, attributionControl: false, pitchWithRotate: false });
       mp.addControl(new m.AttributionControl({ compact: true }), 'bottom-left');
       const setup = () => {
         if (!mp.getSource('hx-lines')) {
           mp.addSource('hx-areas', { type: 'geojson', data: EMPTY });
-          mp.addLayer({ id: 'hx-areas-fill', type: 'fill', source: 'hx-areas', paint: { 'fill-color': '#c8f25a', 'fill-opacity': 0.28 } });
+          mp.addLayer({ id: 'hx-areas-fill', type: 'fill', source: 'hx-areas', paint: { 'fill-color': NUIT.itineraire, 'fill-opacity': 0.16 } });
           mp.addLayer({ id: 'hx-areas-line', type: 'line', source: 'hx-areas', paint: { 'line-color': '#c8f25a', 'line-width': 3 } });
           mp.addSource('hx-lines', { type: 'geojson', data: EMPTY });
-          mp.addLayer({ id: 'hx-lines-casing', type: 'line', source: 'hx-lines', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#12141c', 'line-width': ['+', ['get', 'width'], 3], 'line-opacity': 0.55 } });
+          mp.addLayer({ id: 'hx-lines-glow', type: 'line', source: 'hx-lines', filter: ['==', ['get', 'glow'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['+', ['get', 'width'], 16], 'line-blur': 10, 'line-opacity': 0.42 } });
+          mp.addLayer({ id: 'hx-lines-casing', type: 'line', source: 'hx-lines', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': NUIT.halo, 'line-width': ['+', ['get', 'width'], 4], 'line-opacity': 0.7 } });
           mp.addLayer({ id: 'hx-lines', type: 'line', source: 'hx-lines', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'] } });
           mp.addLayer({ id: 'hx-lines-dash', type: 'line', source: 'hx-lines', filter: ['==', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-dasharray': [0.1, 2] } });
         }
         loaded = true; setReady(false); setReady(true);
       };
       mp.on('style.load', setup);
-      // Style Hailand inaccessible (jeton d'un autre compte, réseau) : on bascule une fois sur le style de repli.
+      // Carte Hailand Nuit inaccessible (jeton, réseau) : on bascule une fois sur le style sombre de Mapbox.
       mp.on('error', (e) => {
         const status = (e.error as { status?: number } | undefined)?.status;
         if (!loaded && !fellBack && (status === 401 || status === 403 || status === 404)) { fellBack = true; mp.setStyle(FALLBACK_STYLE); return; }
@@ -107,7 +109,7 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
 
   useEffect(() => {
     const mp = map.current; if (!mp || !ready) return;
-    (mp.getSource('hx-lines') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines.filter((l) => l.coords.length > 1).map((l) => ({ type: 'Feature', properties: { color: l.color, dashed: Boolean(l.dashed), width: l.width ?? 6 }, geometry: { type: 'LineString', coordinates: l.coords } })) });
+    (mp.getSource('hx-lines') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines.filter((l) => l.coords.length > 1).map((l) => ({ type: 'Feature', properties: { color: l.color, dashed: Boolean(l.dashed), glow: Boolean(l.glow), width: l.width ?? 6 }, geometry: { type: 'LineString', coordinates: l.coords } })) });
     (mp.getSource('hx-areas') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: areas.map((a) => ({ type: 'Feature', properties: {}, geometry: a.geometry })) });
   }, [lines, areas, ready]);
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { announcements, arrivalClock, arrived, bearing, directionsUrl, haversine, inPolygon, isOffRoute, meters, minutes, prepare, profileOf, progress, turnOf, type LngLat, type Route } from './nav';
+import { announcements, arrivalClock, arrived, bearing, directionsUrl, haversine, inPolygon, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, turnOf, type LngLat, type Route } from './nav';
 
 // Itinéraire en L près de Matam : 333 m vers le nord, puis 220 m vers l'est (≈ 0,003° de latitude, 0,002° de longitude).
 const A: LngLat = [-13.66, 9.54], B: LngLat = [-13.66, 9.543], C: LngLat = [-13.658, 9.543];
@@ -90,5 +90,21 @@ describe('arrivée et affichage', () => {
     expect(u).toContain('/mapbox/driving/-13.660000,9.540000;-13.658000,9.543000?');
     expect(u).toContain('language=fr');
     expect(u).toContain('voice_instructions=true');
+  });
+});
+
+describe('trajet parcouru', () => {
+  const p = prepare(route);
+  it('coupe l’itinéraire au point atteint, sans perdre de tracé', () => {
+    const { done, rest } = splitAt(p, 400);
+    expect(done[0]).toEqual(A);
+    expect(rest.at(-1)).toEqual(C);
+    expect(done.at(-1)).toEqual(rest[0]); // même point de coupure
+    expect(Math.round(haversine(B, rest[0]!))).toBeGreaterThan(55); // ≈ 66 m après le virage
+    expect(rest[0]![1]).toBeCloseTo(9.543, 5);
+  });
+  it('rien de parcouru au départ, tout à l’arrivée', () => {
+    expect(splitAt(p, 0)).toEqual({ done: [], rest: p.coords });
+    expect(splitAt(p, 10_000)).toEqual({ done: p.coords, rest: [] });
   });
 });
