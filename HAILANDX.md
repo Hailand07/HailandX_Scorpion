@@ -528,6 +528,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-16 | Seconde remise à zéro des comptes préparée et testée (`2026-10-16_reinitialisation_comptes_2.sql`, sauvegarde `sauvegarde_20261016`) ; constat : phase 5 pas encore déployée sur Console, Flotte et l'accueil de HailandX (limite Vercel). |
 | 2026-10-16 | Redéploiement de la phase 5 : commentaire sans effet dans `apps/console` et `apps/hailandx` pour forcer la reconstruction de Hailand Console et de HailandX (le déploiement du 2026-10-14 avait été refusé par la limite Vercel ; un « Redeploy » reconstruit l'ancien commit). Flotte : « Promote to Production » de l'aperçu de la PR #32. |
 | 2026-10-16 | **`BASE_DE_DONNEES.md`** (révision 1, identique dans les 3 dépôts) : explication de chaque table de la base partagée, tables inutilisées, recettes SQL. Contrôle automatique `supabase/tests/schema-doc.test.ts` (toute table créée par une migration doit y être décrite). Script de ménage `supabase/maintenance/2026-10-16_menage_tables_inutilisees.sql` (sauvegarde puis suppression de 8 tables d'anciens prototypes ; test `menage-tables.test.ts`) — ⏳ à exécuter par le fondateur. Écosystème révision 86. |
+| 2026-10-20 | Flotte : jeton Mapbox corrigé sur Vercel (un caractère faux), carte de nouveau affichée. Plan « Flotte Nuit, écrans d'ouverture, logos » validé (§32), étape 0 (maquettes) en cours. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -753,3 +754,22 @@ Une PR par étape, testée, documentée, vérifiée à l'écran.
 - **Hailand Console → Livreurs → « Ajouter un livreur »** (maquette F2 : numéro, nom, moto / vélo / voiture / à pied) : `fn_console_courier_add` (équipe seulement, journal) — numéro qui a déjà un Compte Hailand → livreur **validé** tout de suite ; sinon **invitation en attente** (`courier_invitations`, lisible par l'équipe seulement), onglet « Invitations en attente ». À la première connexion à Flotte, `fn_flotte_rejoindre()` transforme l'invitation en livreur validé. Les anciennes candidatures restent traitables (onglet affiché seulement s'il en reste).
 - **Notification « Adresse certifiée : vous pouvez ouvrir la vente »** : déclencheur `declarations_certified_notify` (après mise à jour de `certified_building_id`, c'est-à-dire quand HailandMap certifie le bâtiment et que la base rattache l'adresse) → notification au propriétaire d'une boutique « en préparation » ou « bientôt » à cette adresse, lien `/vendeur/ouvrir` (centre de notifications de HailandX Vendeur, icône ✅). Les adresses de résidents restent signalées par NavigationX (bandeau de certification existant).
 - Migration **`supabase/migrations/2026-10-24_flotte_recrutement_certification.sql`** (✅ appliquée) ; tests `supabase/tests/recrutement.test.ts` (6) ; l'ancien test de candidature adapté. **245 tests**.
+
+## 32. Plan « Flotte Nuit, écrans d'ouverture, logos » (2026-10-20) — 📄 validé par le fondateur, à suivre dans l'ordre
+
+**Constat (2026-10-20, capture du fondateur)** : la carte de Flotte s'affiche (jeton Mapbox corrigé sur Vercel : un caractère faux), mais en grand écran la carte occupe toute la largeur et les panneaux restent une colonne de téléphone collée au centre ; le style de carte est le style clair de NavigationX, sans lien avec l'interface nuit de Flotte. HailandX, HailandX Vendeur, Flotte et Console n'ont **pas d'écran d'ouverture** (HailandX a seulement `/bienvenue`, accueil de première visite) ni d'**icône d'application** (onglet, écran d'accueil du téléphone).
+
+**Décisions du fondateur (2026-10-20)** :
+- Logos **gardés tels quels** : HailandMap (carré bleu, maison), HailandX (mot « HailandX », X bleu ; pastille noire), Hailand Console (carré noir, bouclier vert citron), NavigationX (flèche). **À créer** : **Hailand Flotte** et **HailandX Vendeur** (aujourd'hui « HailandX » + étiquette « Vendeur »), dans la même famille.
+- **Flotte n'est jamais utilisée sur ordinateur pour une mission** : la version PC doit seulement rester propre si on l'ouvre (panneau à gauche, carte à droite), sans fonction propre.
+- **Carte sombre « Hailand Nuit » pour Flotte seulement** (le suivi de colis de HailandX reste en thème clair).
+
+**Plan (chaque étape validée avant la suivante)** :
+0. **Maquettes** (artefact « HailandX — Maquettes », page v5) : famille de logos (Flotte, Vendeur ajoutés), écrans d'ouverture des 4 applications, style de carte Hailand Nuit (fond bleu nuit, itinéraire vert citron, trajet parcouru éteint, bâtiments en relief), tous les écrans de Flotte en téléphone et en PC, bandeau de navigation.
+1. **Logos et ouverture** : composant d'ouverture commun dans `packages/kit` (logo animé ≈ 1,2 s, une fois par ouverture, animation réduite si demandée, chargement en parallèle) ; icônes d'onglet et d'installation (manifeste, iPhone) dans HailandX, Vendeur, Flotte, Console.
+2. **Carte Hailand Nuit** : style sombre de Mapbox recoloré dans le code au chargement (versionné, sans dépendre de Mapbox Studio).
+3. **Flotte, parcours et mise en page** : Ouverture → Connexion → (numéro non enregistré) → **Hors service** (gains du jour, espèces à reverser, « Passer en service ») → **En service** (missions proches sur la carte) → **Proposition** (retrait, dépôt, distance, gain) → **Vers le retrait** (navigation) → scan du QR → **Vers le client** → code + photo → **Récapitulatif** → En service ; menu (historique, gains, profil, aide, déconnexion). Téléphone : panneau du bas ; PC : panneau à gauche.
+4. **Navigation avancée** : bandeau de manœuvre (flèche, distance, rue, virage suivant), caméra inclinée qui suit le sens de marche avec zoom selon la vitesse, curseur animé, heure d'arrivée, minutes et km restants, trajet parcouru éteint, Recentrer, son, vue d'ensemble.
+5. **Fin** : tests, captures, documentation, PR, déploiement ; essai sur un vrai téléphone.
+
+Aucun changement de base de données prévu.
