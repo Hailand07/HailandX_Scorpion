@@ -8,8 +8,9 @@ import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
 import { telHref, useHeight, useVoice, useWakeLock } from '@/lib/device';
 import { uploadProof } from '@/lib/proof';
-import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, meters, minutes, prepare, profileOf, progress, turnOf, type LngLat, type Route } from '@/lib/nav';
+import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, turnOf, type LngLat, type Route } from '@/lib/nav';
 import { FlotteMap, hasMap, type Line, type Pin, type View } from '@/components/FlotteMap';
+import { NUIT } from '@/lib/hailandNuit';
 import { Ico, TurnIcon } from '@/components/Icons';
 
 interface Stop {
@@ -195,12 +196,17 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
       const n = overview.legs.length;
       return overview.legs.map((_, i) => {
         const current = i === 0 && hasMe;
-        return { id: `leg${i}`, coords: legCoords(overview, i), color: current ? '#3346f0' : '#c8f25a', dashed: !current && n > 1, width: current ? 6 : 5 };
+        // Hailand Nuit : l'étape à faire maintenant en vert lumineux, la suivante en pointillé.
+        return { id: `leg${i}`, coords: legCoords(overview, i), color: NUIT.itineraire, dashed: !current && n > 1, glow: current || n === 1, width: current || n === 1 ? 7 : 5 };
       });
     }
-    if (mode !== 'apercu' && route) return [{ id: 'route', coords: route.geometry.coordinates, color: '#c8f25a', width: 8 }];
+    if (mode !== 'apercu' && route) {
+      // Le trajet déjà parcouru s'éteint derrière le livreur.
+      const { done, rest } = prepared && prog ? splitAt(prepared, prog.along) : { done: [] as LngLat[], rest: route.geometry.coordinates };
+      return [{ id: 'fait', coords: done, color: NUIT.parcouru, width: 7 }, { id: 'route', coords: rest, color: NUIT.itineraire, width: 8, glow: true }];
+    }
     return [];
-  }, [mode, overview, route, hasMe]);
+  }, [mode, overview, route, hasMe, prepared, prog?.along]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const areas = useMemo(() => {
     const g = mode === 'apercu' ? info?.dropoff.outline : target?.outline;

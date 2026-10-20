@@ -100,6 +100,22 @@ export function progress(p: Prepared, pos: LngLat, hint = 0): Progress {
   };
 }
 
+/**
+ * Coupe l'itinéraire au point atteint (`along`, en mètres) : partie déjà parcourue (éteinte sur la carte) et partie restante (en vert).
+ */
+export function splitAt(p: Prepared, along: number): { done: LngLat[]; rest: LngLat[] } {
+  const c = p.coords;
+  if (c.length < 2 || along <= 0) return { done: [], rest: c };
+  if (along >= p.total) return { done: c, rest: [] };
+  let i = 0;
+  while (i < c.length - 2 && p.cum[i + 1]! <= along) i++;
+  const seg = p.cum[i + 1]! - p.cum[i]!;
+  const t = seg > 0 ? (along - p.cum[i]!) / seg : 0;
+  const a = c[i]!, b = c[i + 1]!;
+  const cut: LngLat = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  return { done: [...c.slice(0, i + 1), cut], rest: [cut, ...c.slice(i + 1)] };
+}
+
 /** Hors route quand l'écart dépasse 40 m, ou la précision du GPS + 15 m si elle est plus mauvaise. */
 export const isOffRoute = (offRoute: number, accuracy = 0) => offRoute > Math.max(40, accuracy + 15);
 
