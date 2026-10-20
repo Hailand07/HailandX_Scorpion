@@ -529,6 +529,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-16 | Redéploiement de la phase 5 : commentaire sans effet dans `apps/console` et `apps/hailandx` pour forcer la reconstruction de Hailand Console et de HailandX (le déploiement du 2026-10-14 avait été refusé par la limite Vercel ; un « Redeploy » reconstruit l'ancien commit). Flotte : « Promote to Production » de l'aperçu de la PR #32. |
 | 2026-10-16 | **`BASE_DE_DONNEES.md`** (révision 1, identique dans les 3 dépôts) : explication de chaque table de la base partagée, tables inutilisées, recettes SQL. Contrôle automatique `supabase/tests/schema-doc.test.ts` (toute table créée par une migration doit y être décrite). Script de ménage `supabase/maintenance/2026-10-16_menage_tables_inutilisees.sql` (sauvegarde puis suppression de 8 tables d'anciens prototypes ; test `menage-tables.test.ts`) — ⏳ à exécuter par le fondateur. Écosystème révision 86. |
 | 2026-10-20 | Flotte : jeton Mapbox corrigé sur Vercel (un caractère faux), carte de nouveau affichée. Plan « Flotte Nuit, écrans d'ouverture, logos » validé (§32), étape 0 (maquettes) en cours. |
+| 2026-10-20 | Plan §32, étapes 0 et 1 : maquettes v5 validées (Flotte A, Vendeur devanture sur fond sombre) ; logos `packages/ui/src/marks.ts` + `AppMark`, icônes d'onglet et d'installation des 4 applications (`scripts/icones.ts`), manifeste de la Console, écran d'ouverture commun `Ouverture` (CSS seulement, une fois par onglet). 258 tests. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -773,3 +774,10 @@ Une PR par étape, testée, documentée, vérifiée à l'écran.
 5. **Fin** : tests, captures, documentation, PR, déploiement ; essai sur un vrai téléphone.
 
 Aucun changement de base de données prévu.
+
+**Étape 0 ✅ (2026-10-20)** : maquettes page v5 validées. Choix du fondateur : **Flotte = A** (carré bleu nuit, itinéraire vert du point bleu à la flèche) ; **Vendeur = devanture à auvent du A sur le fond sombre du B** (sans « X » bleu) ; tout le reste validé tel quel.
+
+**Étape 1 ✅ code (2026-10-20)** — logos, icônes, écrans d'ouverture :
+- **Source unique des logos** : `packages/ui/src/marks.ts` (`markSvg(app)`, tracés seulement, `APP_INFO` : nom et phrase). Composant `AppMark` (en-têtes, connexion) ; logo Vendeur devant « HailandX Vendeur », logo Flotte dans la connexion et l'en-tête, logo Console sur la connexion (inchangé visuellement). Flotte a un liseré `#2a3150` pour rester visible sur fond nuit.
+- **Icônes** générées par `node --experimental-strip-types scripts/icones.ts` (sharp) : `src/app/icon.svg` (onglet), `src/app/apple-icon.png` (iPhone 180 px), `public/icone-192.png`, `icone-512.png`, `icone-maskable-512.png` (installation) dans les 4 applications ; manifestes complétés ; **la Console a désormais un manifeste**. Test `packages/ui/src/marks.test.ts` : les icônes servies doivent correspondre à la source (sinon relancer le script).
+- **Écran d'ouverture** `Ouverture` (`packages/ui`) placé en tête de `<body>` des 4 applications : rendu serveur, animation CSS seulement (`tokens.css` : ≈ 1,35 s, entrée du logo, barre de chargement), aucune attente ajoutée, clics jamais bloqués ; **une fois par onglet** (marque `hx.ouverture.<app>` en `sessionStorage`, classe `hx-sans-ouverture` posée avant React, d'où `suppressHydrationWarning` sur `<html>`) ; animation raccourcie si l'appareil demande moins de mouvement. Vérifié en local (Flotte, Vendeur) : visible au chargement, effacé après 1,35 s, absent au rechargement, 0 erreur. HailandX garde en plus `/bienvenue` (première visite).
