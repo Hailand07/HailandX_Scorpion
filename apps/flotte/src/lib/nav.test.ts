@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { announcements, arrivalClock, arrived, bearing, directionsUrl, haversine, inPolygon, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, turnOf, type LngLat, type Route } from './nav';
+import { announcements, arrivalClock, arrived, bearing, directionsUrl, haversine, inPolygon, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, followZoom, speedKmh, turnOf, type LngLat, type Route } from './nav';
 
 // Itinéraire en L près de Matam : 333 m vers le nord, puis 220 m vers l'est (≈ 0,003° de latitude, 0,002° de longitude).
 const A: LngLat = [-13.66, 9.54], B: LngLat = [-13.66, 9.543], C: LngLat = [-13.658, 9.543];
@@ -106,5 +106,28 @@ describe('trajet parcouru', () => {
   it('rien de parcouru au départ, tout à l’arrivée', () => {
     expect(splitAt(p, 0)).toEqual({ done: [], rest: p.coords });
     expect(splitAt(p, 10_000)).toEqual({ done: p.coords, rest: [] });
+  });
+});
+
+describe('navigation avancée', () => {
+  it('zoom de la caméra selon la vitesse', () => {
+    expect(followZoom(null)).toBe(17.3);
+    expect(followZoom(0)).toBe(17.8); // à l'arrêt : au plus près
+    expect(followZoom(10 / 3.6)).toBe(17.8);
+    expect(followZoom(30 / 3.6)).toBe(17); // à mi-chemin
+    expect(followZoom(80 / 3.6)).toBe(16.2); // plafonné
+  });
+  it('vitesse affichée', () => {
+    expect(speedKmh(null)).toBeNull();
+    expect(speedKmh(-1)).toBeNull();
+    expect(speedKmh(8.9)).toBe(32);
+  });
+  it('rue suivante et progression dans le bandeau', () => {
+    const p = prepare(route);
+    const g = progress(p, [-13.66, 9.542]);
+    expect(g.nextName).toBe('Rue MA.12');
+    expect(g.fraction).toBeGreaterThan(0.3);
+    expect(g.fraction).toBeLessThan(0.7);
+    expect(progress(p, C).fraction).toBe(1);
   });
 });

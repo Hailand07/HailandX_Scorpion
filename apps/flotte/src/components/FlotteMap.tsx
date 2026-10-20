@@ -14,9 +14,24 @@ export interface Line { id: string; coords: LngLat[]; color: string; dashed?: bo
 export interface Area { id: string; geometry: GeoJSON.Geometry }
 export type View =
   | { mode: 'fit'; points: LngLat[]; padding?: { top: number; bottom: number; left: number; right: number }; maxZoom?: number }
-  | { mode: 'follow'; at: LngLat; bearing: number | null; padding?: { top: number; bottom: number } };
+  | { mode: 'follow'; at: LngLat; bearing: number | null; padding?: { top: number; bottom: number }; zoom?: number };
 
 const EMPTY: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+/** Déplace doucement un marqueur vers sa nouvelle position (≈ 0,9 s) au lieu de le faire sauter d'un point GPS à l'autre. */
+const glides = new WeakMap<object, number>();
+function glide(mk: import('mapbox-gl').Marker, to: LngLat, ms = 900) {
+  const from = mk.getLngLat();
+  const stop = glides.get(mk); if (stop) cancelAnimationFrame(stop);
+  if (Math.abs(from.lng - to[0]) + Math.abs(from.lat - to[1]) > 0.01) { mk.setLngLat(to); return; } // saut (> ~1 km) : pas d'animation
+  const t0 = performance.now();
+  const step = (t: number) => {
+    const k = Math.min(1, (t - t0) / ms), e = k * (2 - k);
+    mk.setLngLat([from.lng + (to[0] - from.lng) * e, from.lat + (to[1] - from.lat) * e]);
+    if (k < 1) glides.set(mk, requestAnimationFrame(step)); else glides.delete(mk);
+  };
+  glides.set(mk, requestAnimationFrame(step));
+}
 
 function pinElement(p: Pin): HTMLElement {
   const el = document.createElement(p.onClick ? 'button' : 'div');
@@ -28,8 +43,13 @@ function pinElement(p: Pin): HTMLElement {
 function paint(el: HTMLElement, p: Pin) {
   el.setAttribute('aria-label', p.kind === 'me' ? 'Votre position' : p.kind === 'pickup' ? `Retrait${p.label ? ` : ${p.label}` : ''}` : p.kind === 'dropoff' ? 'Dépôt' : `Mission ${p.label ?? ''}`);
   if (p.kind === 'me') {
-    el.style.cssText = 'width:30px;height:30px;border-radius:10px;background:#3346f0;border:3px solid #fff;box-shadow:0 0 0 6px rgba(51,70,240,.25),0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center';
-    el.innerHTML = p.heading === null || p.heading === undefined ? '' : `<svg width="14" height="14" viewBox="0 0 24 24" style="transform:rotate(${Math.round(p.heading)}deg)"><path d="M12 2 20 21 12 16 4 21z" fill="#fff"/></svg>`;
+    // Curseur du livreur (maquette v5 F4) : flèche bleue bordée de blanc avec halo quand le cap est connu, sinon point bleu.
+    // La rotation est faite par Mapbox (marqueur aligné sur la carte) : la flèche reste juste quand la carte tourne.
+    const fleche = p.heading !== null && p.heading !== undefined;
+    el.style.cssText = 'width:52px;height:52px;display:flex;align-items:center;justify-content:center;pointer-events:none';
+    el.innerHTML = fleche
+      ? '<span style="position:absolute;inset:4px;border-radius:50%;background:rgba(51,70,240,.22)"></span><svg width="40" height="40" viewBox="0 0 40 40" style="position:relative;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))"><path d="M20 4 33 34 20 27 7 34z" fill="#3346f0" stroke="#fff" stroke-width="3" stroke-linejoin="round"/></svg>'
+      : '<span style="position:absolute;inset:10px;border-radius:50%;background:rgba(51,70,240,.25)"></span><span style="position:relative;width:20px;height:20px;border-radius:50%;background:#3346f0;border:4px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)"></span>';
   } else if (p.kind === 'pickup' || p.kind === 'dropoff') {
     const d = p.kind === 'dropoff';
     el.style.cssText = `width:32px;height:32px;border-radius:${d ? '16px' : '9px'};background:${d ? '#c8f25a' : '#fff'};color:#12141c;font:800 14px Manrope,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.45);border:2px solid #12141c`;
@@ -99,10 +119,18 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
     const seen = new Set<string>();
     for (const p of pins) {
       seen.add(p.id);
-      const key = `${p.kind}|${p.label ?? ''}|${p.active ? 1 : 0}|${p.heading === null || p.heading === undefined ? '-' : Math.round(p.heading / 5)}`;
+      const isMe = p.kind === 'me';
+      // Pour le curseur, la clé ne change qu'entre flèche et point : la rotation est appliquée à part (sans repeindre).
+      const key = `${p.kind}|${p.label ?? ''}|${p.active ? 1 : 0}|${isMe ? (p.heading === null || p.heading === undefined ? '-' : 'f') : ''}`;
       const cur = marks.current.get(p.id);
-      if (cur) { cur.m.setLngLat(p.at); if (cur.key !== key) { paint(cur.m.getElement(), p); cur.key = key; } }
-      else marks.current.set(p.id, { m: new m.Marker({ element: pinElement(p) }).setLngLat(p.at).addTo(mp), key });
+      if (cur) {
+        if (isMe) glide(cur.m, p.at); else cur.m.setLngLat(p.at);
+        if (cur.key !== key) { paint(cur.m.getElement(), p); cur.key = key; }
+      } else {
+        const opts = isMe ? { element: pinElement(p), rotationAlignment: 'map' as const, pitchAlignment: 'map' as const } : { element: pinElement(p) };
+        marks.current.set(p.id, { m: new m.Marker(opts).setLngLat(p.at).addTo(mp), key });
+      }
+      if (isMe) marks.current.get(p.id)!.m.setRotation(p.heading ?? 0);
     }
     for (const [id, v] of marks.current) if (!seen.has(id)) { v.m.remove(); marks.current.delete(id); }
   }, [pins, ready]);
@@ -114,11 +142,12 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
   }, [lines, areas, ready]);
 
   // Cadrage : suivi du livreur (orienté, incliné), ou ensemble des points utiles.
-  const viewKey = view ? (view.mode === 'follow' ? `f|${view.at[0].toFixed(5)}|${view.at[1].toFixed(5)}|${Math.round((view.bearing ?? 0) / 4)}` : `b|${view.points.map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join(';')}|${Math.round((view.padding?.bottom ?? 0) / 40)}`) : '';
+  const viewKey = view ? (view.mode === 'follow' ? `f|${view.at[0].toFixed(5)}|${view.at[1].toFixed(5)}|${Math.round((view.bearing ?? 0) / 4)}|${(view.zoom ?? 0).toFixed(1)}` : `b|${view.points.map((p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`).join(';')}|${Math.round((view.padding?.bottom ?? 0) / 40)}`) : '';
   useEffect(() => {
     const mp = map.current, m = mb.current; if (!mp || !m || !ready || !view) return;
     if (view.mode === 'follow') {
-      mp.easeTo({ center: view.at, bearing: view.bearing ?? mp.getBearing(), pitch: 55, zoom: 17.3, padding: { top: view.padding?.top ?? 170, bottom: view.padding?.bottom ?? 150, left: 0, right: 0 }, duration: 900 });
+      // Caméra de navigation : inclinée, orientée dans le sens de marche, zoom selon la vitesse ; glissement linéaire entre deux points GPS.
+      mp.easeTo({ center: view.at, bearing: view.bearing ?? mp.getBearing(), pitch: 60, zoom: view.zoom ?? 17.3, padding: { top: view.padding?.top ?? 170, bottom: view.padding?.bottom ?? 150, left: 0, right: 0 }, duration: 1000, easing: (t) => t });
     } else if (view.points.length === 1) {
       mp.easeTo({ center: view.points[0], zoom: 16, bearing: 0, pitch: 0, duration: 600 });
     } else if (view.points.length > 1) {

@@ -68,6 +68,10 @@ export interface Progress {
   then: { maneuver: Maneuver; distance: number } | null;
   remaining: number;
   remainingSeconds: number;
+  /** Nom de la rue après la prochaine manœuvre (bandeau), si Mapbox le donne. */
+  nextName: string | null;
+  /** Part du trajet déjà faite, de 0 à 1 (barre de progression). */
+  fraction: number;
 }
 
 /**
@@ -97,6 +101,8 @@ export function progress(p: Prepared, pos: LngLat, hint = 0): Progress {
     then: thenStep && nextStep ? { maneuver: thenStep.maneuver, distance: nextStep.distance } : null,
     remaining,
     remainingSeconds: p.total > 0 ? (p.route.duration * remaining) / p.total : 0,
+    nextName: nextStep?.name?.trim() || null,
+    fraction: p.total > 0 ? Math.min(1, along / p.total) : 0,
   };
 }
 
@@ -115,6 +121,20 @@ export function splitAt(p: Prepared, along: number): { done: LngLat[]; rest: Lng
   const cut: LngLat = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
   return { done: [...c.slice(0, i + 1), cut], rest: [cut, ...c.slice(i + 1)] };
 }
+
+/**
+ * Zoom de la caméra qui suit le livreur, selon sa vitesse : très près à pied ou au ralenti (17,8), plus large en roulant vite (16,2),
+ * pour voir venir le prochain virage. Sans vitesse connue : 17,3.
+ */
+export function followZoom(speedMs: number | null | undefined): number {
+  if (speedMs === null || speedMs === undefined || Number.isNaN(speedMs)) return 17.3;
+  const kmh = Math.max(0, speedMs) * 3.6;
+  return Math.round((17.8 - Math.min(1, Math.max(0, (kmh - 10) / 40)) * 1.6) * 100) / 100;
+}
+
+/** Vitesse affichée (km/h, entière), ou null si le GPS ne la donne pas. */
+export const speedKmh = (speedMs: number | null | undefined): number | null =>
+  speedMs === null || speedMs === undefined || Number.isNaN(speedMs) || speedMs < 0 ? null : Math.round(speedMs * 3.6);
 
 /** Hors route quand l'écart dépasse 40 m, ou la précision du GPS + 15 m si elle est plus mauvaise. */
 export const isOffRoute = (offRoute: number, accuracy = 0) => offRoute > Math.max(40, accuracy + 15);

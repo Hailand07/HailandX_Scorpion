@@ -532,6 +532,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-20 | Plan §32, étapes 0 et 1 : maquettes v5 validées (Flotte A, Vendeur devanture sur fond sombre) ; logos `packages/ui/src/marks.ts` + `AppMark`, icônes d'onglet et d'installation des 4 applications (`scripts/icones.ts`), manifeste de la Console, écran d'ouverture commun `Ouverture` (CSS seulement, une fois par onglet). 258 tests. |
 | 2026-10-20 | Plan §32, étape 2 : carte « Hailand Nuit » de Flotte écrite dans le code (`lib/hailandNuit.ts`, Mapbox Streets v8), itinéraire vert lumineux, trajet parcouru éteint (`splitAt`), relief sombre des bâtiments. |
 | 2026-10-20 | Plan §32, étape 3 : Flotte refaite selon les maquettes v5 (hors service, en service, mission proposée, retrait, remise, fin, menu), panneau à gauche sur ordinateur, pages `/livraisons` et `/aide`. |
+| 2026-10-20 | Plan §32, étape 4 : navigation avancée de Flotte (bandeau de manœuvre, caméra inclinée avec zoom selon la vitesse, flèche animée orientée, vue d'ensemble, vitesse, barre de progression). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -796,3 +797,12 @@ Aucun changement de base de données prévu.
 - **Nouvelles pages** : `/livraisons` (gains du jour et des 7 jours, espèces à reverser et plafond, historique par jour) et `/aide` (client absent, code, QR, adresse imprécise, espèces, GPS).
 - Aucune modification de la base : lectures déjà permises (`parcels` du livreur, `couriers`).
 - Vérifié : captures téléphone et ordinateur (base et GPS simulés, vraies tuiles Mapbox) des 11 écrans, 0 erreur ; lint, 257 tests, build de Flotte OK.
+
+**Étape 4 ✅ code (2026-10-20)** — navigation avancée (maquette v5 F4) :
+- **Bandeau de manœuvre** : pictogramme sur carré vert, distance en grand, consigne de Mapbox (+ nom de la rue si absent de la consigne, `Progress.nextName`), rangée « Puis » avec le virage suivant ; « Nouvel itinéraire… » pendant un recalcul.
+- **Caméra** : inclinée à 60°, orientée dans le sens de marche, **zoom selon la vitesse** (`followZoom` : 17,8 à l'arrêt ou au ralenti → 16,2 à 50 km/h et plus), glissement linéaire d'1 s entre deux points GPS.
+- **Curseur du livreur** : flèche bleue bordée de blanc avec halo, posée sur la carte et tournée par Mapbox selon le cap (point bleu si le cap est inconnu), **déplacement animé** (≈ 0,9 s) entre deux positions.
+- **Commandes** : voix, **vue d'ensemble** du trajet restant, Recentrer ; **compteur de vitesse** (km/h, masqué si le GPS ne donne pas la vitesse) ; barre du bas avec **barre de progression** (`Progress.fraction`), minutes et distance restantes, heure d'arrivée, « Étape 1 sur 2 : retrait chez … » / « Étape 2 sur 2 : dépôt … », bouton d'arrêt. Sur ordinateur, le panneau de gauche rappelle la mission.
+- Vérifié : captures (itinéraire simulé, vraies tuiles Mapbox) téléphone, vue d'ensemble et ordinateur ; 3 tests ajoutés (`followZoom`, `speedKmh`, `nextName`/`fraction`) ; lint, 260 tests, build de Flotte OK. ⚠️ À essayer **sur un vrai téléphone en roulant** (cap, vitesse, voix, écran allumé).
+
+**Étape 5 (fin)** : documentation à jour ; reste l'essai réel sur téléphone par le fondateur, puis les retouches qu'il demandera.
