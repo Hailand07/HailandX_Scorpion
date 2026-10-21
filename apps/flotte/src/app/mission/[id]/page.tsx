@@ -83,7 +83,8 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
   useEffect(() => {
     if (!sb || !fix || !session || Date.now() - lastPing.current < 20_000) return;
     lastPing.current = Date.now();
-    void sb.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng });
+    // `.then()` obligatoire : une requête Supabase n'est envoyée que lorsqu'on l'attend (sans lui, la position n'arrivait jamais).
+    void sb.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng }).then(() => undefined);
   }, [sb, fix, session]);
 
   const leg = info?.status === 'retire' ? 'dropoff' : 'pickup';
