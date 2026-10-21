@@ -27,7 +27,7 @@ const online = (c: Courier) => c.status === 'valide' && c.available && c.last_se
  * Suspendre, réactiver, enregistrer les espèces reversées : tout est inscrit au journal.
  */
 export default function CouriersPage() {
-  const { sb } = useConsole();
+  const { sb, role } = useConsole();
   const { busy, msg, run } = useAction();
   const [rows, setRows] = useState<Courier[] | null>(null);
   const [invites, setInvites] = useState<Invitation[]>([]);
@@ -35,6 +35,8 @@ export default function CouriersPage() {
   const [form, setForm] = useState({ phone: '', name: '', vehicle: 'moto' });
   const [confirm, setConfirm] = useState<string | null>(null);
   const [cash, setCash] = useState<Record<string, string>>({});
+  /** Plafond d'espèces en cours de modification (fondateur) : livreur, montant, motif. */
+  const [plafond, setPlafond] = useState<{ id: string; montant: string; motif: string } | null>(null);
 
   const load = useCallback(async () => {
     const { data } = await sb.from('couriers').select('user_id,full_name,phone,vehicle,status,available,cash_balance_gnf,cash_limit_gnf,last_seen_at,created_at').order('created_at', { ascending: false });
@@ -66,6 +68,11 @@ export default function CouriersPage() {
   const settle = (c: Courier) => {
     const amount = Number((cash[c.user_id] ?? String(c.cash_balance_gnf)).replace(/\D/g, ''));
     return run(sb.rpc('fn_courier_cash_settle', { p_courier: c.user_id, p_amount: amount }), `Espèces reçues de ${c.full_name} : ${formatGnf(amount)}.`, async () => { setCash((x) => ({ ...x, [c.user_id]: '' })); await load(); });
+  };
+  const saveLimit = (c: Courier) => {
+    if (!plafond) return;
+    const amount = Number(plafond.montant.replace(/\D/g, ''));
+    return run(sb.rpc('fn_console_courier_cash_limit', { p_courier: c.user_id, p_limit: amount, p_motif: plafond.motif }), `Plafond d’espèces de ${c.full_name} : ${formatGnf(amount)}.`, async () => { setPlafond(null); await load(); });
   };
 
   return (
@@ -131,6 +138,20 @@ export default function CouriersPage() {
                     </span>
                   ) : <button type="button" onClick={() => setConfirm(c.user_id)} className={btn.small}>{c.status === 'candidat' ? 'Refuser' : 'Suspendre'}</button>)}
                 </div>
+                {c.status === 'valide' && (plafond?.id === c.user_id ? (
+                  <form className="flex flex-wrap items-center gap-2 rounded-[14px] bg-[#faf9f5] px-3 py-2.5" onSubmit={(e) => { e.preventDefault(); void saveLimit(c); }}>
+                    <span className="text-[13px] font-extrabold">Plafond d’espèces</span>
+                    <input inputMode="numeric" aria-label={`Nouveau plafond d’espèces de ${c.full_name}`} value={plafond.montant} onChange={(e) => setPlafond({ ...plafond, montant: e.target.value })} className="h-9 w-32 rounded-[11px] border border-line bg-card px-2.5 text-[14px] font-bold" />
+                    <input aria-label="Motif" placeholder="Motif (obligatoire)" value={plafond.motif} onChange={(e) => setPlafond({ ...plafond, motif: e.target.value })} className="h-9 min-w-0 flex-1 rounded-[11px] border border-line bg-card px-2.5 text-[13px] font-semibold" />
+                    <button type="submit" disabled={busy || plafond.motif.trim().length < 3} className={btn.small}>Enregistrer</button>
+                    <button type="button" onClick={() => setPlafond(null)} className={btn.small}>Annuler</button>
+                  </form>
+                ) : (
+                  <span className="flex flex-wrap items-center gap-2 text-[12.5px] font-semibold text-muted">
+                    Plafond d’espèces : <span className="font-extrabold text-ink">{formatGnf(c.cash_limit_gnf)}</span>
+                    {role === 'fondateur' && <button type="button" onClick={() => setPlafond({ id: c.user_id, montant: String(c.cash_limit_gnf), motif: '' })} className="font-extrabold text-blue">Modifier</button>}
+                  </span>
+                ))}
                 {c.cash_balance_gnf > 0 && (
                   <form className="flex flex-wrap items-center gap-2 rounded-[14px] bg-[#faf9f5] px-3 py-2.5" onSubmit={(e) => { e.preventDefault(); void settle(c); }}>
                     <span className={`flex-1 text-[13px] font-extrabold ${over ? 'text-[#9a6b00]' : ''}`}>Espèces en main : {formatGnf(c.cash_balance_gnf)}{over ? ` · au-dessus du plafond (${formatGnf(c.cash_limit_gnf)})` : ''}</span>

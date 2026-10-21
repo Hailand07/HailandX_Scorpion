@@ -11,7 +11,8 @@ export const hasMap = Boolean(TOKEN);
 export interface Pin { id: string; at: LngLat; kind: 'me' | 'pickup' | 'dropoff' | 'fee'; label?: string; heading?: number | null; active?: boolean; onClick?: () => void }
 /** Tracé. `glow` : halo lumineux (itinéraire à suivre) ; `dashed` : pointillé (étape suivante, trajet indicatif). */
 export interface Line { id: string; coords: LngLat[]; color: string; dashed?: boolean; width?: number; glow?: boolean }
-export interface Area { id: string; geometry: GeoJSON.Geometry }
+/** Bâtiment surligné : `color` (retrait ambre, dépôt vert), `active` = l'arrêt vers lequel on va maintenant (plus marqué). */
+export interface Area { id: string; geometry: GeoJSON.Geometry; color?: string; active?: boolean }
 export type View =
   | { mode: 'fit'; points: LngLat[]; padding?: { top: number; bottom: number; left: number; right: number }; maxZoom?: number }
   | { mode: 'follow'; at: LngLat; bearing: number | null; padding?: { top: number; bottom: number }; zoom?: number };
@@ -52,7 +53,7 @@ function paint(el: HTMLElement, p: Pin) {
       : '<span style="position:absolute;inset:10px;border-radius:50%;background:rgba(51,70,240,.25)"></span><span style="position:relative;width:20px;height:20px;border-radius:50%;background:#3346f0;border:4px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5)"></span>';
   } else if (p.kind === 'pickup' || p.kind === 'dropoff') {
     const d = p.kind === 'dropoff';
-    el.style.cssText = `width:32px;height:32px;border-radius:${d ? '16px' : '9px'};background:${d ? '#c8f25a' : '#fff'};color:#12141c;font:800 14px Manrope,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.45);border:2px solid #12141c`;
+    el.style.cssText = `width:32px;height:32px;border-radius:${d ? '16px' : '9px'};background:${d ? NUIT.depot : NUIT.retrait};color:#12141c;font:800 14px Manrope,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.45);border:2px solid #12141c`;
     el.textContent = d ? 'D' : 'R';
   } else {
     el.style.cssText = `height:30px;padding:0 10px;border-radius:15px;background:${p.active ? '#c8f25a' : '#fff'};color:#12141c;font:800 12.5px Manrope,system-ui,sans-serif;display:flex;align-items:center;box-shadow:0 2px 8px rgba(0,0,0,.45);border:${p.active ? '2px solid #12141c' : '0'};cursor:pointer;white-space:nowrap`;
@@ -88,8 +89,11 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
       const setup = () => {
         if (!mp.getSource('hx-lines')) {
           mp.addSource('hx-areas', { type: 'geojson', data: EMPTY });
-          mp.addLayer({ id: 'hx-areas-fill', type: 'fill', source: 'hx-areas', paint: { 'fill-color': NUIT.itineraire, 'fill-opacity': 0.16 } });
-          mp.addLayer({ id: 'hx-areas-line', type: 'line', source: 'hx-areas', paint: { 'line-color': '#c8f25a', 'line-width': 3 } });
+          mp.addLayer({ id: 'hx-areas-glow', type: 'line', source: 'hx-areas', filter: ['==', ['get', 'active'], true], paint: { 'line-color': ['get', 'color'], 'line-width': 12, 'line-blur': 8, 'line-opacity': 0.55 } });
+          mp.addLayer({ id: 'hx-areas-fill', type: 'fill', source: 'hx-areas', paint: { 'fill-color': ['get', 'color'], 'fill-opacity': ['case', ['get', 'active'], 0.42, 0.22] } });
+          mp.addLayer({ id: 'hx-areas-line', type: 'line', source: 'hx-areas', paint: { 'line-color': ['get', 'color'], 'line-width': ['case', ['get', 'active'], 3.5, 2] } });
+          // En navigation inclinée, le bâtiment surligné se dresse en volume coloré au-dessus des volumes sombres de la ville.
+          mp.addLayer({ id: 'hx-areas-3d', type: 'fill-extrusion', source: 'hx-areas', minzoom: 15, paint: { 'fill-extrusion-color': ['get', 'color'], 'fill-extrusion-height': ['case', ['get', 'active'], 9, 7], 'fill-extrusion-base': 0, 'fill-extrusion-opacity': 0.7 } });
           mp.addSource('hx-lines', { type: 'geojson', data: EMPTY });
           mp.addLayer({ id: 'hx-lines-glow', type: 'line', source: 'hx-lines', filter: ['==', ['get', 'glow'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': ['get', 'color'], 'line-width': ['+', ['get', 'width'], 16], 'line-blur': 10, 'line-opacity': 0.42 } });
           mp.addLayer({ id: 'hx-lines-casing', type: 'line', source: 'hx-lines', filter: ['!=', ['get', 'dashed'], true], layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': NUIT.halo, 'line-width': ['+', ['get', 'width'], 4], 'line-opacity': 0.7 } });
@@ -138,7 +142,7 @@ export function FlotteMap({ pins, lines = [], areas = [], view, onUserMove, clas
   useEffect(() => {
     const mp = map.current; if (!mp || !ready) return;
     (mp.getSource('hx-lines') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: lines.filter((l) => l.coords.length > 1).map((l) => ({ type: 'Feature', properties: { color: l.color, dashed: Boolean(l.dashed), glow: Boolean(l.glow), width: l.width ?? 6 }, geometry: { type: 'LineString', coordinates: l.coords } })) });
-    (mp.getSource('hx-areas') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: areas.map((a) => ({ type: 'Feature', properties: {}, geometry: a.geometry })) });
+    (mp.getSource('hx-areas') as import('mapbox-gl').GeoJSONSource | undefined)?.setData({ type: 'FeatureCollection', features: areas.map((a) => ({ type: 'Feature', properties: { color: a.color ?? NUIT.depot, active: a.active !== false }, geometry: a.geometry })) });
   }, [lines, areas, ready]);
 
   // Cadrage : suivi du livreur (orienté, incliné), ou ensemble des points utiles.

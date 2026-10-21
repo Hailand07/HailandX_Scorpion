@@ -136,6 +136,9 @@ export function followZoom(speedMs: number | null | undefined): number {
 export const speedKmh = (speedMs: number | null | undefined): number | null =>
   speedMs === null || speedMs === undefined || Number.isNaN(speedMs) || speedMs < 0 ? null : Math.round(speedMs * 3.6);
 
+/** Tracé d'un tronçon (retrait, puis dépôt) d'un itinéraire à plusieurs arrêts, d'après la géométrie de ses étapes. */
+export const legCoords = (r: Route, i: number): LngLat[] => (r.legs[i]?.steps ?? []).flatMap((s) => ((s as unknown as { geometry?: { coordinates: LngLat[] } }).geometry?.coordinates ?? []));
+
 /** Hors route quand l'écart dépasse 40 m, ou la précision du GPS + 15 m si elle est plus mauvaise. */
 export const isOffRoute = (offRoute: number, accuracy = 0) => offRoute > Math.max(40, accuracy + 15);
 
