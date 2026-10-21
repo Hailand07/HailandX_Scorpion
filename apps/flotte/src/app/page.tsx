@@ -26,6 +26,8 @@ interface Mine { id: string; status: string; delivery_fee_gnf: number; shops: { 
 const cta = CTA;
 const short = (n: number) => n.toLocaleString('fr-FR').replace(/ | /g, ' ');
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
+/** Rayon de recherche des missions (le serveur plafonne à 20 km) : à l'échelle de Conakry–Dubréka, 8 km laissait des missions invisibles. */
+const RAYON_KM = 20;
 const where = (q: string | null, c: string | null) => [q, c].filter(Boolean).join(', ') || 'Zone de livraison';
 
 /**
@@ -66,7 +68,8 @@ export default function Home() {
   useEffect(() => {
     if (!sb || !fix || courier?.status !== 'valide' || Date.now() - lastPing.current < 20_000) return;
     lastPing.current = Date.now();
-    void sb.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng });
+    // `.then()` obligatoire : une requête Supabase n'est envoyée que lorsqu'on l'attend (sans lui, la position n'arrivait jamais).
+    void sb.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng }).then(() => undefined);
   }, [sb, fix, courier?.status]);
 
   const loadMissions = useCallback(async () => {
@@ -78,7 +81,7 @@ export default function Home() {
     const rows = (d.data as { delivery_fee_gnf: number; distance_km: number | null }[]) ?? [];
     setToday({ count: rows.length, fees: rows.reduce((n, r) => n + r.delivery_fee_gnf, 0), km: rows.reduce((n, r) => n + Number(r.distance_km ?? 0), 0) });
     if (courier.available && fix) {
-      const r = await sb.rpc('fn_missions_carte', { p_lat: fix.lat, p_lng: fix.lng, p_radius_km: 8 });
+      const r = await sb.rpc('fn_missions_carte', { p_lat: fix.lat, p_lng: fix.lng, p_radius_km: RAYON_KM });
       setMissions((r.data as Mission[] | null) ?? []);
     } else setMissions([]);
   }, [sb, uid, courier?.status, courier?.available, fix]);
@@ -253,7 +256,7 @@ export default function Home() {
             <div className="flex items-baseline justify-between"><h1 className="font-display text-[18px] font-semibold">Missions proches</h1>{missions.length > 1 && <span className="text-[12.5px] font-bold text-night-muted">{missions.length} disponibles</span>}</div>
             {room <= 0 && <p className={WARN}>{Ico.wallet(18)}Plafond d’espèces atteint : reversez vos espèces avant une mission payable à la livraison.</p>}
             {!fix && <p className="text-[13.5px] font-medium text-night-muted">Recherche de votre position… Autorisez la localisation pour voir les missions autour de vous.</p>}
-            {fix && missions.length === 0 && <p className="text-[13.5px] font-medium text-night-muted">Aucune mission pour l’instant. La carte se met à jour toute seule.</p>}
+            {fix && missions.length === 0 && <p className="text-[13.5px] font-medium text-night-muted">Aucune mission à moins de {RAYON_KM} km pour l’instant. La carte se met à jour toute seule.</p>}
             {missions.map((m) => {
               const on = m.parcel_id === selected?.parcel_id;
               return (
