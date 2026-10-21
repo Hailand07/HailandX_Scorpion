@@ -8,7 +8,9 @@
 -- 2. Les contours des deux bâtiments (retrait, dépôt) sont renvoyés pour être surlignés dans Flotte.
 -- 3. Refus d'une mission au-delà du plafond d'espèces : message exact (montant à encaisser, plafond, déjà en main).
 -- 4. Hailand Console : le fondateur règle le plafond d'espèces d'un livreur (journalisé).
--- Remplacements de fonctions et ajout d'une fonction ; aucune donnée existante n'est modifiée.
+-- Remplacements de fonctions et ajout de fonctions ; aucune donnée existante n'est modifiée.
+-- APPLIQUÉE EN PRODUCTION le 2026-10-21 (accord du fondateur), en deux migrations : flotte_batiments_exacts_points,
+-- flotte_batiments_exacts_mission_plafond. Vérifié : mission en attente → retrait et dépôt à 0 m de leurs bâtiments certifiés, contours renvoyés.
 -- ════════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 /** Point du bâtiment d'une déclaration : intérieur au contour certifié s'il existe, sinon point d'ancrage, sinon point GPS. */
