@@ -8,8 +8,8 @@ import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
 import { telHref, useHeight, useVoice, useWakeLock } from '@/lib/device';
 import { uploadProof } from '@/lib/proof';
-import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, meters, minutes, prepare, profileOf, progress, splitAt, followZoom, speedKmh, turnOf, type LngLat, type Route } from '@/lib/nav';
-import { FlotteMap, hasMap, type Line, type Pin, type View } from '@/components/FlotteMap';
+import { announcements, ARRIVAL_M, arrivalClock, arrived, directionsUrl, haversine, isOffRoute, legCoords, meters, minutes, prepare, profileOf, progress, splitAt, followZoom, speedKmh, turnOf, type LngLat, type Route } from '@/lib/nav';
+import { FlotteMap, hasMap, type Area, type Line, type Pin, type View } from '@/components/FlotteMap';
 import { NUIT } from '@/lib/hailandNuit';
 import { Ico, TurnIcon } from '@/components/Icons';
 import { FLOAT_BTN, MAP_AREA, SHEET, SheetHead, StopBadge, WARN, useWide } from '@/components/Frame';
@@ -28,7 +28,6 @@ const LEVEL: Record<number, string> = { 3: 'bâtiment certifié (niveau 3)', 2: 
 const place = (s: Stop) => [s.quartier, s.commune && `commune de ${s.commune}`].filter(Boolean).join(' · ') || 'Quartier non renseigné';
 const details = (s: Stop) => [s.floor && `étage ${s.floor}`, s.door && `porte ${s.door}`, s.landmark].filter(Boolean).join(' · ');
 const errText = (e: { message: string }) => e.message.replace(/^[^:]{0,60}:\s*/, '');
-const legCoords = (r: Route, i: number): LngLat[] => (r.legs[i]?.steps ?? []).flatMap((s) => ((s as unknown as { geometry?: { coordinates: LngLat[] } }).geometry?.coordinates ?? []));
 
 /**
  * Mission en cours, carte plein écran dès l'acceptation :
@@ -220,10 +219,15 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
     return [];
   }, [mode, overview, route, hasMe, prepared, prog?.along]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const areas = useMemo(() => {
-    const g = mode === 'apercu' ? info?.dropoff.outline : target?.outline;
-    return g ? [{ id: 'cible', geometry: g }] : [];
-  }, [mode, target, info]);
+  // Bâtiments surlignés (demande du fondateur, 2026-10-21) : retrait en ambre tant que le colis n'est pas retiré, dépôt en vert ;
+  // l'arrêt vers lequel on va maintenant est plus marqué (halo, volume plus haut).
+  const areas: Area[] = useMemo(() => {
+    if (!info) return [];
+    const out: Area[] = [];
+    if (info.status === 'accepte' && info.pickup.outline) out.push({ id: 'retrait', geometry: info.pickup.outline, color: NUIT.retrait, active: leg === 'pickup' });
+    if (info.dropoff.outline) out.push({ id: 'depot', geometry: info.dropoff.outline, color: NUIT.depot, active: leg === 'dropoff' });
+    return out;
+  }, [info, leg]);
 
   const view: View | null = useMemo(() => {
     if (!info || !targetAt) return null;
@@ -417,7 +421,7 @@ function StopCard({ letter, title, stop, heading, leg, callLabel, showPlace = tr
   const extra = details(stop);
   return (
     <article className="flex items-start gap-3 rounded-[18px] border border-night-line bg-night px-3.5 py-3">
-      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-[13px] font-extrabold text-ink ${letter === 'D' ? 'rounded-full bg-lime' : 'rounded-[9px] bg-white'}`}>{letter}</span>
+      <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center text-[13px] font-extrabold text-ink ${letter === 'D' ? 'rounded-full bg-lime' : 'rounded-[9px] bg-[#ffb547]'}`}>{letter}</span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="text-[11.5px] font-extrabold tracking-[0.04em] text-night-muted">{title.toUpperCase()}{leg ? ` · ${meters(leg.distance)} · ${minutes(leg.duration)}` : ''}</span>
         <span className="text-[15px] font-extrabold">{heading}</span>

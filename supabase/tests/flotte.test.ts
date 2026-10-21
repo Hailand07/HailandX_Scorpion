@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import type { PGlite } from '@electric-sql/pglite';
 import { as, freshDb, U } from './harness';
 
-/** Flotte, navigation : fiche de mission à deux arrêts (livreur attribué seulement) et carte des missions disponibles (dépôt approximatif). */
+/** Flotte, navigation : fiche de mission à deux arrêts (livreur attribué seulement), carte des missions (bâtiments exacts et contours), plafond d'espèces. */
 let db: PGlite;
 const q = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await db.query<T>(sql, params)).rows;
 const one = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => (await q<T>(sql, params))[0]!;
@@ -31,14 +31,17 @@ beforeAll(async () => {
 }, 60000);
 
 describe('carte des missions disponibles', () => {
-  it('le livreur disponible voit la mission avec le retrait exact et un dépôt arrondi (≈ 300 m), sans téléphone ni code', async () => {
+  it('le livreur disponible voit la mission avec les bâtiments exacts et leurs contours, sans téléphone ni code', async () => {
     const list = (await as(db, U.livreur, () => one<{ m: Record<string, unknown>[] }>('select fn_missions_carte($1, $2, 8) m', [SELLER.lat + 0.01, SELLER.lng]))).m;
     expect(list).toHaveLength(1);
     const m = list[0]!;
     expect(m).toMatchObject({ parcel_id: parcel, from_name: 'Kadi Wax', from_quartier: 'Coleah Domino', from_commune: 'Matam', to_quartier: 'Coleah Domino', to_commune: 'Matam', from_lat: SELLER.lat });
     expect(Math.abs(Number(m.pickup_m) - 1112)).toBeLessThan(20);
-    expect(Number(m.to_lat)).not.toBe(BUYER.lat);
-    expect(Math.abs(Number(m.to_lat) - BUYER.lat)).toBeLessThan(0.0016);
+    // Décision du fondateur (2026-10-21) : plus d'arrondi du dépôt, le bâtiment certifié est la référence.
+    expect([Number(m.to_lat), Number(m.to_lng)]).toEqual([BUYER.lat, BUYER.lng]);
+    expect((m.from_outline as { type: string }).type).toBe('Polygon'); // bâtiment certifié du vendeur
+    expect((m.to_outline as { type: string }).type).toBe('Polygon');   // contour repéré de l'acheteur
+    expect(m).toMatchObject({ from_level: 3 });
     expect(Object.keys(m).some((k) => /phone|code|floor|door|landmark/.test(k))).toBe(false);
   });
   it('hors du rayon, indisponible ou non livreur : rien', async () => {
@@ -70,5 +73,25 @@ describe('fiche de la mission acceptée', () => {
     await db.exec(`update shops set whatsapp = '+224655001122' where slug = 'kadi-wax'`);
     const d = (await as(db, U.livreur, () => one<{ d: Detail }>('select fn_mission_detail($1) d', [parcel]))).d;
     expect(d.pickup.phone).toBe('+224655001122');
+  });
+});
+
+describe('plafond d’espèces', () => {
+  it('une mission au-delà du plafond est refusée avec un message exact, même sans rien à reverser', async () => {
+    await db.exec(`update couriers set available = true, cash_limit_gnf = 50000 where user_id = '${U.livreur2}'`);
+    await as(db, U.livreur, () => db.query('select fn_courier_release($1)', [parcel]));
+    const err = await as(db, U.livreur2, () => db.query('select fn_courier_accept($1)', [parcel]).then(() => '', (e: Error) => e.message));
+    expect(err).toMatch(/demande d'encaisser \d[\d ]* GNF, plus que votre plafond de 50 000 GNF/);
+    expect(err).not.toMatch(/reversez/i);
+    expect((await one<{ status: string }>('select status from parcels where id = $1', [parcel])).status).toBe('mission_proposee');
+  });
+  it('le fondateur relève le plafond depuis la console (journalisé) ; un livreur ou un opérateur ne le peut pas', async () => {
+    await db.exec(`update agents set console_role = 'fondateur' where id = '${U.admin}'`);
+    const refus = (who: string) => as(db, who, () => db.query('select fn_console_courier_cash_limit($1, 2000000, $2)', [U.livreur2, 'gros colis']).then(() => '', (e: Error) => e.message));
+    expect(await refus(U.livreur2)).toMatch(/réservé au fondateur/);
+    await as(db, U.admin, () => db.query('select fn_console_courier_cash_limit($1, 2000000, $2)', [U.livreur2, 'gros colis']));
+    expect((await one<{ l: number }>('select cash_limit_gnf l from couriers where user_id = $1', [U.livreur2])).l).toBe(2000000);
+    expect(await one('select action, motif, detail from console_journal order by created_at desc limit 1')).toEqual({ action: 'livreur_plafond', motif: 'gros colis', detail: { avant: 50000, apres: 2000000 } });
+    expect(await as(db, U.livreur2, () => one<{ r: string }>('select fn_courier_accept($1) r', [parcel]))).toEqual({ r: 'accepte' });
   });
 });

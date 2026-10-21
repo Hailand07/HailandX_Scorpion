@@ -20,6 +20,9 @@ export const NUIT = {
   texteQuartier: '#8a93b3',
   halo: '#0b1020',
   itineraire: '#c8f25a',
+  /** Bâtiment de retrait (boutique) : ambre ; bâtiment de dépôt (client) : vert citron, comme le repère D. */
+  retrait: '#ffb547',
+  depot: '#c8f25a',
   parcouru: '#3a4462',
 } as const;
 

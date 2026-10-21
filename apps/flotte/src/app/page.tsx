@@ -8,22 +8,24 @@ import { AppMark } from '@hailandx/ui';
 import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
-import { meters, type LngLat } from '@/lib/nav';
+import { directionsUrl, legCoords, meters, minutes, profileOf, type LngLat, type Route } from '@/lib/nav';
+import { NUIT } from '@/lib/hailandNuit';
 import { useHeight } from '@/lib/device';
-import { FlotteMap, type Line, type Pin, type View } from '@/components/FlotteMap';
+import { FlotteMap, type Area, type Line, type Pin, type View } from '@/components/FlotteMap';
 import { CTA, FLOAT_BTN, GHOST, MAP_AREA, Menu, SHEET, SheetHead, Stat, StopBadge, TOP_BAR, WARN, useWide } from '@/components/Frame';
 import { Ico } from '@/components/Icons';
 
 interface Courier { user_id: string; full_name: string; vehicle: string; status: 'candidat' | 'valide' | 'suspendu'; available: boolean; cash_balance_gnf: number; cash_limit_gnf: number }
 interface Mission {
   parcel_id: string; fee_gnf: number; distance_km: number; cod_amount_gnf: number; pickup_m: number;
-  from_name: string; from_quartier: string | null; from_commune: string | null; from_lat: number; from_lng: number;
-  to_quartier: string | null; to_commune: string | null; to_level: number; to_lat: number; to_lng: number;
+  from_name: string; from_quartier: string | null; from_commune: string | null; from_lat: number; from_lng: number; from_level?: number; from_outline?: GeoJSON.Geometry | null;
+  to_quartier: string | null; to_commune: string | null; to_level: number; to_lat: number; to_lng: number; to_outline?: GeoJSON.Geometry | null;
 }
 interface Mine { id: string; status: string; delivery_fee_gnf: number; shops: { name: string } | null }
 
 const cta = CTA;
 const short = (n: number) => n.toLocaleString('fr-FR').replace(/ | /g, ' ');
+const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 const where = (q: string | null, c: string | null) => [q, c].filter(Boolean).join(', ') || 'Zone de livraison';
 
 /**
@@ -41,6 +43,8 @@ export default function Home() {
   const [today, setToday] = useState({ count: 0, fees: 0, km: 0 });
   const [detail, setDetail] = useState(false);
   const [menu, setMenu] = useState(false);
+  /** Itinéraire réel (routes Mapbox) de la mission choisie : position → retrait → dépôt, gardé par mission. */
+  const [trajets, setTrajets] = useState<Record<string, Route | null>>({});
   const wide = useWide();
   const [sel, setSel] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -104,7 +108,38 @@ export default function Home() {
     if (me) out.push({ id: 'me', kind: 'me', at: me, heading: fix?.heading ?? null });
     return out;
   }, [missions, selected, detail, me?.[0], me?.[1], fix?.heading]); // eslint-disable-line react-hooks/exhaustive-deps
-  const lines: Line[] = useMemo(() => (selected ? [{ id: 'trajet', coords: [[selected.from_lng, selected.from_lat], [selected.to_lng, selected.to_lat]], color: '#c8f25a', dashed: !detail, glow: detail, width: detail ? 6 : 4 }] : []), [selected, detail]);
+  // Itinéraire par les routes (et non plus une ligne droite) : demandé à Mapbox une fois par mission choisie.
+  const meKnown = me !== null;
+  useEffect(() => {
+    if (!selected || !TOKEN || selected.parcel_id in trajets) return;
+    const pts: LngLat[] = [...(me ? [me] : []), [selected.from_lng, selected.from_lat], [selected.to_lng, selected.to_lat]];
+    const ctrl = new AbortController();
+    fetch(directionsUrl(pts, profileOf(courier?.vehicle), TOKEN), { signal: ctrl.signal }).then((r) => r.json())
+      .then((j: { routes?: Route[] }) => setTrajets((t) => ({ ...t, [selected.parcel_id]: j.routes?.[0] ?? null })))
+      .catch(() => undefined);
+    return () => ctrl.abort();
+  }, [selected?.parcel_id, meKnown]); // eslint-disable-line react-hooks/exhaustive-deps
+  const trajet = selected ? trajets[selected.parcel_id] ?? null : null;
+  const lines: Line[] = useMemo(() => {
+    if (!selected) return [];
+    if (trajet) {
+      const n = trajet.legs.length; // 2 : position → retrait, retrait → dépôt ; 1 sans position connue
+      const course = legCoords(trajet, n - 1);
+      return [
+        ...(n > 1 ? [{ id: 'approche', coords: legCoords(trajet, 0), color: NUIT.retrait, dashed: true, width: 4 }] : []),
+        { id: 'course', coords: course, color: NUIT.itineraire, glow: detail, width: detail ? 6 : 4.5 },
+      ];
+    }
+    return [{ id: 'trajet', coords: [[selected.from_lng, selected.from_lat], [selected.to_lng, selected.to_lat]], color: '#c8f25a', dashed: true, width: 3 }];
+  }, [selected, trajet, detail]);
+  // Bâtiments de retrait (ambre) et de dépôt (vert) surlignés ; le retrait est l'arrêt suivant.
+  const areas: Area[] = useMemo(() => {
+    if (!selected) return [];
+    return [
+      ...(selected.from_outline ? [{ id: 'retrait', geometry: selected.from_outline, color: NUIT.retrait, active: true }] : []),
+      ...(selected.to_outline ? [{ id: 'depot', geometry: selected.to_outline, color: NUIT.depot, active: false }] : []),
+    ];
+  }, [selected]);
   const view: View | null = useMemo(() => {
     const pts: LngLat[] = [...(me ? [me] : []), ...(selected ? [[selected.from_lng, selected.from_lat] as LngLat, [selected.to_lng, selected.to_lat] as LngLat] : missions.map((m) => [m.from_lng, m.from_lat] as LngLat))];
     const padding = wide ? { top: 110, bottom: 60, left: 60, right: 60 } : { top: 120, bottom: (sheetH || 340) + 30, left: 50, right: 50 };
@@ -154,6 +189,8 @@ export default function Home() {
   const enService = courier.available;
   // La mission ouverte doit rester celle choisie : si elle disparaît (prise par un autre livreur), on revient à la liste.
   const open = enService && detail && selected !== null && selected.parcel_id === sel;
+  // Mission payable à la livraison au-delà du plafond d'espèces : refusée par la base, on le dit avant (montants exacts).
+  const trop = selected !== null && courier.cash_balance_gnf + selected.cod_amount_gnf > courier.cash_limit_gnf;
   const Current = current && (
     <Link href={`/mission/${current.id}`} className="flex items-center justify-between gap-3 rounded-2xl bg-lime px-4 py-3.5 text-ink shadow-[0_8px_22px_rgba(0,0,0,.35)]">
       <span className="flex min-w-0 flex-col"><span className="text-[11.5px] font-extrabold tracking-[0.04em]">MISSION EN COURS</span><span className="truncate text-[14.5px] font-extrabold">{current.shops?.name ?? 'Boutique'} · {current.status === 'retire' ? 'en route vers le dépôt' : 'à récupérer'}</span></span>
@@ -165,7 +202,7 @@ export default function Home() {
   return (
     <main className="fixed inset-0 overflow-hidden bg-night">
       <div className={MAP_AREA}>
-        <FlotteMap className="absolute inset-0" pins={enService ? pins : []} lines={enService ? lines : []} view={enService ? view : null} />
+        <FlotteMap className="absolute inset-0" pins={enService ? pins : []} lines={enService ? lines : []} areas={enService ? areas : []} view={enService ? view : null} />
         {!enService && <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-night/55" />}
       </div>
 
@@ -235,7 +272,7 @@ export default function Home() {
           <>
             <div className="flex items-end justify-between gap-3">
               <span className="flex flex-col gap-0.5"><span className="text-[12.5px] font-bold text-night-muted">Votre gain</span><span className="font-display text-[34px] font-semibold leading-none tracking-[-0.02em] text-lime">{formatGnf(selected.fee_gnf)}</span></span>
-              <span className="flex flex-col items-end gap-0.5 pb-0.5"><span className="font-display text-[18px] font-semibold">{Number(selected.distance_km).toLocaleString('fr-FR')} km</span><span className="text-[12.5px] font-bold text-night-muted">retrait à {meters(selected.pickup_m)}</span></span>
+              <span className="flex flex-col items-end gap-0.5 pb-0.5"><span className="font-display text-[18px] font-semibold">{trajet ? meters(trajet.legs[trajet.legs.length - 1]!.distance) : `${Number(selected.distance_km).toLocaleString('fr-FR')} km`}</span><span className="text-[12.5px] font-bold text-night-muted">{trajet && trajet.legs.length > 1 ? `retrait à ${meters(trajet.legs[0]!.distance)} · ≈ ${minutes(trajet.duration)} en tout` : `retrait à ${meters(selected.pickup_m)}`}</span></span>
             </div>
             <div className="flex flex-col">
               <div className="flex gap-3">
@@ -248,7 +285,8 @@ export default function Home() {
               </div>
             </div>
             {selected.cod_amount_gnf > 0 && <p className={WARN}>{Ico.wallet(18)}Paiement à la livraison : encaisser {formatGnf(selected.cod_amount_gnf)}</p>}
-            <button type="button" disabled={busy} onClick={() => accept(selected.parcel_id)} className={cta}>{busy ? 'Acceptation…' : 'Accepter la mission'}</button>
+            {trop && <p role="alert" className="rounded-2xl border border-[#5a2a24] bg-[#3a1a1a] px-3.5 py-3 text-[13px] font-bold leading-relaxed text-[#ffb4a8]">{courier.cash_balance_gnf > 0 ? `Vous avez déjà ${formatGnf(courier.cash_balance_gnf)} en main : avec cette mission vous dépasseriez votre plafond d’espèces (${formatGnf(courier.cash_limit_gnf)}). Reversez vos espèces ou demandez à l’équipe de relever le plafond.` : `Cette mission demande d’encaisser ${formatGnf(selected.cod_amount_gnf)}, plus que votre plafond d’espèces (${formatGnf(courier.cash_limit_gnf)}). Demandez à l’équipe Hailand de le relever.`}</p>}
+            <button type="button" disabled={busy || trop} onClick={() => accept(selected.parcel_id)} className={cta}>{busy ? 'Acceptation…' : trop ? 'Au-delà de votre plafond d’espèces' : 'Accepter la mission'}</button>
             <button type="button" onClick={() => setDetail(false)} className={`${GHOST} lg:flex hidden`}>Retour aux missions</button>
           </>
         )}

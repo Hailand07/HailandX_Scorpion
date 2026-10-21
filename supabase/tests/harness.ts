@@ -30,6 +30,8 @@ create function public.st_y(g public.geometry) returns double precision language
 create table public.buildings (id text primary key, status text, is_validated boolean, geom_pg text);
 -- Contours : texte GeoJSON dans le banc (géométrie PostGIS en production) ; st_asgeojson le renvoie tel quel.
 create function public.st_asgeojson(g text) returns text language sql immutable as $$ select g $$;
+-- Point intérieur d'un contour : le banc n'a pas de vraie géométrie ; on revient au point d'ancrage de la déclaration.
+create function public.st_pointonsurface(g text) returns public.geometry language sql immutable as $$ select null::public.geometry $$;
 create table public.quartiers (id text primary key, nom text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
@@ -75,6 +77,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-10-21_flotte_navigation.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-23_compte_hailand.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-10-24_flotte_recrutement_certification.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-10-25_flotte_batiments_exacts.sql', import.meta.url), 'utf8'));
   return db;
 }
 

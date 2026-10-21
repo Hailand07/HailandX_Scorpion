@@ -51,9 +51,9 @@ export function Stat({ label, value, accent = false }: { label: string; value: s
   );
 }
 
-/** Lettre d'arrêt : R (retrait, carré blanc) ou D (dépôt, rond vert). */
+/** Lettre d'arrêt : R (retrait, carré ambre) ou D (dépôt, rond vert), aux couleurs des bâtiments surlignés sur la carte. */
 export function StopBadge({ letter, size = 26 }: { letter: 'R' | 'D'; size?: number }) {
-  return <span style={{ width: size, height: size }} className={`flex shrink-0 items-center justify-center text-[13px] font-extrabold text-ink ${letter === 'D' ? 'rounded-full bg-lime' : 'rounded-[8px] bg-white'}`}>{letter}</span>;
+  return <span style={{ width: size, height: size }} className={`flex shrink-0 items-center justify-center text-[13px] font-extrabold text-ink ${letter === 'D' ? 'rounded-full bg-lime' : 'rounded-[8px] bg-[#ffb547]'}`}>{letter}</span>;
 }
 
 export interface MenuCourier { full_name: string; vehicle: string; cash_balance_gnf: number }
