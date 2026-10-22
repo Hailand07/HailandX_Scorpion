@@ -2,12 +2,28 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { brandOf, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
+import { ago, brandOf, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
-import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
+import { getCatalog, offerKey, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
+import { serverClient } from '@hailandx/kit';
+import { AskQuestion } from '@/components/AskQuestion';
+import { RecordView } from '@/components/RecentlyViewed';
 import { BuyBar } from '@/components/BuyBar';
 import { FavoriteButton } from '@/components/FavoriteButton';
 import { ProductGallery, ReadMore } from '@/components/ProductGallery';
+
+interface Question { id: string; question: string; answer: string | null; answered_at: string | null; created_at: string; shops: { name: string } | null }
+
+/** Questions publiques et produits souvent achetés ensemble (HAILANDX.md §35). En cas d'échec (base injoignable), la page s'affiche sans. */
+async function extras(productId: string | undefined): Promise<{ questions: Question[]; together: { product_id: string; orders: number }[] }> {
+  const sb = serverClient();
+  if (!sb || !productId) return { questions: [], together: [] };
+  const [qs, bt] = await Promise.all([
+    sb.from('product_questions').select('id,question,answer,answered_at,created_at,shops:answer_shop_id(name)').eq('product_id', productId).order('created_at', { ascending: false }).limit(60),
+    sb.rpc('fn_bought_together', { p_product: productId, p_limit: 8 }),
+  ]);
+  return { questions: (qs.data as unknown as Question[]) ?? [], together: (bt.data as { product_id: string; orders: number }[]) ?? [] };
+}
 
 type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> };
 
@@ -61,6 +77,12 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
   const points = readAttributes(p.attributes).points;
   const left = (p.variants ?? []).reduce((n, v) => n + Math.max(0, v.stock), 0);
   const stockText = p.inStock === false ? 'Rupture de stock' : left > 0 && left <= 5 ? `Plus que ${left} en stock` : 'En stock';
+  const { questions, together: pairs } = await extras(p.productId);
+  // Meilleure offre en vente de chaque produit souvent acheté avec celui-ci.
+  const together = pairs.flatMap((x) => { const o = cat.products.find((c) => c.productId === x.product_id); return o ? [{ ...o, orders: x.orders }] : []; });
+  const answered = questions.filter((x) => x.answer);
+  const pending = questions.filter((x) => !x.answer);
+  const viewed = { key: offerKey(p), href: `/p/${p.slug}?b=${shop.slug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shop.name, etaMinutes: p.etaMinutes };
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">
@@ -139,13 +161,31 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
       )}
 
       {!p.description && specs.length === 0 && points.length === 0 && (
-        <p className="mx-[18px] rounded-2xl bg-bg px-4 py-3 text-[13px] font-semibold text-muted">Le vendeur n’a pas encore détaillé ce produit. Une question ? Contactez la boutique avant de commander.</p>
+        <p className="mx-[18px] rounded-2xl bg-bg px-4 py-3 text-[13px] font-semibold text-muted">Le vendeur n’a pas encore détaillé ce produit. Une question ? Posez-la plus bas : la boutique vous répond.</p>
       )}
 
       {p.offerNote && (
         <section aria-labelledby="note" className="mx-[18px] flex flex-col gap-1.5 rounded-2xl border border-line-soft px-4 py-3">
           <h2 id="note" className="text-[13px] font-extrabold">Le mot du vendeur</h2>
           <p className="whitespace-pre-line text-[14px] font-medium leading-relaxed">{p.offerNote}</p>
+        </section>
+      )}
+
+      {p.productId && (
+        <section aria-labelledby="questions" className="flex flex-col gap-2.5 px-[18px]">
+          <div className="flex items-baseline justify-between">
+            <h2 id="questions" className="text-sm font-extrabold">Questions et réponses</h2>
+            {questions.length > 0 && <span className="text-[12px] font-bold text-muted">{questions.length} question{questions.length > 1 ? 's' : ''}</span>}
+          </div>
+          {questions.length === 0 && <p className="text-[12.5px] font-semibold text-muted">Aucune question pour l’instant. Posez la vôtre : la boutique répond ici, pour tout le monde.</p>}
+          {[...answered.slice(0, 4), ...pending.slice(0, 2)].map((x) => <QA key={x.id} x={x} />)}
+          {answered.length + pending.length > 6 && (
+            <details className="flex flex-col gap-2.5">
+              <summary className="cursor-pointer list-none text-[13px] font-extrabold text-blue-ink">Voir toutes les questions ({questions.length})</summary>
+              <div className="mt-2.5 flex flex-col gap-2.5">{[...answered.slice(4), ...pending.slice(2)].map((x) => <QA key={x.id} x={x} />)}</div>
+            </details>
+          )}
+          <AskQuestion productId={p.productId} next={`/p/${p.slug}?b=${shop.slug}`} />
         </section>
       )}
 
@@ -194,6 +234,22 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
+      {together.length > 0 && (
+        <section aria-label="Souvent achetés ensemble" className="flex flex-col gap-2.5 px-[18px]">
+          <h2 className="text-sm font-extrabold">Souvent achetés ensemble</h2>
+          <div className="flex snap-x gap-2.5 overflow-x-auto [scrollbar-width:none]">
+            {together.map((o) => (
+              <Link key={o.productId} href={`/p/${o.slug}?b=${o.shopSlug}`} className="flex w-[130px] shrink-0 snap-start flex-col gap-1">
+                <PhotoSlot src={o.photoUrl} color={o.color} className="h-[130px] rounded-2xl" label={o.name} />
+                <span className="line-clamp-2 text-xs font-bold leading-tight">{o.name}</span>
+                <span className="text-[12.5px] font-extrabold">{formatGnf(o.priceGnf)}</span>
+                <span className="text-[11px] font-semibold text-muted">Pris ensemble {o.orders} fois</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {similar.length > 0 && (
         <section aria-label="Produits similaires" className="flex flex-col gap-2.5 px-[18px]">
           <div className="flex items-baseline justify-between">
@@ -231,7 +287,25 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
+      <RecordView item={viewed} />
       <BuyBar available={p.inStock !== false} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
     </main>
+  );
+}
+
+/** Une question et sa réponse (ou « en attente »). */
+function QA({ x }: { x: Question }) {
+  return (
+    <article className="flex flex-col gap-1.5 rounded-2xl border border-line-soft px-4 py-3">
+      <p className="text-[13.5px] font-extrabold leading-snug"><span className="mr-1.5 text-blue-ink">Q.</span>{x.question}</p>
+      {x.answer ? (
+        <>
+          <p className="whitespace-pre-line text-[13.5px] font-medium leading-relaxed"><span className="mr-1.5 font-extrabold text-ok">R.</span>{x.answer}</p>
+          <span className="text-[11.5px] font-semibold text-muted">{x.shops?.name ?? 'La boutique'}{x.answered_at ? ` · ${ago(x.answered_at)}` : ''}</span>
+        </>
+      ) : (
+        <span className="text-[12px] font-semibold text-muted">En attente de la réponse du vendeur · posée {ago(x.created_at)}</span>
+      )}
+    </article>
   );
 }

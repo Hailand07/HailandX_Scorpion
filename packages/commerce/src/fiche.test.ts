@@ -30,3 +30,21 @@ describe('fiches produit par catégorie', () => {
     expect(ficheCompleteness('autres', 'x'.repeat(80), full, 3)).toBe(100);
   });
 });
+
+describe('filtres d’une catégorie', () => {
+  it('lit l’adresse : nombres avec espaces, bornes inversées, état inconnu ignoré', async () => {
+    const { parseFilters } = await import('./fiche');
+    expect(parseFilters({ marque: ' Samsung ', min: '1 000 000', max: '500000', etat: 'neuf' })).toEqual({ marque: 'Samsung', min: 500000, max: 1000000, etat: 'neuf' });
+    expect(parseFilters({ min: '', max: 'abc', etat: 'cassé' })).toEqual({});
+  });
+  it('marque, prix et état ; liste des marques par fréquence', async () => {
+    const { matchesFilters, brandsOf } = await import('./fiche');
+    const tel = { priceGnf: 1_350_000, condition: 'neuf' as const, attributes: { marque: 'Realme' } };
+    const occ = { priceGnf: 2_300_000, condition: 'occasion' as const, attributes: { marque: 'Apple' } };
+    expect(matchesFilters(tel, { marque: 'realme', max: 1_500_000 })).toBe(true);
+    expect(matchesFilters(tel, { etat: 'occasion' })).toBe(false);
+    expect(matchesFilters(occ, { min: 2_000_000, etat: 'occasion' })).toBe(true);
+    expect(matchesFilters({ priceGnf: 10 }, { marque: 'X' })).toBe(false);
+    expect(brandsOf([occ, tel, occ, {}])).toEqual(['Apple', 'Realme']);
+  });
+});

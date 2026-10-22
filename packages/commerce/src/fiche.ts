@@ -234,3 +234,35 @@ export function ficheCompleteness(categoryId: string | null | undefined, descrip
   const weights = [0.25, 0.25, 0.15, 0.35];
   return Math.round(parts.reduce((n, p, i) => n + p * weights[i]!, 0) * 100);
 }
+
+/** Filtres d'une catégorie (HAILANDX.md §35) : marque, prix minimum et maximum (GNF), état. */
+export interface CatalogFilters { marque?: string; min?: number; max?: number; etat?: 'neuf' | 'occasion' }
+
+/** Lit les filtres depuis l'adresse (`?marque=&min=&max=&etat=`) ; ignore ce qui n'est pas valable. */
+export function parseFilters(q: { marque?: string; min?: string; max?: string; etat?: string }): CatalogFilters {
+  const num = (v?: string) => { const n = Number((v ?? '').replace(/[^\d]/g, '')); return v && Number.isFinite(n) && n > 0 ? n : undefined; };
+  const f: CatalogFilters = {};
+  if (q.marque?.trim()) f.marque = q.marque.trim().slice(0, FICHE_LIMITS.value);
+  const min = num(q.min), max = num(q.max);
+  if (min !== undefined) f.min = min;
+  if (max !== undefined) f.max = max;
+  if (f.min !== undefined && f.max !== undefined && f.min > f.max) [f.min, f.max] = [f.max, f.min];
+  if (q.etat === 'neuf' || q.etat === 'occasion') f.etat = q.etat;
+  return f;
+}
+
+/** Le produit passe-t-il les filtres ? (marque comparée sans tenir compte des majuscules ; « neuf » par défaut). */
+export function matchesFilters(p: { priceGnf: number; condition?: 'neuf' | 'occasion'; attributes?: unknown }, f: CatalogFilters): boolean {
+  if (f.marque && (brandOf(p.attributes) ?? '').toLowerCase() !== f.marque.toLowerCase()) return false;
+  if (f.min !== undefined && p.priceGnf < f.min) return false;
+  if (f.max !== undefined && p.priceGnf > f.max) return false;
+  if (f.etat && (p.condition ?? 'neuf') !== f.etat) return false;
+  return true;
+}
+
+/** Marques présentes dans une liste de produits, par nombre de produits puis par ordre alphabétique. */
+export function brandsOf(list: { attributes?: unknown }[]): string[] {
+  const n = new Map<string, number>();
+  for (const p of list) { const b = brandOf(p.attributes); if (b) n.set(b, (n.get(b) ?? 0) + 1); }
+  return [...n.keys()].sort((a, b) => n.get(b)! - n.get(a)! || a.localeCompare(b, 'fr'));
+}
