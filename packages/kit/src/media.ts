@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 const BUCKET = 'hx-media';
 
-/** Adresse publique d'une image du stockage. */
+/** Adresse publique d'une image du stockage. Une adresse web complète (`https://…`, ex. photos du catalogue de démonstration) est rendue telle quelle. */
 export const mediaUrl = (path: string | null | undefined): string | null =>
-  path && process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}` : null;
+  path?.startsWith('https://') ? path
+  : path && process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}` : null;
 
 /** Réduit une photo (3G oblige) : côté le plus long ≤ 1280 px, JPEG qualité 0,8. Le résultat dépasse rarement 300 Ko. */
 export async function shrinkImage(file: File, maxSide = 1280, quality = 0.8): Promise<Blob> {

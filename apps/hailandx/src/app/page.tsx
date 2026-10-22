@@ -1,25 +1,44 @@
 import Link from 'next/link';
-import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { buildFeed, formatGnf, type FeedCandidate } from '@hailandx/commerce';
+import { Wordmark } from '@hailandx/ui';
+import { buildFeed, type FeedCandidate } from '@hailandx/commerce';
 import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 import { DeliverTo } from '@/components/DeliverTo';
 import { LienHailand, NotificationBell, VENDEUR_URL } from '@hailandx/kit';
 import { RueStrip } from '@/components/RueStrip';
 import { CartButton } from '@/components/CartButton';
+import { ProductCard, ProductGrid, type GridItem } from '@/components/ProductGrid';
 
-/** Accueil : « la rue commerçante » — un échantillon par boutique et par catégorie (règle validée par le fondateur). */
-export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string; compte?: string }> }) {
-  const { cat, compte } = await searchParams;
+const TRIS = { pertinence: 'Pertinence', 'prix-croissant': 'Prix croissant', 'prix-decroissant': 'Prix décroissant' } as const;
+type Tri = keyof typeof TRIS;
+
+/**
+ * Accueil, comme les grandes applications de vente (décision du fondateur, 2026-10-22, HAILANDX.md §34) :
+ * TOUS les produits sont en ligne, rangés par catégorie. « Tout » = une rangée par catégorie (la plus fournie d'abord) ;
+ * une catégorie choisie = tous ses produits en grille, avec un tri. Le nom de la boutique figure sur chaque carte.
+ */
+export default async function Home({ searchParams }: { searchParams: Promise<{ cat?: string; compte?: string; tri?: string }> }) {
+  const { cat: catParam, compte, tri: triParam } = await searchParams;
   const { shops: SHOPS, products: PRODUCTS, source } = await getCatalog();
-  const CATEGORIES = [...new Set(PRODUCTS.map((p) => p.category))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const counts = new Map<string, number>();
+  for (const p of PRODUCTS) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  const CATEGORIES = [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b, 'fr'));
+  const cat = catParam && CATEGORIES.includes(catParam) ? catParam : undefined;
+  const tri: Tri = triParam && triParam in TRIS ? (triParam as Tri) : 'pertinence';
   const shopBySlug = (slug: string) => SHOPS.find((s) => s.slug === slug);
   const productByKey = (key: string) => PRODUCTS.find((p) => offerKey(p) === key);
   const candidates: FeedCandidate[] = PRODUCTS.map((p) => {
     const shop = shopBySlug(p.shopSlug)!;
     return { id: offerKey(p), shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustFor(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
   });
-  // La rotation change l'échantillon retenu toutes les heures.
-  const feed = buildFeed(candidates, { rotation: Math.floor(Date.now() / 3_600_000), limit: 12, category: cat && CATEGORIES.includes(cat) ? cat : undefined });
+  // Ordre de pertinence (score, confiance, proximité, boutiques intercalées) ; la rotation horaire varie les premiers.
+  const ranked = (category: string): GridItem[] =>
+    buildFeed(candidates, { category, perGroup: Infinity, rotation: Math.floor(Date.now() / 3_600_000) }).map((c) => {
+      const p = productByKey(c.id)!;
+      return { key: c.id, href: `/p/${p.slug}?b=${p.shopSlug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shopBySlug(p.shopSlug)?.name ?? '', etaMinutes: p.etaMinutes };
+    });
+  const grid = cat ? ranked(cat) : [];
+  if (tri === 'prix-croissant') grid.sort((a, b) => a.priceGnf - b.priceGnf);
+  if (tri === 'prix-decroissant') grid.sort((a, b) => b.priceGnf - a.priceGnf);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 pb-4">
@@ -48,26 +67,30 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
         <RueStrip shops={SHOPS.map((x) => ({ slug: x.slug, name: x.name, initials: x.initials, color: x.color, logoUrl: x.logoUrl ?? null, isNew: x.isNew }))} real={source === 'base'} />
       </section>
 
-      <section aria-label="Échantillons des boutiques" className="grid grid-cols-2 gap-3 px-5">
-        {feed.map((f) => {
-          const p = productByKey(f.id)!;
-          const shop = shopBySlug(f.shopId)!;
+      {cat ? (
+        <section aria-label={cat} className="flex flex-col gap-3 px-5">
+          <div className="flex items-baseline justify-between"><h2 className="font-display text-lg font-semibold tracking-tight">{cat}</h2><span className="text-[12.5px] font-semibold text-muted">{grid.length} produit{grid.length > 1 ? 's' : ''}</span></div>
+          <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+            {(Object.keys(TRIS) as Tri[]).map((t) => (
+              <Link key={t} href={`/?cat=${encodeURIComponent(cat)}${t === 'pertinence' ? '' : `&tri=${t}`}`} aria-current={t === tri ? 'true' : undefined} className={`flex h-8 shrink-0 items-center rounded-full px-3 text-[12.5px] font-bold ${t === tri ? 'bg-blue-soft text-blue-ink' : 'border border-line bg-card text-muted'}`}>{TRIS[t]}</Link>
+            ))}
+          </div>
+          <ProductGrid items={grid} />
+        </section>
+      ) : (
+        CATEGORIES.map((c) => {
+          const row = ranked(c).slice(0, 12);
           return (
-            <Link key={offerKey(p)} href={`/p/${p.slug}?b=${p.shopSlug}`} className="flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card">
-              <span className="relative block">
-                <PhotoSlot src={p.photoUrl} color={p.color} className="h-[150px]" label={p.name} />
-                <span className="absolute bottom-2.5 right-2.5 rounded-full bg-white/90 px-2 py-1 text-[10.5px] font-bold">≈ {p.etaMinutes} min</span>
-                {shop.isNew && <span className="absolute left-2.5 top-2.5"><Badge tone="ink">Nouveau</Badge></span>}
-              </span>
-              <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
-                <span className="truncate text-[13.5px] font-bold">{p.name}</span>
-                <Price className="text-[15px]">{formatGnf(p.priceGnf)}</Price>
-                <span className="flex items-center gap-1 text-[11.5px] font-semibold text-muted"><VerifiedMark size={13} />{shop.name}</span>
-              </span>
-            </Link>
+            <section key={c} aria-label={c} className="flex flex-col gap-2.5">
+              <div className="flex items-baseline justify-between px-5">
+                <h2 className="font-display text-lg font-semibold tracking-tight">{c}</h2>
+                <Link href={`/?cat=${encodeURIComponent(c)}`} className="text-[12.5px] font-extrabold text-blue-ink">Voir tout ({counts.get(c)})</Link>
+              </div>
+              <div className="flex snap-x gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">{row.map((p) => <ProductCard key={p.key} p={p} />)}</div>
+            </section>
           );
-        })}
-      </section>
+        })
+      )}
 
       {source === 'exemple' && (
         <section className="mx-5 flex flex-col gap-2 rounded-[22px] border border-line bg-card p-4">

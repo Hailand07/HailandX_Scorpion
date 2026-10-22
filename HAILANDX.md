@@ -81,7 +81,8 @@ Chaque point garde l'intention du fondateur ; il précise la règle ou corrige u
 - Pour les produits uniques (vêtement fait main, plat cuisiné), la fiche n'a qu'une offre : rien ne change pour le vendeur.
 
 ### 3.2 Le fil « la rue commerçante » : la règle des échantillons
-- **Règle de base** (celle du fondateur) : pour chaque vendeur, **un échantillon par catégorie**. L'échantillon est le meilleur produit de la catégorie (ventes, avis, nouveauté) et **tourne** régulièrement pour que le fil vive.
+> ⚠️ **Remplacée le 2026-10-22 par décision du fondateur (§34)** : tous les produits sont en ligne, rangés par catégorie (comme Amazon) ; les règles de classement ci-dessous (diversité, découverte, proximité, confiance) restent appliquées à l'ordre des produits.
+- **Règle de base** (ancienne, celle du fondateur jusqu'au 2026-10-22) : pour chaque vendeur, **un échantillon par catégorie**. L'échantillon est le meilleur produit de la catégorie (ventes, avis, nouveauté) et **tourne** régulièrement pour que le fil vive.
 - **Ajouts proposés** :
   - **diversité** : jamais deux échantillons du même vendeur à la suite ; on alterne les catégories dans le fil général ;
   - **découverte** : un nouveau vendeur reçoit une mise en avant temporaire. Sinon, les anciens prennent toute la place et personne ne peut démarrer ;
@@ -538,6 +539,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-21 | Flotte : position du livreur enfin envoyée au serveur (`fn_courier_ping` jamais exécuté, faute de `.then()`), rayon des missions 8 → 20 km, garde-fou de test. |
 | 2026-10-22 | Fiche produit détaillée (§33) : fiche type par catégorie (`fiche.ts`), page produit HailandX enrichie (galerie, En bref, points forts, description, caractéristiques, mot du vendeur, livraison et garanties, carte du vendeur), éditeur du vendeur avec indicateur de complétude, migration `2026-10-26_hailandx_fiche_produit.sql` (⚠️ à appliquer). |
 | 2026-10-22 | Migration `2026-10-26_hailandx_fiche_produit.sql` appliquée en production (accord du fondateur) ; vérifications faites. |
+| 2026-10-22 | §34 : tous les produits en ligne par catégorie (rangées + grille avec tri), « Produits similaires » sur la page produit, photos par adresse web ; catalogue de démonstration de 50 produits dans Djigo Shop (`demo-…`). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -829,3 +831,17 @@ Aucun changement de base de données prévu.
 - **HailandX Vendeur** (éditeur de produit) : état (neuf / occasion), **fiche détaillée** (description ≤ 4 000 caractères, 3 à 5 points forts, caractéristiques de la catégorie) avec un **indicateur « Complète à N % »** (photos, description, points forts, caractéristiques), et **« Le mot du vendeur »** (`offers.description`). Règle de la fiche commune (§ « plusieurs vendeurs, même produit ») : **seul le créateur de la fiche (ou l'équipe) la modifie** ; un vendeur qui ajoute son offre à une fiche existante la voit en lecture seule et écrit dans son mot du vendeur.
 - **Base** : migration `supabase/migrations/2026-10-26_hailandx_fiche_produit.sql` (ajouts seulement) — limites de taille (`catalog_products.description` ≤ 4 000, `attributes` objet ≤ 16 Ko, `offers.description` ≤ 1 000) et `fn_product_update_details` (créateur ou équipe). Tests `supabase/tests/fiche.test.ts`. ✅ **Appliquée en production le 2026-10-22** avec l'accord du fondateur (données vérifiées avant : aucune hors limite ; après : 3 contraintes présentes, fonction réservée aux comptes connectés, refus vérifié pour un vendeur qui n'a pas créé la fiche, dans une transaction annulée).
 - 💡 Ensuite : filtres de recherche par caractéristique (marque, stockage…), questions-réponses des acheteurs sur la fiche, fusion de fiches en double par l'équipe.
+
+## 34. Tous les produits en ligne, par catégorie, et catalogue de démonstration (2026-10-22) ✅ code, tests, données ; ⚠️ à essayer en ligne
+
+**Décision du fondateur** (2026-10-22) : l'ancienne règle « un échantillon par catégorie et par vendeur » (§3.2) n'est pas la bonne. Comme les grandes applications de vente, **tous les produits sont en ligne, rangés par catégorie** ; le nom de la boutique figure sur chaque produit ; en bas d'un produit, on **recommande des produits de même catégorie et de même nature**.
+
+- **Accueil HailandX** (`apps/hailandx/src/app/page.tsx`) :
+  - « Tout » : **une rangée par catégorie** (la plus fournie d'abord), 12 produits à faire glisser, avec « Voir tout (N) » ;
+  - une catégorie choisie : **tous ses produits en grille**, avec un tri **Pertinence / Prix croissant / Prix décroissant** ; les cartes s'ajoutent au fil du défilement (sans bouton, `components/ProductGrid.tsx`) ;
+  - ordre de pertinence inchangé : score du produit, indice de confiance, coup de pouce aux nouvelles boutiques, proximité, boutiques intercalées, rotation horaire (`buildFeed(…, { perGroup: Infinity })`, `packages/commerce/src/feed.ts`).
+- **Page produit** : **« Produits similaires »** (`similarProducts`, testé) — même catégorie, toutes boutiques ; d'abord même type d'article, même marque, gamme de prix voisine, puis confiance de la boutique ; lien « Tout <catégorie> ». « Aussi chez <boutique> » reste en dessous (10 produits).
+- **Photos par adresse web** : `mediaUrl` rend telle quelle une adresse `https://…` (sinon chemin du stockage `hx-media`).
+- **Catalogue de démonstration** (demande du fondateur, accord explicite pour ces écritures) : **50 produits dans Djigo Shop**, 10 catégories, fiches complètes à 100 % (sauf 1), photos de `cdn.dummyjson.com` et de Wikimedia Commons, adresses web en **`demo-…`**. Détail, crédits des photos et requête de retrait : `supabase/maintenance/2026-10-22_catalogue_demo_djigo.md`. ⚠️ À retirer (ou remplacer par de vraies photos) avant l'ouverture au public.
+- Essai d'envoi des photos dans le stockage par une fonction temporaire (`demo-photos`, clé de service) **refusé par le garde-fou de sécurité de la session** ; la fonction a été neutralisée (répond 410) — ⚠️ **à supprimer par le fondateur** dans Supabase → Edge Functions.
+- 💡 Ensuite : page catégorie dédiée avec filtres (marque, prix, état), « Vus récemment », « Souvent achetés ensemble » quand il y aura des commandes.
