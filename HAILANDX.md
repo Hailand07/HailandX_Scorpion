@@ -540,6 +540,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-22 | Fiche produit détaillée (§33) : fiche type par catégorie (`fiche.ts`), page produit HailandX enrichie (galerie, En bref, points forts, description, caractéristiques, mot du vendeur, livraison et garanties, carte du vendeur), éditeur du vendeur avec indicateur de complétude, migration `2026-10-26_hailandx_fiche_produit.sql` (⚠️ à appliquer). |
 | 2026-10-22 | Migration `2026-10-26_hailandx_fiche_produit.sql` appliquée en production (accord du fondateur) ; vérifications faites. |
 | 2026-10-22 | §34 : tous les produits en ligne par catégorie (rangées + grille avec tri), « Produits similaires » sur la page produit, photos par adresse web ; catalogue de démonstration de 50 produits dans Djigo Shop (`demo-…`). |
+| 2026-10-22 | Migration `2026-10-27_hailandx_questions_achats.sql` appliquée par le fondateur (éditeur SQL) ; vérifications faites. |
 | 2026-10-22 | §35 : filtres de catégorie (marque, prix, état), « Vus récemment » (sur le téléphone), « Souvent achetés ensemble », questions-réponses (HailandX, Vendeur, Console) ; migration `2026-10-27_hailandx_questions_achats.sql` (⚠️ à appliquer). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
@@ -847,7 +848,7 @@ Aucun changement de base de données prévu.
 - Essai d'envoi des photos dans le stockage par une fonction temporaire (`demo-photos`, clé de service) **refusé par le garde-fou de sécurité de la session** ; la fonction a été neutralisée (répond 410) — ⚠️ **à supprimer par le fondateur** dans Supabase → Edge Functions.
 - 💡 Ensuite : page catégorie dédiée avec filtres (marque, prix, état), « Vus récemment », « Souvent achetés ensemble » quand il y aura des commandes.
 
-## 35. Filtres, « Vus récemment », « Souvent achetés ensemble », questions-réponses (2026-10-22) ✅ code, tests ; ⚠️ migration à appliquer, à essayer en ligne
+## 35. Filtres, « Vus récemment », « Souvent achetés ensemble », questions-réponses (2026-10-22) ✅ code, tests, migration appliquée ; ⚠️ à essayer en ligne
 
 Les 4 suggestions validées par le fondateur après §34.
 
@@ -859,4 +860,4 @@ Les 4 suggestions validées par le fondateur après §34.
    - **HailandX Vendeur** : Plus → **Questions des clients** (`/questions`) : questions sur les produits que vend la boutique, sans réponse d'abord ; « Répondre » / « Modifier ma réponse ». Une seule boutique répond à une question (la première) ; les autres boutiques du même produit voient sa réponse.
    - **Notifications** : la boutique est prévenue d'une nouvelle question (❓, lien `/vendeur/questions`), l'acheteur de la réponse (💬, lien vers le produit).
    - **Hailand Console** → **Litiges, avis, questions** : les 50 dernières questions, **Masquer / Rétablir** avec motif (inscrit au journal : « Question masquée sur une fiche produit »).
-- **Base** : migration `supabase/migrations/2026-10-27_hailandx_questions_achats.sql` — table `product_questions` (lecture publique sans l'auteur, écriture par fonctions seulement), `fn_ask_question`, `fn_answer_question`, `fn_shop_questions`, `fn_moderate_question`, `fn_bought_together`. Tests `supabase/tests/questions.test.ts` (9). Les scripts de remise à zéro des comptes (`supabase/maintenance/2026-10-16_…_2.sql`, `2026-10-22_….sql`) sauvegardent et vident aussi cette table si elle existe. ⚠️ **Non appliquée** : en attendant, la page produit s'affiche sans questions ni « souvent achetés ensemble », et l'envoi d'une question échoue.
+- **Base** : migration `supabase/migrations/2026-10-27_hailandx_questions_achats.sql` — table `product_questions` (lecture publique sans l'auteur, écriture par fonctions seulement), `fn_ask_question`, `fn_answer_question`, `fn_shop_questions`, `fn_moderate_question`, `fn_bought_together`. Tests `supabase/tests/questions.test.ts` (9). Les scripts de remise à zéro des comptes (`supabase/maintenance/2026-10-16_…_2.sql`, `2026-10-22_….sql`) sauvegardent et vident aussi cette table si elle existe. ✅ **Appliquée en production le 2026-10-22 par le fondateur** (éditeur SQL de Supabase : l'outil de migration du connecteur avait expiré deux fois sans rien écrire). Vérifié ensuite : table et sécurité par ligne en place, 2 règles de lecture, 5 fonctions (seule `fn_bought_together` ouverte aux visiteurs), auteur des questions illisible, aucune écriture directe ; essai dans une transaction annulée (visiteur refusé pour poser une question).
