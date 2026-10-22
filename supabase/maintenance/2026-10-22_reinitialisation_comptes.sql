@@ -60,15 +60,22 @@ create table sauvegarde_20261022.couriers as table public.couriers;
 create table sauvegarde_20261022.certification_priorities as table public.certification_priorities;
 create table sauvegarde_20261022.notifications as table public.notifications;
 create table sauvegarde_20261022.console_journal as table public.console_journal;
+-- Questions-réponses (migration 2026-10-27) : sauvegardées et vidées seulement si la table existe déjà.
+do $q$ begin
+  if to_regclass('public.product_questions') is not null then
+    execute 'create table sauvegarde_20261022.product_questions as table public.product_questions';
+  end if;
+end $q$;
 
 -- ── 2. Données d'usage : tout est vidé (y compris celles des administrateurs) ─────────────────────────────────────────────
 -- TRUNCATE sans CASCADE : si une table liée avait été oubliée, la transaction échouerait sans rien modifier.
-truncate table
-  public.notifications, public.dispute_messages, public.disputes, public.review_reports, public.reviews,
-  public.delivery_events, public.ledger_entries, public.payments, public.order_items, public.parcels, public.orders,
-  public.product_favorites, public.shop_follows, public.share_links, public.offer_variants, public.offers,
-  public.shop_sections, public.shop_scores, public.shop_members, public.certification_priorities, public.shops,
-  public.catalog_products, public.couriers, public.console_journal, public.declarations;
+-- La table des questions-réponses (migration 2026-10-27) référence boutiques et produits : vidée dans la même instruction si elle existe.
+do $q$
+declare t text := 'public.notifications, public.dispute_messages, public.disputes, public.review_reports, public.reviews, public.delivery_events, public.ledger_entries, public.payments, public.order_items, public.parcels, public.orders, public.product_favorites, public.shop_follows, public.share_links, public.offer_variants, public.offers, public.shop_sections, public.shop_scores, public.shop_members, public.certification_priorities, public.shops, public.catalog_products, public.couriers, public.console_journal, public.declarations';
+begin
+  if to_regclass('public.product_questions') is not null then t := 'public.product_questions, ' || t; end if;
+  execute 'truncate table ' || t;
+end $q$;
 
 -- ── 3. Réclamations de bâtiments (le cadastre reste intact) ───────────────────────────────────────────────────────────────
 update public.buildings set claimed_by = null where claimed_by is not null;

@@ -540,6 +540,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-22 | Fiche produit détaillée (§33) : fiche type par catégorie (`fiche.ts`), page produit HailandX enrichie (galerie, En bref, points forts, description, caractéristiques, mot du vendeur, livraison et garanties, carte du vendeur), éditeur du vendeur avec indicateur de complétude, migration `2026-10-26_hailandx_fiche_produit.sql` (⚠️ à appliquer). |
 | 2026-10-22 | Migration `2026-10-26_hailandx_fiche_produit.sql` appliquée en production (accord du fondateur) ; vérifications faites. |
 | 2026-10-22 | §34 : tous les produits en ligne par catégorie (rangées + grille avec tri), « Produits similaires » sur la page produit, photos par adresse web ; catalogue de démonstration de 50 produits dans Djigo Shop (`demo-…`). |
+| 2026-10-22 | §35 : filtres de catégorie (marque, prix, état), « Vus récemment » (sur le téléphone), « Souvent achetés ensemble », questions-réponses (HailandX, Vendeur, Console) ; migration `2026-10-27_hailandx_questions_achats.sql` (⚠️ à appliquer). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -845,3 +846,17 @@ Aucun changement de base de données prévu.
 - **Catalogue de démonstration** (demande du fondateur, accord explicite pour ces écritures) : **50 produits dans Djigo Shop**, 10 catégories, fiches complètes à 100 % (sauf 1), photos de `cdn.dummyjson.com` et de Wikimedia Commons, adresses web en **`demo-…`**. Détail, crédits des photos et requête de retrait : `supabase/maintenance/2026-10-22_catalogue_demo_djigo.md`. ⚠️ À retirer (ou remplacer par de vraies photos) avant l'ouverture au public.
 - Essai d'envoi des photos dans le stockage par une fonction temporaire (`demo-photos`, clé de service) **refusé par le garde-fou de sécurité de la session** ; la fonction a été neutralisée (répond 410) — ⚠️ **à supprimer par le fondateur** dans Supabase → Edge Functions.
 - 💡 Ensuite : page catégorie dédiée avec filtres (marque, prix, état), « Vus récemment », « Souvent achetés ensemble » quand il y aura des commandes.
+
+## 35. Filtres, « Vus récemment », « Souvent achetés ensemble », questions-réponses (2026-10-22) ✅ code, tests ; ⚠️ migration à appliquer, à essayer en ligne
+
+Les 4 suggestions validées par le fondateur après §34.
+
+1. **Filtres d'une catégorie** (accueil, catégorie choisie) : **marque** (liste des marques présentes), **prix minimum et maximum** (GNF), **état** (neuf / occasion). Lus dans l'adresse (`?cat=…&marque=…&min=…&max=…&etat=…`) : une recherche filtrée se partage. Combinables avec le tri. `parseFilters`, `matchesFilters`, `brandsOf` (`packages/commerce/src/fiche.ts`, testés).
+2. **« Vus récemment »** : rangée en haut de l'accueil (« Tout »), 20 produits au plus, le dernier vu en premier, bouton « Effacer ». **Gardé sur le téléphone seulement** (stockage du navigateur), jamais envoyé au serveur ; un produit retiré de la vente disparaît de la rangée (`components/RecentlyViewed.tsx`).
+3. **« Souvent achetés ensemble »** (page produit, au-dessus de « Produits similaires ») : produits commandés avec celui-ci, les plus fréquents d'abord (« Pris ensemble N fois »). Fonction `fn_bought_together` : uniquement des **nombres agrégés**, et **seulement à partir de 2 commandes distinctes** (aucune commande isolée ne peut être devinée) ; colis annulés exclus. Vide tant qu'il n'y a pas de vraies commandes.
+4. **Questions-réponses** :
+   - **HailandX** (page produit, avant « Livraison, paiement et garanties ») : questions avec réponse d'abord (4, puis « Voir toutes les questions »), questions en attente ; bouton « Poser une question au vendeur » (connexion requise, 5 questions par jour ; la question est publique **sans le nom ni le numéro** de son auteur).
+   - **HailandX Vendeur** : Plus → **Questions des clients** (`/questions`) : questions sur les produits que vend la boutique, sans réponse d'abord ; « Répondre » / « Modifier ma réponse ». Une seule boutique répond à une question (la première) ; les autres boutiques du même produit voient sa réponse.
+   - **Notifications** : la boutique est prévenue d'une nouvelle question (❓, lien `/vendeur/questions`), l'acheteur de la réponse (💬, lien vers le produit).
+   - **Hailand Console** → **Litiges, avis, questions** : les 50 dernières questions, **Masquer / Rétablir** avec motif (inscrit au journal : « Question masquée sur une fiche produit »).
+- **Base** : migration `supabase/migrations/2026-10-27_hailandx_questions_achats.sql` — table `product_questions` (lecture publique sans l'auteur, écriture par fonctions seulement), `fn_ask_question`, `fn_answer_question`, `fn_shop_questions`, `fn_moderate_question`, `fn_bought_together`. Tests `supabase/tests/questions.test.ts` (9). Les scripts de remise à zéro des comptes (`supabase/maintenance/2026-10-16_…_2.sql`, `2026-10-22_….sql`) sauvegardent et vident aussi cette table si elle existe. ⚠️ **Non appliquée** : en attendant, la page produit s'affiche sans questions ni « souvent achetés ensemble », et l'envoi d'une question échoue.

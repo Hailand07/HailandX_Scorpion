@@ -65,6 +65,10 @@ export function journalText(e: Pick<JournalEntry, 'action' | 'target_id' | 'deta
       return d.resolution === 'acheteur' ? 'Litige tranché en faveur de l’acheteur (colis annulé)' : d.resolution === 'vendeur' ? 'Litige tranché en faveur du vendeur (livraison confirmée)' : 'Litige tranché';
     case 'avis_modere':
       return d.decision === 'masque' ? 'Avis signalé masqué' : 'Avis signalé maintenu';
+    case 'question_masquee':
+      return `Question masquée sur une fiche produit : ${quoted(d.question)}`;
+    case 'question_retablie':
+      return `Question rétablie : ${quoted(d.question)}`;
     case 'versement_vendeur':
       return `Versement de ${formatGnf(Number(d.montant) || 0)} à une boutique enregistré`;
     case 'remboursement':
@@ -81,7 +85,7 @@ export function journalText(e: Pick<JournalEntry, 'action' | 'target_id' | 'deta
 }
 
 export const TAG: Record<string, string> = {
-  parametre: 'Paramètre', boutique: 'Boutique', livreur: 'Livreur', litige: 'Litige', avis: 'Avis',
+  parametre: 'Paramètre', boutique: 'Boutique', livreur: 'Livreur', litige: 'Litige', avis: 'Avis', question: 'Question',
   acheteur: 'Argent', certification: 'Certification', compte: 'Équipe',
 };
 /** Étiquette d'une entrée (les versements à une boutique sont rangés sous « Argent »). */

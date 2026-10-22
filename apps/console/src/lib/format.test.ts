@@ -24,6 +24,8 @@ describe('console : formats', () => {
     expect(journalText({ action: 'action_inconnue', target_id: null, detail: {} })).toBe('action inconnue');
     expect(journalTag({ action: 'versement_vendeur', target_type: 'boutique' })).toBe('Argent');
     expect(journalTag({ action: 'boutique_statut', target_type: 'boutique' })).toBe('Boutique');
+    expect(journalText({ action: 'question_masquee', target_id: 'q', detail: { question: 'Votre numéro ?' } })).toBe('Question masquée sur une fiche produit : « Votre numéro ? »');
+    expect(journalTag({ action: 'question_masquee', target_type: 'question' })).toBe('Question');
   });
   it('numéro lisible', () => {
     expect(phoneText('224612345678')).toBe('+224 612 34 56 78');

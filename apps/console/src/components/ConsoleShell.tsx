@@ -26,7 +26,7 @@ const NAV: { href: string; label: string; icon: keyof typeof ICONS; badge?: (o: 
   { href: '/certifications', label: 'Certifications', icon: 'shield', badge: (o) => o.certifs_pending },
   { href: '/boutiques', label: 'Boutiques', icon: 'shop' },
   { href: '/livreurs', label: 'Livreurs', icon: 'truck', badge: (o) => o.couriers_pending + o.cash_over_limit },
-  { href: '/litiges', label: 'Litiges et avis', icon: 'alert', badge: (o) => o.disputes_open + o.reports_open },
+  { href: '/litiges', label: 'Litiges, avis, questions', icon: 'alert', badge: (o) => o.disputes_open + o.reports_open },
   { href: '/argent', label: 'Argent', icon: 'wallet' },
   { href: '/equipe', label: 'Comptes et équipe', icon: 'user' },
   { href: '/parametres', label: 'Paramètres', icon: 'sliders' },

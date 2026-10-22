@@ -28,6 +28,7 @@ export default function PlusPage() {
             {open && <ListRow href="/argent" icon="wallet" label="Argent" />}
             {open && <ListRow href="/statistiques" icon="chart" label="Statistiques et liens suivis" />}
             {open && <ListRow href="/avis" icon="star" label="Avis des clients" />}
+            {open && <ListRow href="/questions" icon="help" label="Questions des clients" />}
             <ListRow href="/reglages" icon="sliders" label="Réglages de la boutique" />
             <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex min-h-[58px] items-center gap-3 px-4">
               <Icon name="eye" /><span className="flex-1 text-[15px] font-bold">Voir ma boutique sur HailandX</span><span aria-hidden="true" className="font-extrabold text-[#9a9db0]">↗</span>
