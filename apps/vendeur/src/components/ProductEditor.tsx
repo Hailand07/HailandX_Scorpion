@@ -2,14 +2,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { formatGnf, slugify } from '@hailandx/commerce';
+import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, formatGnf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 
 interface Variant { key: number; id: string; label: string; stock: number }
 interface Section { id: string; name: string }
 interface Cat { id: string; name: string }
-interface Existing { id: string; price_gnf: number; section_id: string | null; active: boolean; photo_paths: string[] | null; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Existing { id: string; price_gnf: number; section_id: string | null; active: boolean; photo_paths: string[] | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { id: string; name: string; slug: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null; created_by: string | null } | null }
+interface Linked { id: string; name: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null }
 
 const MAX_PHOTOS = 5;
 const rand = () => Math.random().toString(36).slice(2, 6);
@@ -26,8 +27,14 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   const [sections, setSections] = useState<Section[]>([]);
   const [cats, setCats] = useState<Cat[]>([]);
   const [name, setName] = useState('');
-  const [linked, setLinked] = useState<{ id: string; name: string } | null>(null);
-  const [sugg, setSugg] = useState<{ id: string; name: string }[]>([]);
+  const [linked, setLinked] = useState<Linked | null>(null);
+  const [sugg, setSugg] = useState<Linked[]>([]);
+  // Fiche détaillée (HAILANDX.md §33) : description, points forts, caractéristiques de la catégorie ; état et mot du vendeur (offre).
+  const [desc, setDesc] = useState('');
+  const [points, setPoints] = useState<string[]>(['', '', '']);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [condition, setCondition] = useState<'neuf' | 'occasion'>('neuf');
+  const [note, setNote] = useState('');
   const [price, setPrice] = useState('');
   const [variants, setVariants] = useState<Variant[]>([{ key: 0, id: '', label: '', stock: 1 }]);
   const [removed, setRemoved] = useState<string[]>([]);
@@ -46,11 +53,14 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
     sb.from('shop_sections').select('id,name').eq('shop_id', shop.id).order('position').order('name').then(({ data }) => setSections((data as Section[]) ?? []));
     sb.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? []));
     if (!offerId) return;
-    sb.from('offers').select('id,price_gnf,section_id,active,photo_paths,offer_variants(id,label,stock),catalog_products(name,slug)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
+    sb.from('offers').select('id,price_gnf,section_id,active,photo_paths,description,condition,offer_variants(id,label,stock),catalog_products(id,name,slug,category_id,description,attributes,created_by)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
       const o = (data as unknown as Existing | null) ?? null;
       setExisting(o);
       if (!o) return;
       setPrice(String(o.price_gnf)); setSection(o.section_id); setActive(o.active); setKept(o.photo_paths ?? []);
+      setCondition(o.condition ?? 'neuf'); setNote(o.description ?? '');
+      const cp = o.catalog_products;
+      if (cp) { setCat(cp.category_id); setDesc(cp.description ?? ''); const d = readAttributes(cp.attributes); setValues(d.values); setPoints([...d.points, '', '', ''].slice(0, Math.max(3, d.points.length))); }
       const vs = (o.offer_variants ?? []).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
       if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: v.id, label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
     });
@@ -61,8 +71,8 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
     const term = name.trim().replace(/[%_,()]/g, ' ').trim();
     if (!sb || editing || linked || term.length < 3) { setSugg([]); return; }
     const t = setTimeout(async () => {
-      const { data } = await sb.from('catalog_products').select('id,name').ilike('name', `%${term}%`).eq('status', 'actif').limit(4);
-      setSugg((data as { id: string; name: string }[]) ?? []);
+      const { data } = await sb.from('catalog_products').select('id,name,category_id,description,attributes').ilike('name', `%${term}%`).eq('status', 'actif').limit(4);
+      setSugg((data as Linked[]) ?? []);
     }, 300);
     return () => clearTimeout(t);
   }, [name, linked, editing, sb]);
@@ -73,6 +83,12 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   const setVar = (key: number, patch: Partial<Variant>) => setVariants((vs) => vs.map((v) => (v.key === key ? { ...v, ...patch } : v)));
   const priceN = Number(price.replace(/\s/g, ''));
 
+  // Fiche modifiable : nouvelle fiche, ou fiche que ce vendeur a créée ; sinon on n'ajoute que son offre (état, mot du vendeur).
+  const ownFiche = editing ? existing?.catalog_products?.created_by === uid : !linked;
+  const fiche = ficheOf(linked ? linked.category_id : cat);
+  const attrs = cleanAttributes(linked ? linked.category_id : cat, { values, points });
+  const shared = linked ?? (editing && !ownFiche ? existing?.catalog_products ?? null : null);
+
   async function save() {
     setMsg(null);
     const rows = variants.map((v) => ({ ...v, label: v.label.trim() || (variants.length === 1 ? 'Standard' : '') }));
@@ -81,6 +97,8 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
       if (!Number.isFinite(priceN) || priceN < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
       if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
       if (new Set(rows.map((r) => r.label.toLowerCase())).size !== rows.length) throw new Error('Deux variantes portent le même nom.');
+      if (desc.length > FICHE_LIMITS.description) throw new Error(`Description trop longue (${FICHE_LIMITS.description} caractères au plus).`);
+      if (note.length > 1000) throw new Error('Le mot du vendeur dépasse 1 000 caractères.');
       setBusy(true);
       const uploaded: string[] = [];
       for (const f of files) uploaded.push(await uploadPhoto(sb!, uid, f));
@@ -91,22 +109,27 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
         let slug = '';
         if (!productId) {
           slug = `${slugify(name) || 'produit'}-${rand()}`;
-          const { data, error } = await sb!.from('catalog_products').insert({ slug, name: name.trim(), category_id: cat, created_by: uid }).select('id').single();
+          const { data, error } = await sb!.from('catalog_products').insert({ slug, name: name.trim(), category_id: cat, created_by: uid, description: desc.trim() || null, attributes: attrs }).select('id').single();
           if (error) throw new Error(errText(error));
           productId = (data as { id: string }).id;
         } else {
           const { data } = await sb!.from('catalog_products').select('slug').eq('id', productId).maybeSingle();
           slug = (data as { slug: string } | null)?.slug ?? '';
         }
-        const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop.id, product_id: productId, section_id: section, price_gnf: Math.round(priceN), photo_paths: photos }).select('id').single();
+        const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop.id, product_id: productId, section_id: section, price_gnf: Math.round(priceN), photo_paths: photos, condition, description: note.trim() || null }).select('id').single();
         if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans la liste.');
         if (e2) throw new Error(errText(e2));
         const { error: e3 } = await sb!.from('offer_variants').insert(rows.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
         if (e3) throw new Error(errText(e3));
         setPublished({ slug, name: linked?.name ?? name.trim() });
       } else {
-        const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), section_id: section, active, photo_paths: photos }).eq('id', offerId!);
+        const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), section_id: section, active, photo_paths: photos, condition, description: note.trim() || null }).eq('id', offerId!);
         if (error) throw new Error(errText(error));
+        // Fiche commune : seul son créateur la complète (la base le vérifie aussi).
+        if (ownFiche && existing?.catalog_products) {
+          const r = await sb!.rpc('fn_product_update_details', { p_product: existing.catalog_products.id, p_description: desc.trim(), p_attributes: attrs });
+          if (r.error) throw new Error(errText(r.error));
+        }
         for (const id of removed) {
           const r = await sb!.from('offer_variants').delete().eq('id', id);
           if (r.error?.code === '23503') throw new Error('Une variante déjà commandée ne se supprime pas : mettez plutôt son stock à 0.');
@@ -132,7 +155,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
         <h1 className="font-display text-[22px] font-semibold">Produit en vente</h1>
         <p className="text-[14.5px] font-semibold leading-relaxed text-muted">Il apparaît dans votre boutique. Partagez-le pour vos premières ventes.</p>
         <a href={`https://wa.me/?text=${encodeURIComponent(`${published.name} — ${formatGnf(Math.round(priceN))} ${url}`)}`} target="_blank" rel="noreferrer" className="flex h-[50px] w-full items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Partager sur WhatsApp</a>
-        <button type="button" onClick={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setBusy(false); }} className="flex h-12 w-full items-center justify-center rounded-2xl border border-line text-[14px] font-extrabold">Ajouter un autre produit</button>
+        <button type="button" onClick={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} className="flex h-12 w-full items-center justify-center rounded-2xl border border-line text-[14px] font-extrabold">Ajouter un autre produit</button>
         <Link href="/produits" className="flex h-11 items-center text-[14px] font-extrabold">Retour aux produits</Link>
       </Screen>
     );
@@ -141,6 +164,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
   const nPhotos = kept.length + files.length;
+  const completeness = ficheCompleteness(cat, desc, attrs, nPhotos);
   const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   return (
     <Screen className="gap-3 pb-32">
@@ -196,12 +220,8 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
       </section>
 
       <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
-        <h2 className="text-[14px] font-extrabold">Rayon</h2>
-        <div className="flex flex-wrap gap-2">
-          {sections.map((s) => <button key={s.id} type="button" aria-pressed={section === s.id} onClick={() => setSection(s.id)} className={pill(section === s.id)}>{s.name}</button>)}
-          <button type="button" aria-pressed={section === null} onClick={() => setSection(null)} className={pill(section === null)}>Sans rayon</button>
-        </div>
-        {sections.length === 0 && <p className="text-[12px] font-semibold text-muted">Créez vos rayons depuis la liste des produits (« + Rayon »).</p>}
+        <h2 className="text-[14px] font-extrabold">État</h2>
+        <div className="flex gap-2">{(['neuf', 'occasion'] as const).map((c) => <button key={c} type="button" aria-pressed={condition === c} onClick={() => setCondition(c)} className={pill(condition === c)}>{c === 'neuf' ? 'Neuf' : 'Occasion'}</button>)}</div>
       </section>
 
       {!editing && !linked && (
@@ -210,6 +230,54 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
           <div className="flex flex-wrap gap-2">{cats.map((c) => <button key={c.id} type="button" aria-pressed={cat === c.id} onClick={() => setCat(c.id)} className={pill(cat === c.id)}>{c.name}</button>)}</div>
         </section>
       )}
+
+      {shared ? (
+        <section className="flex flex-col gap-1.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+          <h2 className="text-[14px] font-extrabold">Fiche du produit</h2>
+          <p className="text-[12.5px] font-semibold leading-relaxed text-muted">Cette fiche est partagée avec un autre vendeur qui l’a créée : sa description et ses caractéristiques s’affichent pour tous. Ajoutez ce qui vous est propre dans « Le mot du vendeur ».</p>
+          {shared.description && <p className="line-clamp-4 whitespace-pre-line text-[13px] font-medium">{shared.description}</p>}
+        </section>
+      ) : (
+        <>
+          <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+            <div className="flex items-baseline justify-between gap-2"><h2 className="text-[14px] font-extrabold">Fiche détaillée</h2><span className="text-[12px] font-extrabold text-ok">Complète à {completeness} %</span></div>
+            <span className="h-1.5 overflow-hidden rounded-full bg-bg"><span className="block h-1.5 rounded-full bg-ok" style={{ width: `${completeness}%` }} /></span>
+            <p className="text-[12px] font-semibold leading-relaxed text-muted">{fiche.hint} Une fiche complète inspire confiance et fait vendre.</p>
+            <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Description
+              <textarea value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={FICHE_LIMITS.description} rows={5} placeholder="Décrivez le produit comme si le client l’avait en main : à quoi il sert, sa qualité, ses dimensions, ce qui le rend différent." className="rounded-[14px] border border-line px-3.5 py-3 text-[15px] font-medium leading-relaxed outline-none focus:border-blue" />
+              <span className="self-end text-[11px] font-bold text-muted">{desc.length} / {FICHE_LIMITS.description}</span>
+            </label>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[13px] font-extrabold">Points forts <span className="font-semibold text-muted">· 3 à 5 phrases courtes</span></span>
+              {points.map((pt, i) => (
+                <input key={i} value={pt} onChange={(e) => setPoints((ps) => ps.map((x, j) => (j === i ? e.target.value : x)))} maxLength={FICHE_LIMITS.point} aria-label={`Point fort ${i + 1}`} placeholder={['Ex. Tissu épais qui ne déteint pas', 'Ex. Livré avec chargeur rapide', 'Ex. Fabriqué à Conakry'][i] ?? 'Autre point fort'} className="h-11 rounded-xl bg-bg px-3 text-[14.5px] font-semibold outline-none focus:ring-2 focus:ring-blue" />
+              ))}
+              {points.length < FICHE_LIMITS.points && <button type="button" onClick={() => setPoints((ps) => [...ps, ''])} className="h-10 self-start rounded-xl px-1 text-[13px] font-extrabold text-blue-ink">+ Ajouter un point fort</button>}
+            </div>
+          </section>
+
+          <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
+            <h2 className="text-[14px] font-extrabold">Caractéristiques</h2>
+            {fiche.fields.map((f) => <FieldInput key={f.key} f={f} value={values[f.key] ?? ''} onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))} />)}
+            <p className="text-[11.5px] font-semibold text-muted">Laissez vide ce qui ne s’applique pas : seuls les champs remplis s’affichent.</p>
+          </section>
+        </>
+      )}
+
+      <section className="flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Le mot du vendeur <span className="font-semibold text-muted">· facultatif, propre à votre boutique</span>
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={3} placeholder="Ex. Garantie boutique 1 mois, échange possible si la taille ne va pas, retrait en boutique possible." className="rounded-[14px] border border-line px-3.5 py-3 text-[14.5px] font-medium leading-relaxed outline-none focus:border-blue" />
+        </label>
+      </section>
+
+      <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <h2 className="text-[14px] font-extrabold">Rayon</h2>
+        <div className="flex flex-wrap gap-2">
+          {sections.map((s) => <button key={s.id} type="button" aria-pressed={section === s.id} onClick={() => setSection(s.id)} className={pill(section === s.id)}>{s.name}</button>)}
+          <button type="button" aria-pressed={section === null} onClick={() => setSection(null)} className={pill(section === null)}>Sans rayon</button>
+        </div>
+        {sections.length === 0 && <p className="text-[12px] font-semibold text-muted">Créez vos rayons depuis la liste des produits (« + Rayon »).</p>}
+      </section>
 
       {editing && (
         <section className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card px-3.5 py-3">
@@ -231,5 +299,27 @@ function Thumb({ src, onRemove }: { src: string | null; onRemove: () => void }) 
       {src && /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" className="h-full w-full object-cover" />}
       <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
     </span>
+  );
+}
+
+/** Un champ de la fiche type : texte, choix (liste proposée, saisie libre possible), nombre avec unité, oui / non, texte long. */
+function FieldInput({ f, value, onChange }: { f: FicheField; value: string; onChange: (v: string) => void }) {
+  const id = `fiche-${f.key}`;
+  const box = 'h-11 min-w-0 flex-1 rounded-xl bg-bg px-3 text-[14.5px] font-semibold outline-none focus:ring-2 focus:ring-blue';
+  return (
+    <label htmlFor={id} className="flex flex-col gap-1.5 text-[12.5px] font-extrabold">{f.label}
+      {f.kind === 'long' ? (
+        <textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} rows={2} maxLength={FICHE_LIMITS.longValue} placeholder={f.placeholder} className="rounded-xl bg-bg px-3 py-2.5 text-[14.5px] font-medium leading-relaxed outline-none focus:ring-2 focus:ring-blue" />
+      ) : f.kind === 'oui_non' ? (
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={box}><option value="">Non précisé</option><option value="oui">Oui</option><option value="non">Non</option></select>
+      ) : f.kind === 'nombre' ? (
+        <span className="flex items-center gap-2"><input id={id} value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" placeholder={f.placeholder} className={box} />{f.unit && <span className="w-14 shrink-0 text-[12.5px] font-extrabold text-muted">{f.unit}</span>}</span>
+      ) : (
+        <>
+          <input id={id} value={value} onChange={(e) => onChange(e.target.value)} maxLength={FICHE_LIMITS.value} placeholder={f.placeholder ?? (f.options ? 'Choisir ou écrire' : '')} list={f.options ? `${id}-liste` : undefined} className={box} />
+          {f.options && <datalist id={`${id}-liste`}>{f.options.map((o) => <option key={o} value={o} />)}</datalist>}
+        </>
+      )}
+    </label>
   );
 }
