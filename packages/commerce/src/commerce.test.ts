@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  buildFeed, buyerStep, canDeliverTo, canSell, canTransition, checkHandoverCode, deliveryFeeGnf, doorPrecision, formatGnf, isFinal, MAX_HANDOVER_ATTEMPTS,
+  buildFeed, similarProducts, buyerStep, canDeliverTo, canSell, canTransition, checkHandoverCode, deliveryFeeGnf, doorPrecision, formatGnf, isFinal, MAX_HANDOVER_ATTEMPTS,
   newHandoverCode, normalizeGnPhone, formatGnPhone, slugify, parseParcelQr, rankOffers, shopState, trustScore, withinHandoverRange, badgesFor, type FeedCandidate, type Offer,
 } from './index';
 
@@ -141,6 +141,11 @@ describe('fil « la rue »', () => {
     const feed = buildFeed(items);
     for (let i = 1; i < feed.length; i++) expect(feed[i].shopId === feed[i - 1].shopId).toBe(false);
   });
+  it('tout le catalogue d’une catégorie : chaque produit une fois, mêmes règles d’intercalage', () => {
+    const all = buildFeed(items, { perGroup: Infinity });
+    expect(all).toHaveLength(items.length);
+    expect(new Set(all.map((f) => f.id)).size).toBe(items.length);
+  });
   it('filtre par catégorie et limite le nombre', () => {
     expect(buildFeed(items, { category: 'mode' }).every((f) => f.category === 'mode')).toBe(true);
     expect(buildFeed(items, { limit: 2 })).toHaveLength(2);
@@ -189,5 +194,16 @@ describe('téléphone et identifiants', () => {
     expect(slugify('Kadi Wax & Co')).toBe('kadi-wax-co');
     expect(slugify('  Beauté Nafi  ')).toBe('beaute-nafi');
     expect(slugify('é')).toBe('e');
+  });
+});
+
+describe('produits similaires', () => {
+  const p = (key: string, categoryId: string, priceGnf: number, attributes: Record<string, unknown> = {}) => ({ key, categoryId, priceGnf, attributes });
+  it('même catégorie seulement, sans le produit lui-même ; même type et même marque d’abord, puis prix voisin', () => {
+    const cur = p('a', 'mode', 100_000, { type: 'Chaussures', marque: 'Nike' });
+    const all = [cur, p('b', 'mode', 100_000, { type: 'Robe' }), p('c', 'mode', 400_000, { type: 'Chaussures', marque: 'Nike' }), p('d', 'mode', 90_000, { type: 'Chaussures' }), p('e', 'beaute', 100_000, { type: 'Chaussures' })];
+    expect(similarProducts(cur, all).map((x) => x.key)).toEqual(['c', 'd', 'b']);
+    expect(similarProducts({ ...cur, categoryId: null }, all)).toEqual([]);
+    expect(similarProducts(cur, all, 1)).toHaveLength(1);
   });
 });

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { brandOf, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer } from '@hailandx/commerce';
+import { brandOf, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { BuyBar } from '@/components/BuyBar';
@@ -46,7 +46,13 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
   const { ranked, recommended, selected: p } = pickOffers(cat, slug, b);
   if (!p) notFound();
   const shop = cat.shops.find((x) => x.slug === p.shopSlug)!;
-  const others = cat.products.filter((o) => o.shopSlug === shop.slug && o.slug !== p.slug);
+  const others = cat.products.filter((o) => o.shopSlug === shop.slug && o.slug !== p.slug).slice(0, 10);
+  // « Produits similaires » : même catégorie, toutes boutiques, même type / marque / gamme de prix d'abord (HAILANDX.md §34).
+  const trustOf = new Map(cat.shops.map((x) => [x.slug, trustFor(x)]));
+  const similar = similarProducts(
+    { key: `${p.slug}|${p.shopSlug}`, categoryId: p.categoryId ?? p.category, priceGnf: p.priceGnf, attributes: p.attributes },
+    cat.products.filter((o) => o.slug !== p.slug).map((o) => ({ ...o, key: `${o.slug}|${o.shopSlug}`, categoryId: o.categoryId ?? o.category, shopTrust: trustOf.get(o.shopSlug) })),
+  );
   const sellers = ranked.filter((o) => o.shopSlug !== p.shopSlug);
   // Fiche détaillée : marque, « En bref », points forts, tableau des caractéristiques (fiche type de la catégorie).
   const brand = brandOf(p.attributes);
@@ -188,6 +194,25 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
+      {similar.length > 0 && (
+        <section aria-label="Produits similaires" className="flex flex-col gap-2.5 px-[18px]">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-sm font-extrabold">Produits similaires</h2>
+            {p.category && <Link href={`/?cat=${encodeURIComponent(p.category)}`} className="text-[12.5px] font-extrabold text-blue-ink">Tout {p.category.toLowerCase()}</Link>}
+          </div>
+          <div className="flex snap-x gap-2.5 overflow-x-auto [scrollbar-width:none]">
+            {similar.map((o) => (
+              <Link key={o.key} href={`/p/${o.slug}?b=${o.shopSlug}`} className="flex w-[130px] shrink-0 snap-start flex-col gap-1">
+                <PhotoSlot src={o.photoUrl} color={o.color} className="h-[130px] rounded-2xl" label={o.name} />
+                <span className="line-clamp-2 text-xs font-bold leading-tight">{o.name}</span>
+                <span className="text-[12.5px] font-extrabold">{formatGnf(o.priceGnf)}</span>
+                <span className="truncate text-[11px] font-semibold text-muted">{cat.shops.find((x) => x.slug === o.shopSlug)?.name}</span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
       {others.length > 0 && (
         <section aria-label="Autres produits de la boutique" className="flex flex-col gap-2.5 px-[18px]">
           <div className="flex items-baseline justify-between">
@@ -196,7 +221,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
           </div>
           <div className="flex gap-2.5 overflow-x-auto">
             {others.map((o) => (
-              <Link key={o.slug} href={`/p/${o.slug}`} className="flex w-[110px] shrink-0 flex-col gap-1.5">
+              <Link key={o.slug} href={`/p/${o.slug}?b=${o.shopSlug}`} className="flex w-[110px] shrink-0 flex-col gap-1.5">
                 <PhotoSlot src={o.photoUrl} color={o.color} className="h-[110px] rounded-2xl" label={o.name} />
                 <span className="truncate text-xs font-bold">{o.name}</span>
                 <span className="text-[12.5px] font-extrabold">{formatGnf(o.priceGnf)}</span>

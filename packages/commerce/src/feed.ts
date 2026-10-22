@@ -23,6 +23,8 @@ export interface FeedOptions {
   limit?: number;
   /** Catégorie demandée (« tout » si absente). */
   category?: string;
+  /** Éléments gardés par (boutique, catégorie) : 1 = l'échantillon de la rue (défaut) ; `Infinity` = tout le catalogue, même ordre et même intercalage. */
+  perGroup?: number;
 }
 
 const rank = (c: FeedCandidate): number => {
@@ -43,8 +45,11 @@ export function buildFeed(candidates: FeedCandidate[], opts: FeedOptions = {}): 
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(c);
   }
   const samples: FeedCandidate[] = [];
+  const perGroup = opts.perGroup ?? 1;
   for (const list of groups.values()) {
-    const top = [...list].sort((a, b) => rank(b) - rank(a) || a.id.localeCompare(b.id)).slice(0, 3);
+    const sorted = [...list].sort((a, b) => rank(b) - rank(a) || a.id.localeCompare(b.id));
+    if (perGroup > 1) { samples.push(...sorted.slice(0, perGroup)); continue; }
+    const top = sorted.slice(0, 3);
     samples.push(top[Math.abs(rotation) % top.length]);
   }
 
@@ -85,4 +90,30 @@ export function rankOffers(offers: Offer[]): Offer[] {
   const score = (o: Offer) => 0.6 * (o.shopTrust / 100) + 0.25 * norm(o.priceGnf, minP, maxP) + 0.15 * norm(o.etaMinutes, minE, maxE);
   const out = offers.filter((o) => o.inStock).sort((a, b) => score(b) - score(a) || a.priceGnf - b.priceGnf);
   return [...out, ...offers.filter((o) => !o.inStock)];
+}
+
+/** Un produit vu par les recommandations (« Produits similaires » en bas d'une fiche). */
+export interface SimilarCandidate { key: string; categoryId?: string | null; priceGnf: number; attributes?: Record<string, unknown> | null; shopTrust?: number }
+
+const norm = (v: unknown): string => (typeof v === 'string' ? v.trim().toLowerCase() : '');
+
+/**
+ * Produits de même catégorie (toutes boutiques), du plus proche au moins proche : même type d'article (+3),
+ * même marque (+2), prix voisin (jusqu'à +1,5), confiance de la boutique (jusqu'à +0,5). Le produit lui-même est exclu.
+ */
+export function similarProducts<T extends SimilarCandidate>(current: SimilarCandidate, all: T[], limit = 12): T[] {
+  if (!current.categoryId) return [];
+  const type = norm(current.attributes?.type);
+  const brand = norm(current.attributes?.marque);
+  const score = (c: T): number => {
+    const t = norm(c.attributes?.type);
+    const ratio = Math.min(c.priceGnf, current.priceGnf) / Math.max(c.priceGnf, current.priceGnf, 1);
+    return (type && t === type ? 3 : 0) + (brand && norm(c.attributes?.marque) === brand ? 2 : 0) + 1.5 * ratio + 0.5 * ((c.shopTrust ?? 50) / 100);
+  };
+  return all
+    .filter((c) => c.key !== current.key && c.categoryId === current.categoryId)
+    .map((c) => ({ c, s: score(c) }))
+    .sort((a, b) => b.s - a.s || a.c.key.localeCompare(b.c.key))
+    .slice(0, limit)
+    .map((x) => x.c);
 }
