@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, formatGnf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
+import { ShareSheet } from './ShareSheet';
 
 interface Variant { key: number; id: string; label: string; stock: number }
 interface Section { id: string; name: string }
@@ -45,7 +46,8 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
-  const [published, setPublished] = useState<{ slug: string; name: string } | null>(null);
+  const [published, setPublished] = useState<{ slug: string; name: string; offerId?: string } | null>(null);
+  const [sharing, setSharing] = useState(false);
   const [nextKey, setNextKey] = useState(1);
 
   useEffect(() => {
@@ -121,7 +123,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
         if (e2) throw new Error(errText(e2));
         const { error: e3 } = await sb!.from('offer_variants').insert(rows.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
         if (e3) throw new Error(errText(e3));
-        setPublished({ slug, name: linked?.name ?? name.trim() });
+        setPublished({ slug, name: linked?.name ?? name.trim(), offerId: (off as { id: string }).id });
       } else {
         const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), section_id: section, active, photo_paths: photos, condition, description: note.trim() || null }).eq('id', offerId!);
         if (error) throw new Error(errText(error));
@@ -154,7 +156,9 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
         <span role="status" className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-lime"><Icon name="check" size={30} stroke={2.4} /></span>
         <h1 className="font-display text-[22px] font-semibold">Produit en vente</h1>
         <p className="text-[14.5px] font-semibold leading-relaxed text-muted">Il apparaît dans votre boutique. Partagez-le pour vos premières ventes.</p>
-        <a href={`https://wa.me/?text=${encodeURIComponent(`${published.name} — ${formatGnf(Math.round(priceN))} ${url}`)}`} target="_blank" rel="noreferrer" className="flex h-[50px] w-full items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Partager sur WhatsApp</a>
+        <button type="button" onClick={() => setSharing(true)} className="flex h-[50px] w-full items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Partager le lien du produit</button>
+        <p className="w-full truncate rounded-xl bg-bg px-3 py-2 text-[12px] font-semibold text-muted">{url.replace(/^https?:\/\//, '')}</p>
+        {sharing && published.offerId && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: published.offerId, productSlug: published.slug, name: published.name, priceGnf: Math.round(priceN) }} onClose={() => setSharing(false)} />}
         <button type="button" onClick={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} className="flex h-12 w-full items-center justify-center rounded-2xl border border-line text-[14px] font-extrabold">Ajouter un autre produit</button>
         <Link href="/produits" className="flex h-11 items-center text-[14px] font-extrabold">Retour aux produits</Link>
       </Screen>
@@ -168,7 +172,9 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   return (
     <Screen className="gap-3 pb-32">
-      <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'} />
+      <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'}
+        right={editing && existing?.active && existing.catalog_products ? <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-extrabold">Partager</button> : null} />
+      {sharing && editing && existing?.catalog_products && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: existing.id, productSlug: existing.catalog_products.slug, name: existing.catalog_products.name, priceGnf: existing.price_gnf }} onClose={() => setSharing(false)} />}
       <Notice msg={msg} />
 
       <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">

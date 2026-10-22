@@ -10,12 +10,12 @@ interface Review { rating: number; comment: string | null; created_at: string }
 interface OfferStock { id: string; active: boolean; offer_variants: { stock: number }[] | null; catalog_products: { name: string } | null }
 interface Data {
   series: SalesDay[]; prep: { created_at: string }[]; disputes: number; recent: Review[];
-  score: { trust: number; rating: number; review_count: number } | null; offers: OfferStock[]; balance: number;
+  score: { trust: number; rating: number; review_count: number } | null; offers: OfferStock[]; balance: number; questions: number;
 }
 type Period = 'jour' | 'semaine' | 'mois';
 const DAYS: Record<Period, number> = { jour: 1, semaine: 7, mois: 30 };
 
-/** Ma boutique — tableau de bord (v2) : les ventes, ce qui attend une action, l'argent, la confiance, et six pages rangées. */
+/** Ma boutique — tableau de bord (v3) : les ventes, ce qui attend une action, l'argent, la confiance ; Commandes et Produits sont dans la barre du bas (pas de doublon). */
 export function Dashboard({ shop }: { shop: MyShop }) {
   const [d, setD] = useState<Data | null>(null);
   const [period, setPeriod] = useState<Period>('jour');
@@ -23,7 +23,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   const load = useCallback(async () => {
     const sb = browserClient(); if (!sb) return;
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const [sales, prep, disputes, recent, score, offers, ledger] = await Promise.all([
+    const [sales, prep, disputes, recent, score, offers, ledger, questions] = await Promise.all([
       sb.rpc('fn_shop_sales', { p_shop: shop.id, p_days: 60 }),
       sb.from('parcels').select('created_at').eq('shop_id', shop.id).eq('status', 'attente_vendeur').order('created_at'),
       sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id).eq('status', 'litige'),
@@ -31,6 +31,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       sb.from('shop_scores').select('trust,rating,review_count').eq('shop_id', shop.id).maybeSingle(),
       sb.from('offers').select('id,active,offer_variants(stock),catalog_products(name)').eq('shop_id', shop.id),
       sb.from('ledger_entries').select('amount_gnf').eq('account', 'shop').eq('account_id', shop.id),
+      sb.rpc('fn_shop_questions', { p_shop: shop.id }),
     ]);
     setD({
       series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })),
@@ -40,6 +41,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       score: (score.data as Data['score']) ?? null,
       offers: (offers.data as unknown as OfferStock[]) ?? [],
       balance: ((ledger.data as { amount_gnf: number }[]) ?? []).reduce((n, e) => n + e.amount_gnf, 0),
+      questions: ((questions.data as { answer: string | null }[]) ?? []).filter((q) => !q.answer).length,
     });
   }, [shop.id]);
 
@@ -59,16 +61,17 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   if (d?.prep.length) todo.push({ href: '/commandes', badge: d.prep.length, tone: 'bg-lime text-ink', title: 'Colis à préparer', sub: `Le plus ancien attend depuis ${ago(d.prep[0]!.created_at).replace('il y a ', '')}` });
   if (d?.disputes) todo.push({ href: '/commandes?onglet=problemes', badge: d.disputes, tone: 'bg-[#fde8e4] text-[#a3321f]', title: d.disputes > 1 ? 'Problèmes signalés' : 'Problème signalé', sub: 'Donnez votre version à l’équipe Hailand' });
   if (d?.recent.length) todo.push({ href: '/avis', badge: d.recent.length, tone: 'bg-blue-soft text-blue', title: d.recent.length > 1 ? 'Nouveaux avis clients' : 'Nouvel avis client', sub: `${'★'.repeat(d.recent[0]!.rating)}${'☆'.repeat(5 - d.recent[0]!.rating)}${d.recent[0]!.comment ? ` « ${d.recent[0]!.comment.slice(0, 40)}${d.recent[0]!.comment.length > 40 ? '…' : ''} »` : ''}` });
+  if (d?.questions) todo.push({ href: '/questions', badge: d.questions, tone: 'bg-blue-soft text-blue', title: d.questions > 1 ? 'Questions de clients sans réponse' : 'Question de client sans réponse', sub: 'Une réponse rapide fait vendre' });
   if (empty.length) todo.push({ href: '/produits?filtre=rupture', badge: <Icon name="alert" size={18} stroke={2.2} />, tone: 'bg-[#fff1e6] text-[#c2410c]', title: `${empty.length} produit${empty.length > 1 ? 's' : ''} en rupture`, sub: empty.map((o) => o.catalog_products?.name).filter(Boolean).slice(0, 2).join(', ') + ' · stock 0' });
   if (d && !live.length) todo.push({ href: '/produits/nouveau', badge: <Icon name="plus" size={18} stroke={2.4} />, tone: 'bg-lime text-ink', title: 'Ajoutez votre premier produit', sub: 'Photo, prix, stock : deux minutes' });
 
   const tiles: { href: string; icon: keyof typeof ICONS; label: string; sub: string }[] = [
-    { href: '/commandes', icon: 'box', label: 'Commandes', sub: d ? (d.prep.length ? `${d.prep.length} à préparer` : 'À jour') : '…' },
-    { href: '/produits', icon: 'tag', label: 'Produits', sub: d ? `${live.length} en vente` : '…' },
     { href: '/argent', icon: 'wallet', label: 'Argent', sub: d ? `${shortGnf(d.balance)} GNF` : '…' },
     { href: '/statistiques', icon: 'chart', label: 'Statistiques', sub: week?.trendPct != null ? `${week.trendPct > 0 ? '+' : ''}${week.trendPct} % · 7 j` : '7 derniers jours' },
     { href: '/avis', icon: 'star', label: 'Avis', sub: rating ? `${rating} ★ · ${d!.score!.review_count}` : 'Pas encore' },
+    { href: '/questions', icon: 'help', label: 'Questions', sub: d ? (d.questions ? `${d.questions} sans réponse` : 'À jour') : '…' },
     { href: '/reglages', icon: 'sliders', label: 'Réglages', sub: 'Logo, WhatsApp' },
+    { href: '/aide', icon: 'info', label: 'Aide', sub: 'Guides, contact' },
   ];
 
   return (
@@ -137,7 +140,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         </div>
       </section>
 
-      <ShareRow slug={shop.slug} name={shop.name} />
+      <ShareRow shop={shop} />
     </Screen>
   );
 }
