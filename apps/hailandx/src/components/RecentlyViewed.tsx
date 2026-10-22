@@ -23,15 +23,15 @@ export function RecordView({ item }: { item: GridItem }) {
 }
 
 /** Rangée de l'accueil ; `known` = produits encore en vente (un produit retiré n'est plus proposé). */
-export function RecentlyViewed({ known }: { known: string[] }) {
+export function RecentlyViewed({ known, title = 'Vus récemment' }: { known?: string[]; title?: string }) {
   const [items, setItems] = useState<GridItem[]>([]);
-  useEffect(() => { const ok = new Set(known); setItems(read().filter((x) => ok.has(x.key))); }, [known]);
+  useEffect(() => { const ok = known ? new Set(known) : null; setItems(read().filter((x) => !ok || ok.has(x.key))); }, [known]);
   if (!items.length) return null;
   const clear = () => { try { localStorage.removeItem(KEY); } catch { /* ignoré */ } setItems([]); };
   return (
     <section aria-label="Vus récemment" className="flex flex-col gap-2.5">
       <div className="flex items-baseline justify-between px-5">
-        <h2 className="font-display text-lg font-semibold tracking-tight">Vus récemment</h2>
+        <h2 className="font-display text-lg font-semibold tracking-tight">{title}</h2>
         <button type="button" onClick={clear} className="text-[12.5px] font-extrabold text-muted">Effacer</button>
       </div>
       <div className="flex snap-x gap-3 overflow-x-auto px-5 pb-1 [scrollbar-width:none]">{items.map((p) => <ProductCard key={p.key} p={p} />)}</div>

@@ -51,6 +51,39 @@ export function removeLine(offerId: string, variantId: string | null) {
   write(read().filter((l) => !(l.offerId === offerId && l.variantId === variantId)));
 }
 export const clearCart = () => write([]);
+/** Met à jour les prix enregistrés quand le vendeur les a changés (le panier affiche toujours le prix du moment). */
+export function syncPrices(prices: Map<string, number>) {
+  const lines = read();
+  if (!lines.some((l) => prices.has(l.offerId) && prices.get(l.offerId) !== l.priceGnf)) return;
+  write(lines.map((l) => (prices.has(l.offerId) ? { ...l, priceGnf: prices.get(l.offerId)! } : l)));
+}
+
+/** « Mis de côté » : des articles retirés du panier pour plus tard (comme Amazon), sur ce téléphone seulement. */
+const LATER = 'hx.later';
+function readLater(): CartLine[] { try { const v = JSON.parse(localStorage.getItem(LATER) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
+function writeLater(lines: CartLine[]) { try { localStorage.setItem(LATER, JSON.stringify(lines.slice(0, 30))); } catch { /* ignoré */ } window.dispatchEvent(new Event(EVENT)); }
+export function saveForLater(offerId: string, variantId: string | null) {
+  const line = read().find((l) => l.offerId === offerId && l.variantId === variantId);
+  if (!line) return;
+  writeLater([line, ...readLater().filter((l) => !(l.offerId === offerId && l.variantId === variantId))]);
+  removeLine(offerId, variantId);
+}
+export function moveToCart(offerId: string, variantId: string | null) {
+  const line = readLater().find((l) => l.offerId === offerId && l.variantId === variantId);
+  if (!line) return;
+  writeLater(readLater().filter((l) => l !== line));
+  const { qty, ...rest } = line; addToCart(rest, qty);
+}
+export function removeLater(offerId: string, variantId: string | null) { writeLater(readLater().filter((l) => !(l.offerId === offerId && l.variantId === variantId))); }
+let laterCache: { raw: string | null; lines: CartLine[] } = { raw: null, lines: [] };
+function laterSnapshot(): CartLine[] {
+  let raw: string | null = null; try { raw = localStorage.getItem(LATER); } catch { /* ignoré */ }
+  if (raw !== laterCache.raw) laterCache = { raw, lines: readLater() };
+  return laterCache.lines;
+}
+export function useLater(): CartLine[] {
+  return useSyncExternalStore(subscribe, laterSnapshot, () => EMPTY);
+}
 
 const EMPTY: CartLine[] = [];
 function subscribe(cb: () => void) {

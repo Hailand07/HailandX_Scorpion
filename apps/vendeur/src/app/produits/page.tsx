@@ -4,16 +4,18 @@ import Link from 'next/link';
 import { formatGnf } from '@hailandx/commerce';
 import { BackHeader, browserClient, colorOf, errText, Icon, mediaUrl, Notice, Screen, Switch } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
 
-interface Offer { id: string; section_id: string | null; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string } | null }
+interface Offer { id: string; section_id: string | null; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Section { id: string; name: string }
 
 /** Produits de ma boutique (v2) : recherche, rayons en puces, visibilité d'un geste ; l'ajout et la modification ont leur écran. */
 export default function ProductsPage() {
-  return <SellerGate title="Produits">{({ shop }) => <Products shopId={shop.id} />}</SellerGate>;
+  return <SellerGate title="Produits">{({ shop }) => <Products shopId={shop.id} shopSlug={shop.slug} shopName={shop.name} />}</SellerGate>;
 }
 
-function Products({ shopId }: { shopId: string }) {
+function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: string; shopName: string }) {
+  const [sharing, setSharing] = useState<ShareTarget | null>(null);
   const sb = browserClient();
   const [offers, setOffers] = useState<Offer[] | null>(null);
   const [sections, setSections] = useState<Section[]>([]);
@@ -28,7 +30,7 @@ function Products({ shopId }: { shopId: string }) {
   const load = useCallback(async () => {
     if (!sb) return;
     const [o, s] = await Promise.all([
-      sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(stock),catalog_products(name)').eq('shop_id', shopId).order('created_at', { ascending: false }),
+      sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(stock),catalog_products(name,slug)').eq('shop_id', shopId).order('created_at', { ascending: false }),
       sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name'),
     ]);
     setOffers((o.data as unknown as Offer[]) ?? []);
@@ -108,12 +110,18 @@ function Products({ shopId }: { shopId: string }) {
                   <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span> · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
                 </span>
               </Link>
+              {o.active && o.catalog_products && (
+                <button type="button" onClick={() => setSharing({ shopId, shopSlug, shopName, offerId: o.id, productSlug: o.catalog_products!.slug, name, priceGnf: o.price_gnf })} aria-label={`Partager le lien de ${name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="m16 6-4-4-4 4" /><path d="M12 2v13" /></svg>
+                </button>
+              )}
               <Switch on={o.active} onChange={(v) => toggle(o, v)} label={`Visible dans la boutique : ${name}`} />
             </div>
           );
         })}
       </div>
 
+      {sharing && <ShareSheet target={sharing} onClose={() => setSharing(null)} />}
       <Link href="/produits/nouveau" className="fixed inset-x-5 bottom-[104px] z-30 mx-auto flex h-[54px] max-w-[calc(28rem-2.5rem)] items-center justify-center gap-2 rounded-[18px] bg-ink text-[15px] font-extrabold text-white shadow-[0_8px_24px_rgba(18,20,28,0.22)]">
         <Icon name="plus" size={18} stroke={2.4} />Ajouter un produit
       </Link>
