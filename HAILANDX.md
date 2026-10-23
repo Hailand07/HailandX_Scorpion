@@ -544,6 +544,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-22 | §36 : panier refait (état en direct, mis de côté, récapitulatif), partage d'un produit par lien direct suivi (HailandX Vendeur), correction `/s/<code>` (offre de la boutique qui partage), tableau de bord sans doublon. §37 : plan « HailandX Vendeur niveau Shopify » proposé. |
 | 2026-10-22 | §35 : filtres de catégorie (marque, prix, état), « Vus récemment » (sur le téléphone), « Souvent achetés ensemble », questions-réponses (HailandX, Vendeur, Console) ; migration `2026-10-27_hailandx_questions_achats.sql` (⚠️ à appliquer). |
 | 2026-10-23 | §37 validé : maquettes v6 ; barre du bas à 5 onglets ; Commandes (recherche, fiche d'une commande, annulation avec motif) ; Marketing (codes promo, promotions à prix barré, visuel prêt à publier, affiche QR) ; HailandX : prix barré, code promo à la commande. Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` (⚠️ à appliquer avant fusion) ; BASE_DE_DONNEES révision 7. |
+| 2026-10-23 | Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` appliquée en production (accord du fondateur ; fin par l'éditeur SQL) et vérifiée. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -873,7 +874,7 @@ Les 4 suggestions validées par le fondateur après §34.
 - **Correction** : un lien suivi de produit ouvrait la fiche sans la boutique : si plusieurs boutiques vendent le même produit, le client pouvait tomber sur l'offre d'un concurrent. `/s/<code>` ajoute désormais `?b=<boutique qui partage>`.
 - **Tableau de bord vendeur** : tuiles Commandes et Produits retirées (déjà dans la barre du bas) ; tuiles Argent, Statistiques, Avis, **Questions**, Réglages, Aide ; « À faire » signale les **questions de clients sans réponse**.
 
-## 37. Plan « HailandX Vendeur, niveau Shopify » (2026-10-22) — ✅ validé le 2026-10-23 ; étapes 0, 1 (barre du bas), 3 (Commandes) et 6 (Marketing) codées ; ⚠️ migration à appliquer
+## 37. Plan « HailandX Vendeur, niveau Shopify » (2026-10-22) — ✅ validé le 2026-10-23 ; étapes 0, 1 (barre du bas), 3 (Commandes) et 6 (Marketing) codées ; migration appliquée
 
 Demande : « une appli pour les vendeurs e-commerce, exactement comme Shopify mais pensée pour le contexte guinéen ; professionnelle, esthétique et opérationnelle ». Ce que Shopify apporte et qui manque, adapté (téléphone d'abord, 3G, paiement à la remise, Orange Money, WhatsApp et TikTok comme vitrines, adresse certifiée Hailand) :
 
@@ -896,6 +897,6 @@ Les points 3 (annulation), 4 (prix barré), 5, 6 (codes promo) et 7 (horaires, v
 - ✅ **Marketing** (`apps/vendeur/src/app/marketing`) : ventes venues des partages (30 jours, par réseau) ; **codes promo** (pourcentage ou montant, achat minimum, fin, limite, une fois par client, aperçu client, activer/couper) ; **promotions** (−5 à −30 % en un geste, prix arrondi à 500 GNF, l'ancien prix devient le prix barré ; « Arrêter » le rétablit) ; **visuel prêt à publier** (statut 9:16 ou carré, photo, prix barré, lien suivi du réseau choisi, enregistrer ou partager) ; **affiche QR** de la boutique à imprimer ; partage d'un produit en un geste.
 - ✅ **HailandX** : prix barré et « −x % » sur les cartes et la page produit ; champ **code promo** à la commande (vérifié par `fn_promo_check`, revérifié par `fn_place_order`) ; réduction et motif d'annulation affichés dans la commande.
 - ✅ Prix barré aussi dans l'éditeur de produit (« Prix avant promotion ») et la liste des produits.
-- 🗄️ Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` (tests `vendeur-marketing.test.ts`, 10 cas) — **⚠️ à appliquer AVANT de fusionner** : sans elle, la vitrine HailandX (colonne `compare_at_gnf`) retomberait sur les exemples et la fiche de commande du vendeur serait vide.
+- 🗄️ Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` (tests `vendeur-marketing.test.ts`, 10 cas) — ✅ **appliquée en production le 2026-10-23** (colonnes par Claude ; tables et fonctions par le fondateur dans l'éditeur SQL, le connecteur expirant) et vérifiée (tables protégées, droits, fonctions).
 - ⚠️ **Non fait, décidé** : appel / WhatsApp du client par **numéro masqué** — il faut un fournisseur de téléphonie (relais d'appels) ; en attendant, le livreur reste le seul à recevoir le numéro. À décider : fournisseur, ou messagerie dans l'application.
 - 💡 **Restent** : accueil avec guide de démarrage (2), actions groupées et duplication (4), Clients (5), Boutique en ligne : horaires, vacances, politique (7), Statistiques enrichies (8), Équipe (9).
