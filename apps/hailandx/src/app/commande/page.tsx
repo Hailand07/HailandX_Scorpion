@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Wordmark } from '@hailandx/ui';
+import { Button, Wordmark, Chargement } from '@hailandx/ui';
 import { formatGnf, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
 import { browserClient, Icon, LienHailand, lienEnregistrement, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
@@ -101,7 +101,7 @@ function Checkout() {
       <form onSubmit={place} className="flex flex-col gap-4">
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
-          {!ready ? <p className="text-[13.5px] font-medium text-muted">Chargement de vos adresses…</p> : decls.length === 0 ? (
+          {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length === 0 ? (
             <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Pour être livré jusqu’à votre porte, enregistrez votre adresse une fois dans <b className="font-extrabold text-ink">NavigationX</b>. Elle servira pour toutes vos commandes.</p><LienHailand app="navigationx" href={lienEnregistrement('hailandx', '/commande')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-ink text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Enregistrer mon adresse avec NavigationX</LienHailand><p className="text-[12px] font-semibold text-muted">Votre panier vous attend ici : vous revenez à cette étape à la fin.</p></div>
           ) : (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">

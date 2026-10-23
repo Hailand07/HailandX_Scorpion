@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { BackHeader, browserClient, errText, Icon, Notice, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { Chargement } from '@hailandx/ui';
 
 interface Member { user_id: string; role: 'proprietaire' | 'employe'; phone_masked: string; me: boolean }
 const RIGHTS: [string, boolean][] = [
@@ -52,7 +53,7 @@ function Team({ shopId }: { shopId: string }) {
       <BackHeader href="/plus" title="Équipe" />
       <Notice msg={msg} />
       <section className="overflow-hidden rounded-[22px] border border-line-soft bg-card">
-        {members === null && <p className="p-4 text-[14px] font-semibold text-muted">Chargement…</p>}
+        {members === null && <Chargement />}
         {members?.map((m, i) => (
           <div key={m.user_id} className={`flex items-center gap-3 px-4 py-3 ${i < members.length - 1 ? 'border-b border-[#f0ede6]' : ''}`}>
             <span aria-hidden="true" className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${m.role === 'proprietaire' ? 'bg-[#f6d8bd]' : 'bg-blue-soft text-blue'}`}><Icon name="user" size={19} /></span>

@@ -76,18 +76,21 @@ export interface Offer {
   inStock: boolean;
 }
 
-/** Classe les offres d'une même fiche : confiance (60 %), prix (25 %), délai (15 %). L'offre recommandée est la première en stock. */
+/**
+ * Classe les offres d'une même fiche : confiance (45 %), prix (40 %), délai (15 %). L'offre recommandée est la première en stock.
+ * Le prix compte en proportion du meilleur prix (meilleur ÷ prix) : 10 % plus cher coûte peu, 50 % plus cher coûte autant
+ * que 30 points de confiance — exagérer sur le prix fait perdre la recommandation (HAILANDX.md §39).
+ */
 export function rankOffers(offers: Offer[]): Offer[] {
   const avail = offers.filter((o) => o.inStock);
   if (avail.length === 0) return [...offers];
   const prices = avail.map((o) => o.priceGnf);
   const minP = Math.min(...prices);
-  const maxP = Math.max(...prices);
   const etas = avail.map((o) => o.etaMinutes);
   const minE = Math.min(...etas);
   const maxE = Math.max(...etas);
   const norm = (v: number, lo: number, hi: number) => (hi === lo ? 1 : 1 - (v - lo) / (hi - lo));
-  const score = (o: Offer) => 0.6 * (o.shopTrust / 100) + 0.25 * norm(o.priceGnf, minP, maxP) + 0.15 * norm(o.etaMinutes, minE, maxE);
+  const score = (o: Offer) => 0.45 * (o.shopTrust / 100) + 0.4 * (minP / o.priceGnf) + 0.15 * norm(o.etaMinutes, minE, maxE);
   const out = offers.filter((o) => o.inStock).sort((a, b) => score(b) - score(a) || a.priceGnf - b.priceGnf);
   return [...out, ...offers.filter((o) => !o.inStock)];
 }

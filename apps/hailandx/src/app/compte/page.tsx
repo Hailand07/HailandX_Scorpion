@@ -4,6 +4,7 @@ import Link from 'next/link';
 
 import { browserClient, GroupTitle, Icon, LienHailand, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
 import { maskPhone } from '@hailandx/commerce';
+import { Chargement } from '@hailandx/ui';
 
 /** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
 export default function AccountPage() {
@@ -20,7 +21,7 @@ export default function AccountPage() {
     ]).then(([f, a, n]) => setCounts({ fav: f.count ?? 0, addr: a.count ?? 0, unread: n }));
   }, [session]);
 
-  if (session === undefined) return <Screen className="pt-6"><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (session === undefined) return <Screen className="pt-6"><Chargement /></Screen>;
 
   if (session === null) {
     return (

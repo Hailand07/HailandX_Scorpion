@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BUYER_STEPS, formatGnf, isOrderActive, orderStep, type ParcelStatus, STEP_HEADLINE } from '@hailandx/commerce';
 import { browserClient, mediaUrl, Screen, Segmented, useSession } from '@hailandx/kit';
+import { Chargement } from '@hailandx/ui';
 
 interface Item { name_snapshot: string; quantity: number; offers: { photo_paths: string[] | null; catalog_products: { slug: string } | null } | null }
 interface Parcel { id: string; status: ParcelStatus; delivered_at: string | null; shops: { name: string; slug: string } | null; order_items: Item[] }
@@ -57,7 +58,7 @@ export default function OrdersPage() {
       {session && (
         <>
           <Segmented label="Filtrer les commandes" value={tab} onChange={setTab} items={[{ id: 'cours', label: `En cours · ${active.length}` }, { id: 'fini', label: `Terminées · ${done.length}` }]} />
-          {orders === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+          {orders === null && <Chargement />}
 
           {orders && tab === 'cours' && (
             <>

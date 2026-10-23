@@ -4,6 +4,7 @@ import { Discovery } from '@/components/Discovery';
 import { Onboarding } from '@/components/Onboarding';
 import { Dashboard } from '@/components/Dashboard';
 import { Screen } from '@hailandx/kit';
+import { Chargement } from '@hailandx/ui';
 
 /**
  * Accueil de HailandX Vendeur, deux temps qui ne se mélangent jamais :
@@ -11,7 +12,7 @@ import { Screen } from '@hailandx/kit';
  */
 export default function SellerPage() {
   const { state, shop, decls, decl, cert, uid, reload } = useMyShop();
-  if (state === 'chargement') return <Screen><p className="pt-4 text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (state === 'chargement') return <Screen><Chargement /></Screen>;
   if (state === 'visiteur' || !uid) return <Discovery cta="/connexion?next=/ouvrir" logged={false} />;
   if (!shop) return <Discovery cta="/ouvrir" logged />;
   if (shop.status !== 'ouverte') return <Onboarding shop={shop} decls={decls} decl={decl} cert={cert} uid={uid} reload={reload} />;

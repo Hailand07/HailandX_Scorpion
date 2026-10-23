@@ -6,6 +6,7 @@ import { CANCEL_REASONS, formatGnf, type ParcelStatus, sellerNet } from '@hailan
 import { BackHeader, browserClient, DisputeThread, errText, Icon, mediaUrl, Notice, ProofPhoto, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { orderCode, payLabel, statusPill } from '@/lib/orders';
+import { Chargement } from '@hailandx/ui';
 
 interface Detail {
   id: string; status: ParcelStatus; created_at: string; subtotal_gnf: number; discount_gnf: number; promo_code: string | null; delivery_fee_gnf: number; commission_bps: number;
@@ -55,7 +56,7 @@ function Order({ id }: { id: string }) {
     await load(); await showQr();
   }
 
-  if (d === undefined) return <Screen><BackHeader href="/commandes" title="Commande" /><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (d === undefined) return <Screen><BackHeader href="/commandes" title="Commande" /><Chargement /></Screen>;
   if (d === null) return <Screen><BackHeader href="/commandes" title="Commande" /><p className="text-[14px] font-semibold text-muted">Commande introuvable.</p></Screen>;
 
   const [pillClass, pillText] = statusPill(d.status, d.created_at);

@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf } from '@hailandx/commerce';
 import { telMasque } from '@hailandx/kit';
-import { AppMark } from '@hailandx/ui';
+import { AppMark, Chargement } from '@hailandx/ui';
 import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
@@ -157,7 +157,7 @@ export default function Home() {
   );
   const Shell = ({ children }: { children: React.ReactNode }) => <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3.5 px-5 pb-16 pt-[max(20px,env(safe-area-inset-top))] lg:justify-center">{Head}{children}</main>;
 
-  if (session === undefined || session === null || courier === undefined) return <Shell><p className="text-[14px] font-medium text-night-muted">Chargement…</p></Shell>;
+  if (session === undefined || session === null || courier === undefined) return <Shell><Chargement /></Shell>;
 
   // Flotte n'est proposée à personne : sans dossier livreur, on explique simplement que l'équipe recrute (maquette F1 v4).
   if (courier === null) {

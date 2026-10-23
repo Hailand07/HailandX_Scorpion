@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { ago, brandOf, discountPercent, formatGnf, onVacation, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
+import { ago, brandOf, discountPercent, formatGnf, gapPercent, groupByProduct, onVacation, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, offerKey, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
@@ -27,7 +27,7 @@ async function extras(productId: string | undefined): Promise<{ questions: Quest
 
 type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> };
 
-/** Offres d'une même fiche produit, classées (confiance 60 %, prix 25 %, délai 15 %) ; `b` choisit la boutique mise en avant (lien reçu). */
+/** Offres d'une même fiche produit, classées (confiance 45 %, prix 40 %, délai 15 %) ; `b` choisit la boutique mise en avant (lien reçu). */
 function pickOffers(cat: Catalog, slug: string, b?: string) {
   const all = cat.products.filter((x) => x.slug === slug);
   const asOffer = (x: ProductView): Offer => ({ id: x.shopSlug, shopId: x.shopSlug, priceGnf: x.priceGnf, shopTrust: trustFor(cat.shops.find((s) => s.slug === x.shopSlug)!), etaMinutes: x.etaMinutes, inStock: x.inStock !== false });
@@ -69,7 +69,11 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
     { key: `${p.slug}|${p.shopSlug}`, categoryId: p.categoryId ?? p.category, priceGnf: p.priceGnf, attributes: p.attributes },
     cat.products.filter((o) => o.slug !== p.slug).map((o) => ({ ...o, key: `${o.slug}|${o.shopSlug}`, categoryId: o.categoryId ?? o.category, shopTrust: trustOf.get(o.shopSlug) })),
   );
-  const sellers = ranked.filter((o) => o.shopSlug !== p.shopSlug);
+  // Concurrence par les prix (HAILANDX.md §39) : toutes les offres, de la moins chère à la plus chère (en stock d'abord).
+  const market = groupByProduct(ranked)[0]!;
+  const cheapest = market.best;
+  const isCheapest = ranked.length > 1 && p.priceGnf <= cheapest.priceGnf;
+  const cheaperElsewhere = ranked.length > 1 && cheapest.shopSlug !== p.shopSlug && cheapest.priceGnf < p.priceGnf ? cheapest : null;
   // Fiche détaillée : marque, « En bref », points forts, tableau des caractéristiques (fiche type de la catégorie).
   const brand = brandOf(p.attributes);
   const facts = keyFacts(p.categoryId, p.attributes);
@@ -114,11 +118,19 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
           <Badge tone={p.condition === 'occasion' ? 'sand' : 'ok'}>{p.condition === 'occasion' ? 'Occasion' : 'Neuf'}</Badge>
           <Badge tone={p.inStock === false ? 'ink' : 'sand'}>{stockText}</Badge>
           {p.category && <Badge>{p.category}</Badge>}
-          {ranked.length > 1 && p.shopSlug === recommended?.shopSlug && <Badge tone="lime">Offre recommandée</Badge>}
-          {ranked.length > 1 && <Badge tone="blue">Proposé par {ranked.length} vendeurs</Badge>}
+          {isCheapest && <Badge tone="lime">Meilleur prix</Badge>}
+          {ranked.length > 1 && p.shopSlug === recommended?.shopSlug && <Badge tone="ok">Offre recommandée</Badge>}
+          {ranked.length > 1 && <a href="#vendeurs"><Badge tone="blue">Proposé par {ranked.length} vendeurs · comparer</Badge></a>}
           {badgesOf(shop).map((x) => <Badge key={x}>{x}</Badge>)}
         </div>
       </div>
+
+      {cheaperElsewhere && (
+        <Link href={`/p/${slug}?b=${cheaperElsewhere.shopSlug}`} className="mx-[18px] flex items-center justify-between gap-3 rounded-2xl bg-lime px-4 py-3 text-ink">
+          <span className="flex min-w-0 flex-col"><span className="text-[13.5px] font-extrabold">Moins cher chez {cat.shops.find((x) => x.slug === cheaperElsewhere.shopSlug)?.name}</span><span className="text-[12px] font-bold">{formatGnf(cheaperElsewhere.priceGnf)}, soit {formatGnf(p.priceGnf - cheaperElsewhere.priceGnf)} de moins</span></span>
+          <span className="shrink-0 text-[12.5px] font-extrabold underline">Voir</span>
+        </Link>
+      )}
 
       {facts.length > 0 && (
         <section aria-label="En bref" className="mx-[18px] grid grid-cols-2 gap-2">
@@ -220,18 +232,30 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </div>
       </section>
 
-      {sellers.length > 0 && (
-        <section aria-label="Autres vendeurs de ce produit" className="flex flex-col gap-2.5 px-[18px]">
-          <h2 className="text-sm font-extrabold">Proposé par {ranked.length} vendeurs</h2>
-          {p.shopSlug === recommended?.shopSlug && <p className="text-[12px] font-semibold text-muted">Vous voyez l’offre recommandée : meilleur équilibre confiance, prix et délai.</p>}
-          {sellers.map((o) => {
+      {ranked.length > 1 && (
+        <section id="vendeurs" aria-label="Comparer les vendeurs de ce produit" className="flex flex-col gap-2.5 px-[18px]">
+          <div className="flex items-baseline justify-between"><h2 className="text-sm font-extrabold">Comparer les {ranked.length} vendeurs</h2><span className="text-[12px] font-bold text-muted">du moins cher au plus cher</span></div>
+          <p className="text-[12px] font-semibold text-muted">Même produit, même fiche : chaque boutique fixe son prix. Hailand recommande le meilleur équilibre prix, confiance et délai.</p>
+          {market.offers.map((o) => {
             const s = cat.shops.find((x) => x.slug === o.shopSlug)!;
-            return (
-              <Link key={o.shopSlug} href={`/p/${slug}?b=${o.shopSlug}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-3.5 py-3">
-                <span className="flex min-w-0 flex-col"><span className="flex items-center gap-1.5 truncate text-[13.5px] font-extrabold">{s.name}<VerifiedMark size={14} /></span><span className="text-[11.5px] font-semibold text-muted">Confiance {trustFor(s)}/100 · ≈ {o.etaMinutes} min{o.inStock === false ? ' · rupture' : ''}</span></span>
-                <span className="flex shrink-0 flex-col items-end gap-1"><Price className="text-[14.5px]">{formatGnf(o.priceGnf)}</Price>{o.shopSlug === recommended?.shopSlug && <Badge tone="lime">Recommandée</Badge>}</span>
-              </Link>
+            const here = o.shopSlug === p.shopSlug;
+            const gap = gapPercent(o.priceGnf, cheapest.priceGnf);
+            const body = (
+              <>
+                <span className="flex min-w-0 flex-col"><span className="flex items-center gap-1.5 truncate text-[13.5px] font-extrabold">{s.name}<VerifiedMark size={14} /></span><span className="text-[11.5px] font-semibold text-muted">Confiance {trustFor(s)}/100 · ≈ {o.etaMinutes} min{o.inStock === false ? ' · rupture' : ''}{here ? ' · vous regardez' : ''}</span></span>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <Price className="text-[14.5px]">{formatGnf(o.priceGnf)}</Price>
+                  <span className="flex gap-1">
+                    {o.shopSlug === cheapest.shopSlug && o.inStock !== false && <Badge tone="lime">Meilleur prix</Badge>}
+                    {gap > 0 && <span className="rounded-full bg-bg px-2 py-0.5 text-[11px] font-extrabold text-muted">+{gap} %</span>}
+                    {o.shopSlug === recommended?.shopSlug && <Badge tone="ok">Recommandée</Badge>}
+                  </span>
+                </span>
+              </>
             );
+            return here
+              ? <div key={o.shopSlug} aria-current="true" className="flex items-center justify-between gap-3 rounded-2xl border-2 border-ink bg-card px-3.5 py-3">{body}</div>
+              : <Link key={o.shopSlug} href={`/p/${slug}?b=${o.shopSlug}`} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-3.5 py-3">{body}</Link>;
           })}
         </section>
       )}
