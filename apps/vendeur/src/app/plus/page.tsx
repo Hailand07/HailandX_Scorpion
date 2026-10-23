@@ -6,7 +6,7 @@ import { maskPhone } from '@hailandx/commerce';
 import { browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
 
-/** Plus : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
+/** Menu (ex-« Plus ») : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
 export default function PlusPage() {
   const router = useRouter();
   const { state, session, shop } = useMyShop();
@@ -19,7 +19,7 @@ export default function PlusPage() {
   const since = new Date(session.user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return (
     <Screen className="gap-[18px] pt-6">
-      <h1 className="font-display text-[26px] font-semibold tracking-tight">Plus</h1>
+      <h1 className="font-display text-[26px] font-semibold tracking-tight">Menu</h1>
 
       {shop && (
         <section aria-label="Ma boutique" className="flex flex-col gap-2">

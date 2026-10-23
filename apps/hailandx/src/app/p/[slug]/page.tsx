@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { ago, brandOf, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
+import { ago, brandOf, discountPercent, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, offerKey, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
@@ -82,7 +82,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
   const together = pairs.flatMap((x) => { const o = cat.products.find((c) => c.productId === x.product_id); return o ? [{ ...o, orders: x.orders }] : []; });
   const answered = questions.filter((x) => x.answer);
   const pending = questions.filter((x) => !x.answer);
-  const viewed = { key: offerKey(p), href: `/p/${p.slug}?b=${shop.slug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shop.name, etaMinutes: p.etaMinutes };
+  const viewed = { key: offerKey(p), href: `/p/${p.slug}?b=${shop.slug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shop.name, etaMinutes: p.etaMinutes, compareAtGnf: p.compareAtGnf };
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">
@@ -107,6 +107,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         <h1 className="font-display text-[22px] font-semibold leading-tight tracking-tight">{p.name}</h1>
         <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
           <Price className="text-[22px]">{formatGnf(p.priceGnf)}</Price>
+          {discountPercent(p.priceGnf, p.compareAtGnf) && <><span className="text-[14px] font-semibold text-muted line-through">{formatGnf(p.compareAtGnf!)}</span><span className="rounded-full bg-ink px-2 py-0.5 text-[12px] font-extrabold text-lime">−{discountPercent(p.priceGnf, p.compareAtGnf)} %</span></>}
           <span className="text-[12.5px] font-semibold text-muted">livré à votre porte ≈ {p.etaMinutes} min</span>
         </div>
         <div className="mt-1 flex flex-wrap gap-1.5">

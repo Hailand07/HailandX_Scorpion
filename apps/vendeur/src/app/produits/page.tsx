@@ -6,7 +6,7 @@ import { BackHeader, browserClient, colorOf, errText, Icon, mediaUrl, Notice, Sc
 import { SellerGate } from '@/components/SellerGate';
 import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
 
-interface Offer { id: string; section_id: string | null; price_gnf: number; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Offer { id: string; section_id: string | null; price_gnf: number; compare_at_gnf: number | null; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Section { id: string; name: string }
 
 /** Produits de ma boutique (v2) : recherche, rayons en puces, visibilité d'un geste ; l'ajout et la modification ont leur écran. */
@@ -30,7 +30,7 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const load = useCallback(async () => {
     if (!sb) return;
     const [o, s] = await Promise.all([
-      sb.from('offers').select('id,section_id,price_gnf,active,photo_paths,offer_variants(stock),catalog_products(name,slug)').eq('shop_id', shopId).order('created_at', { ascending: false }),
+      sb.from('offers').select('id,section_id,price_gnf,compare_at_gnf,active,photo_paths,offer_variants(stock),catalog_products(name,slug)').eq('shop_id', shopId).order('created_at', { ascending: false }),
       sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name'),
     ]);
     setOffers((o.data as unknown as Offer[]) ?? []);
@@ -107,7 +107,7 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
                 {photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-[14px] object-cover" /> : <span className="h-[52px] w-[52px] shrink-0 rounded-[14px]" style={{ background: colorOf(name) }} />}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[14px] font-extrabold">{name}</span>
-                  <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span> · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
+                  <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
                 </span>
               </Link>
               {o.active && o.catalog_products && (

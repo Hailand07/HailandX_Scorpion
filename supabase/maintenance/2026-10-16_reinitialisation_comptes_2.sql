@@ -67,6 +67,11 @@ do $q$ begin
   if to_regclass('public.product_questions') is not null then
     execute 'create table sauvegarde_20261016.product_questions as table public.product_questions';
   end if;
+  -- Codes promo (migration 2026-10-28) : idem.
+  if to_regclass('public.promo_uses') is not null then
+    execute 'create table sauvegarde_20261016.promo_codes as table public.promo_codes';
+    execute 'create table sauvegarde_20261016.promo_uses as table public.promo_uses';
+  end if;
 end $q$;
 create table sauvegarde_20261016.courier_invitations as table public.courier_invitations;
 create table sauvegarde_20261016.account_passages as table public.account_passages;
@@ -78,6 +83,7 @@ do $q$
 declare t text := 'public.notifications, public.dispute_messages, public.disputes, public.review_reports, public.reviews, public.delivery_events, public.ledger_entries, public.payments, public.order_items, public.parcels, public.orders, public.product_favorites, public.shop_follows, public.share_links, public.offer_variants, public.offers, public.shop_sections, public.shop_scores, public.shop_members, public.certification_priorities, public.shops, public.catalog_products, public.couriers, public.console_journal, public.declarations, public.courier_invitations, public.account_passages';
 begin
   if to_regclass('public.product_questions') is not null then t := 'public.product_questions, ' || t; end if;
+  if to_regclass('public.promo_uses') is not null then t := 'public.promo_uses, public.promo_codes, ' || t; end if;
   execute 'truncate table ' || t;
 end $q$;
 

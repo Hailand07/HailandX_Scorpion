@@ -40,7 +40,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const ranked = (category: string, f: CatalogFilters = {}): GridItem[] =>
     buildFeed(candidates, { category, perGroup: Infinity, rotation: Math.floor(Date.now() / 3_600_000) }).filter((c) => matchesFilters(productByKey(c.id)!, f)).map((c) => {
       const p = productByKey(c.id)!;
-      return { key: c.id, href: `/p/${p.slug}?b=${p.shopSlug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shopBySlug(p.shopSlug)?.name ?? '', etaMinutes: p.etaMinutes };
+      return { key: c.id, href: `/p/${p.slug}?b=${p.shopSlug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shopBySlug(p.shopSlug)?.name ?? '', etaMinutes: p.etaMinutes, compareAtGnf: p.compareAtGnf };
     });
   const grid = cat ? ranked(cat, filters) : [];
   const href = (o: Record<string, string | number | undefined>) => {

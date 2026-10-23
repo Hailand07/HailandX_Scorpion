@@ -6,9 +6,9 @@ const FAQ: [string, string][] = [
   ['Comment ouvrir ma boutique ?', 'Trois étapes : repérez votre bâtiment avec NavigationX, créez votre boutique, puis demandez la certification. Un agent Hailand vérifie votre emplacement ; la vente s’ouvre ensuite.'],
   ['Pourquoi je ne peux pas encore ajouter de produits ?', 'Les produits s’ajoutent dès que la vente est ouverte, c’est-à-dire quand l’adresse de votre boutique est certifiée par Hailand.'],
   ['Une commande arrive : que faire ?', 'Onglet Commandes : préparez le colis, imprimez l’étiquette si vous voulez, puis touchez « Colis prêt ». Un livreur Hailand vient le chercher et scanne le QR.'],
-  ['Quand suis-je payé ?', 'L’argent d’une vente vous revient quand le colis est remis au client, commission Hailand déduite. Hailand vous verse ce qui vous est dû ; tout est visible dans Plus, « Argent ».'],
+  ['Quand suis-je payé ?', 'L’argent d’une vente vous revient quand le colis est remis au client, commission Hailand déduite. Hailand vous verse ce qui vous est dû ; tout est visible dans Menu, « Argent ».'],
   ['Un client signale un problème ?', 'Onglet Commandes, « Problèmes » : donnez votre version. L’équipe Hailand lit les deux versions et tranche.'],
-  ['Comment avoir plus de ventes ?', 'Des photos réelles, un stock à jour, une préparation rapide, et des liens suivis partagés sur TikTok et WhatsApp (Plus, « Statistiques »).'],
+  ['Comment avoir plus de ventes ?', 'Des photos réelles, un stock à jour, une préparation rapide, et des liens suivis partagés sur TikTok et WhatsApp (onglet Marketing : liens suivis, codes promo, visuels prêts à publier).'],
 ];
 
 /** Aide aux vendeurs : réponses courtes. */

@@ -3,7 +3,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Wordmark } from '@hailandx/ui';
-import { formatGnf, formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
+import { formatGnf, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
 import { browserClient, Icon, LienHailand, lienEnregistrement, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { currentSource } from '@/lib/source';
@@ -29,6 +29,8 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [pay, setPay] = useState<'livraison' | 'orange_money'>('livraison');
+  const [promo, setPromo] = useState('');
+  const [promoCheck, setPromoCheck] = useState<{ code: string; discount: number; lines: { shop_name: string; discount_gnf: number; reason: string | null }[] } | null>(null);
   const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
 
   useEffect(() => {
@@ -57,12 +59,24 @@ function Checkout() {
     if (!decl) return setError('Choisissez une adresse de livraison.');
     setBusy(true);
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
-    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: pay, p_source: currentSource() });
+    const code = promoCheck && promoCheck.discount > 0 ? promoCheck.code : null;
+    const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: pay, p_source: currentSource(), ...(code ? { p_promo: code } : {}) });
     setBusy(false);
     if (err) return setError(err.message.replace(/^.*?:\s*/, '').slice(0, 200) || 'La commande n’a pas pu être passée.');
     clearCart();
     router.replace(`/commandes/${data as string}`);
   }
+
+  /** Vérifie le code auprès de la base (réduction par boutique du panier) ; la commande le revérifie. */
+  async function checkPromo() {
+    const code = normalizePromoCode(promo);
+    if (code.length < 3) return setPromoCheck(null);
+    const items = lines.map((l) => ({ offer_id: l.offerId, qty: l.qty }));
+    const { data } = await sb!.rpc('fn_promo_check', { p_code: code, p_items: items });
+    const rows = (data as { shop_name: string; discount_gnf: number; reason: string | null }[]) ?? [];
+    setPromoCheck({ code, discount: rows.reduce((a, r) => a + r.discount_gnf, 0), lines: rows });
+  }
+  const discount = promoCheck?.discount ?? 0;
 
   const Head = (
     <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><h1 className="font-display text-[20px] font-semibold">Commande</h1></div>
@@ -109,8 +123,19 @@ function Checkout() {
           </label>
           {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez à l’étape suivante. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
         </section>
+        <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
+          <h2 className="text-[13px] font-extrabold text-muted">Code promo</h2>
+          <div className="flex gap-2">
+            <input value={promo} onChange={(e) => { setPromo(normalizePromoCode(e.target.value)); setPromoCheck(null); }} autoCapitalize="characters" placeholder="Ex. KADI10" aria-label="Code promo" className={`${input} font-display tracking-[0.06em]`} />
+            <button type="button" onClick={checkPromo} disabled={promo.length < 3} className="h-12 shrink-0 rounded-2xl border border-line px-4 text-[14px] font-extrabold disabled:opacity-40">Appliquer</button>
+          </div>
+          {promoCheck && (promoCheck.discount > 0
+            ? <p role="status" className="text-[13px] font-bold text-ok">Code {promoCheck.code} : − {formatGnf(promoCheck.discount)} ({promoCheck.lines.filter((r) => r.discount_gnf > 0).map((r) => r.shop_name).join(', ')}).</p>
+            : <p role="status" className="text-[13px] font-bold text-[#a3321f]">Code non valable : {promoCheck.lines[0]?.reason ?? 'inconnu'}.</p>)}
+        </section>
         <section className="flex flex-col gap-1 text-[13.5px] font-semibold">
           <div className="flex justify-between"><span className="text-muted">Articles</span><span>{formatGnf(cartSubtotal(lines))}</span></div>
+          {discount > 0 && <div className="flex justify-between text-ok"><span>Réduction</span><span>− {formatGnf(discount)}</span></div>}
           <div className="flex justify-between"><span className="text-muted">Livraison</span><span>calculée à la validation</span></div>
         </section>
         {error && <p role="alert" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a1c]">{error}</p>}

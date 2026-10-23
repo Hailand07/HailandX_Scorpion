@@ -10,7 +10,7 @@ import { ShareSheet } from './ShareSheet';
 interface Variant { key: number; id: string; label: string; stock: number }
 interface Section { id: string; name: string }
 interface Cat { id: string; name: string }
-interface Existing { id: string; price_gnf: number; section_id: string | null; active: boolean; photo_paths: string[] | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { id: string; name: string; slug: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null; created_by: string | null } | null }
+interface Existing { id: string; price_gnf: number; compare_at_gnf: number | null; section_id: string | null; active: boolean; photo_paths: string[] | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { id: string; name: string; slug: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null; created_by: string | null } | null }
 interface Linked { id: string; name: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null }
 
 const MAX_PHOTOS = 5;
@@ -37,6 +37,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   const [condition, setCondition] = useState<'neuf' | 'occasion'>('neuf');
   const [note, setNote] = useState('');
   const [price, setPrice] = useState('');
+  const [compareAt, setCompareAt] = useState('');
   const [variants, setVariants] = useState<Variant[]>([{ key: 0, id: '', label: '', stock: 1 }]);
   const [removed, setRemoved] = useState<string[]>([]);
   const [section, setSection] = useState<string | null>(null);
@@ -55,11 +56,11 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
     sb.from('shop_sections').select('id,name').eq('shop_id', shop.id).order('position').order('name').then(({ data }) => setSections((data as Section[]) ?? []));
     sb.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? []));
     if (!offerId) return;
-    sb.from('offers').select('id,price_gnf,section_id,active,photo_paths,description,condition,offer_variants(id,label,stock),catalog_products(id,name,slug,category_id,description,attributes,created_by)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
+    sb.from('offers').select('id,price_gnf,compare_at_gnf,section_id,active,photo_paths,description,condition,offer_variants(id,label,stock),catalog_products(id,name,slug,category_id,description,attributes,created_by)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
       const o = (data as unknown as Existing | null) ?? null;
       setExisting(o);
       if (!o) return;
-      setPrice(String(o.price_gnf)); setSection(o.section_id); setActive(o.active); setKept(o.photo_paths ?? []);
+      setPrice(String(o.price_gnf)); setCompareAt(o.compare_at_gnf ? String(o.compare_at_gnf) : ''); setSection(o.section_id); setActive(o.active); setKept(o.photo_paths ?? []);
       setCondition(o.condition ?? 'neuf'); setNote(o.description ?? '');
       const cp = o.catalog_products;
       if (cp) { setCat(cp.category_id); setDesc(cp.description ?? ''); const d = readAttributes(cp.attributes); setValues(d.values); setPoints([...d.points, '', '', ''].slice(0, Math.max(3, d.points.length))); }
@@ -84,6 +85,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
 
   const setVar = (key: number, patch: Partial<Variant>) => setVariants((vs) => vs.map((v) => (v.key === key ? { ...v, ...patch } : v)));
   const priceN = Number(price.replace(/\s/g, ''));
+  const compareN = Number(compareAt.replace(/\s/g, '')) || null;
 
   // Fiche modifiable : nouvelle fiche, ou fiche que ce vendeur a créée ; sinon on n'ajoute que son offre (état, mot du vendeur).
   const ownFiche = editing ? existing?.catalog_products?.created_by === uid : !linked;
@@ -97,6 +99,7 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
     try {
       if (!editing && name.trim().length < 2) throw new Error('Donnez un nom au produit.');
       if (!Number.isFinite(priceN) || priceN < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
+      if (compareN && compareN <= priceN) throw new Error('Le prix barré doit être plus élevé que le prix de vente (ou laissez-le vide).');
       if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
       if (new Set(rows.map((r) => r.label.toLowerCase())).size !== rows.length) throw new Error('Deux variantes portent le même nom.');
       if (desc.length > FICHE_LIMITS.description) throw new Error(`Description trop longue (${FICHE_LIMITS.description} caractères au plus).`);
@@ -118,14 +121,14 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
           const { data } = await sb!.from('catalog_products').select('slug').eq('id', productId).maybeSingle();
           slug = (data as { slug: string } | null)?.slug ?? '';
         }
-        const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop.id, product_id: productId, section_id: section, price_gnf: Math.round(priceN), photo_paths: photos, condition, description: note.trim() || null }).select('id').single();
+        const { data: off, error: e2 } = await sb!.from('offers').insert({ shop_id: shop.id, product_id: productId, section_id: section, price_gnf: Math.round(priceN), compare_at_gnf: compareN ? Math.round(compareN) : null, photo_paths: photos, condition, description: note.trim() || null }).select('id').single();
         if (e2?.code === '23505') throw new Error('Vous proposez déjà ce produit : modifiez-le dans la liste.');
         if (e2) throw new Error(errText(e2));
         const { error: e3 } = await sb!.from('offer_variants').insert(rows.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
         if (e3) throw new Error(errText(e3));
         setPublished({ slug, name: linked?.name ?? name.trim(), offerId: (off as { id: string }).id });
       } else {
-        const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), section_id: section, active, photo_paths: photos, condition, description: note.trim() || null }).eq('id', offerId!);
+        const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), compare_at_gnf: compareN ? Math.round(compareN) : null, section_id: section, active, photo_paths: photos, condition, description: note.trim() || null }).eq('id', offerId!);
         if (error) throw new Error(errText(error));
         // Fiche commune : seul son créateur la complète (la base le vérifie aussi).
         if (ownFiche && existing?.catalog_products) {
@@ -204,6 +207,12 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix
           <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
             <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="185 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
+            <span className="text-[13px] font-extrabold text-muted">GNF</span>
+          </span>
+        </label>
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[11.5px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
+          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
+            <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="numeric" placeholder="210 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
             <span className="text-[13px] font-extrabold text-muted">GNF</span>
           </span>
         </label>

@@ -7,7 +7,7 @@ import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
-interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
+interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; discount_gnf: number; promo_code: string | null; cancel_reason: string | null; cancelled_by: string | null; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
 
 const STEPS = [
   { key: 'confirmee', label: 'Confirmée', help: 'Le vendeur prépare votre colis.' },
@@ -33,7 +33,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,payment_status,created_at').eq('id', id).maybeSingle();
     if (!o.data) { setMissing(true); return; }
     setOrder(o.data as Order);
-    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,shops(name,slug),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
+    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,discount_gnf,promo_code,cancel_reason,cancelled_by,shops(name,slug),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
     const list = (p.data as unknown as Parcel[]) ?? [];
     setParcels(list);
     const c: Record<string, string> = {};
@@ -79,7 +79,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 {['accepte', 'retire'].includes(p.status) && <TrackingMap parcelId={p.id} />}
                 {['remis', 'litige'].includes(p.status) && <ProofPhoto parcelId={p.id} />}
                 <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ""}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
+                {p.discount_gnf > 0 && <div className="flex justify-between text-[12.5px] font-bold text-ok"><span>Code promo {p.promo_code}</span><span>− {formatGnf(p.discount_gnf)}</span></div>}
                 <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>
+                {p.status === 'annule' && p.cancel_reason && <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé {p.cancelled_by === 'vendeur' ? 'par la boutique' : p.cancelled_by === 'equipe' ? 'par l’équipe Hailand' : ''} : « {p.cancel_reason} »{order.payment_method === 'orange_money' ? ' — vous êtes remboursé.' : ''}</p>}
                 {codes[p.id] && (p.status === 'accepte' || p.status === 'retire') && (
                   <div className="flex flex-col items-center gap-1 rounded-2xl bg-lime px-4 py-3">
                     <span className="text-[12px] font-extrabold">Code de remise — à donner au livreur à la porte</span>
@@ -94,7 +96,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             );
           })}
           <div className="flex flex-col gap-1 rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">
-            <div className="flex justify-between"><span className="text-muted">Articles</span><span>{formatGnf(order.subtotal_gnf)}</span></div>
+            <div className="flex justify-between"><span className="text-muted">Articles{parcels.some((x) => x.discount_gnf > 0) ? ' (après réduction)' : ''}</span><span>{formatGnf(order.subtotal_gnf)}</span></div>
             <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{formatGnf(order.delivery_fee_gnf)}</span></div>
             <div className="flex justify-between text-[15px] font-extrabold"><span>Total {order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
           </div>

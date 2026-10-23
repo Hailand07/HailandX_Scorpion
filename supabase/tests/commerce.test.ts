@@ -230,7 +230,7 @@ describe('Flotte : préparation, mission, QR, retrait', () => {
     await db.exec(`update couriers set cash_balance_gnf = 490000, cash_limit_gnf = 500000 where user_id = '${U.livreur2}'`);
     expect(await as(db, U.livreur2, () => refused(db.query('select fn_courier_accept($1)', [p3])))).toMatch(/plafond/);
     expect((await one<{ status: string }>('select status from parcels where id = $1', [p3])).status).toBe('mission_proposee');
-    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1)', [p3]));
+    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1, $2)', [p3, 'Rupture de stock']));
   });
 
   it('retrait : le QR du colis signé, scanné par le livreur attribué, fait passer le colis « en route »', async () => {

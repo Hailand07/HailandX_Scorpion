@@ -5,18 +5,19 @@ import { usePathname } from 'next/navigation';
 import { browserClient, Icon, useSession } from '@hailandx/kit';
 
 /** Écrans plein écran ou de démarrage : pas de barre du bas. */
-const HIDDEN = ['/connexion', '/ouvrir', '/produits/', '/commandes/etiquette', '/compte/supprimer'];
+const HIDDEN = ['/connexion', '/ouvrir', '/produits/', '/commandes/', '/marketing/', '/compte/supprimer'];
 
 const svg = (d: React.ReactNode, active: boolean) => <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{d}</svg>;
 const TABS = [
-  { href: '/', label: 'Tableau de bord', match: (p: string) => p === '/', icon: <><rect x="3" y="3" width="7" height="9" rx="1.5" /><rect x="14" y="3" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /></> },
+  { href: '/', label: 'Accueil', match: (p: string) => p === '/', icon: <><path d="M3 11 12 3l9 8" /><path d="M5 10v10h14V10" /></> },
   { href: '/commandes', label: 'Commandes', match: (p: string) => p.startsWith('/commandes'), icon: <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="m3 8 9 5 9-5" /><path d="M12 13v8" /></> },
   { href: '/produits', label: 'Produits', match: (p: string) => p.startsWith('/produits'), icon: <><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" /><path d="M7.5 7.5h.01" /></> },
-  { href: '/plus', label: 'Plus', match: (p: string) => ['/plus', '/argent', '/statistiques', '/avis', '/reglages', '/notifications', '/aide'].some((x) => p.startsWith(x)), icon: <><circle cx="5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="19" cy="12" r="1.6" /></> },
+  { href: '/marketing', label: 'Marketing', match: (p: string) => p.startsWith('/marketing'), icon: <><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></> },
+  { href: '/plus', label: 'Menu', match: (p: string) => ['/plus', '/argent', '/statistiques', '/avis', '/questions', '/reglages', '/notifications', '/aide'].some((x) => p.startsWith(x)), icon: <path d="M4 6h16M4 12h16M4 18h16" /> },
 ];
 
 /**
- * Barre du bas de HailandX Vendeur : Tableau de bord, Commandes, Produits, Plus.
+ * Barre du bas de HailandX Vendeur (maquettes v6) : Accueil, Commandes, Produits, Marketing, Menu. Rien de ce qui est ici n'est répété sur l'accueil.
  * Elle n'apparaît qu'une fois la vente ouverte ; avant, l'application est un seul parcours (ouvrir ma boutique).
  */
 export function VendeurNav() {
@@ -43,7 +44,7 @@ export function VendeurNav() {
   return (
     <>
       <div aria-hidden="true" className="h-[88px]" />
-      <nav aria-label="Navigation de HailandX Vendeur" className="fixed inset-x-0 bottom-0 z-40 mx-auto grid max-w-md grid-cols-4 border-t border-line bg-card/[0.97] px-2 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+      <nav aria-label="Navigation de HailandX Vendeur" className="fixed inset-x-0 bottom-0 z-40 mx-auto grid max-w-md grid-cols-5 border-t border-line bg-card/[0.97] px-2 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         {TABS.map((t) => {
           const active = t.match(path);
           const badge = t.href === '/commandes' ? toPrepare : 0;
