@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BackHeader, browserClient, errText, HAILANDX_URL, LienHailand, Notice, Screen } from '@hailandx/kit';
 import { ago } from '@hailandx/commerce';
 import { SellerGate } from '@/components/SellerGate';
+import { Chargement } from '@hailandx/ui';
 
 interface Q { id: string; product_slug: string; product_name: string; question: string; answer: string | null; answered_by_me: boolean | null; answered_at: string | null; created_at: string }
 
@@ -40,7 +41,7 @@ function Questions({ shopId }: { shopId: string }) {
       <p className="text-[13px] font-semibold leading-relaxed text-muted">Les acheteurs posent leurs questions sur la fiche de vos produits. Votre réponse s’affiche pour tout le monde : une réponse rapide et précise fait vendre.</p>
       {list && list.length > 0 && <p className="text-[13px] font-extrabold">{waiting > 0 ? `${waiting} question${waiting > 1 ? 's' : ''} sans réponse` : 'Toutes les questions ont une réponse.'}</p>}
       <Notice msg={msg} />
-      {list === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {list === null && <Chargement />}
       {list?.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-semibold text-muted">Aucune question pour l’instant.</p>}
       {list?.map((q) => (
         <article key={q.id} className="flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">

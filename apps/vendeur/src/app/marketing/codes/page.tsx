@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { formatGnf, isPromoCode, normalizePromoCode, type PromoKind, promoLabel } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, Notice, Screen, Switch } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { Chargement } from '@hailandx/ui';
 
 interface Code { id: string; code: string; kind: PromoKind; value: number; min_subtotal_gnf: number; max_uses: number | null; once_per_buyer: boolean; ends_at: string | null; active: boolean; promo_uses: { discount_gnf: number }[] }
 const field = 'h-12 w-full min-w-0 rounded-xl bg-bg px-3 text-[15px] font-bold outline-none focus:ring-2 focus:ring-blue';
@@ -38,7 +39,7 @@ function Codes({ shopId, shopName }: { shopId: string; shopName: string }) {
       <Notice msg={msg} />
       {!form && <button type="button" onClick={() => setForm(true)} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white">+ Nouveau code promo</button>}
       {form && <NewCode shopId={shopId} shopName={shopName} onCancel={() => setForm(false)} onSaved={async (code) => { setForm(false); setMsg({ tone: 'ok', text: `Code ${code} créé : donnez-le à vos clients (statut WhatsApp, bio TikTok…).` }); await load(); }} />}
-      {codes === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {codes === null && <Chargement />}
       {codes?.length === 0 && !form && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">Aucun code pour l’instant. Un code comme « BIENVENUE » aide un nouveau client à passer sa première commande.</p>}
       {codes?.map((c) => {
         const expired = c.ends_at !== null && new Date(c.ends_at) <= new Date();

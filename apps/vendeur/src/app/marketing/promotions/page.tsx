@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { discountPercent, formatGnf } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, Icon, mediaUrl, Notice, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { Chargement } from '@hailandx/ui';
 
 interface Offer { id: string; price_gnf: number; compare_at_gnf: number | null; photo_paths: string[] | null; catalog_products: { name: string; photo_paths: string[] | null } | null }
 const PCTS = [5, 10, 15, 20, 30];
@@ -41,7 +42,7 @@ function Promotions({ shopId }: { shopId: string }) {
       <BackHeader href="/marketing" title="Promotions" />
       <p className="text-[13px] font-semibold leading-relaxed text-muted">Baissez un prix : l’ancien reste affiché barré sur HailandX avec le pourcentage. Sur l’honneur : l’ancien prix doit être celui que vous pratiquiez vraiment.</p>
       <Notice msg={msg} />
-      {offers === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {offers === null && <Chargement />}
       {offers?.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">Aucun produit en vente.</p>}
       {list.map((o) => {
         const base = o.compare_at_gnf ?? o.price_gnf;

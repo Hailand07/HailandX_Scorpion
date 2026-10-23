@@ -1,12 +1,13 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatGnf } from '@hailandx/commerce';
+import { formatGnf, gapPercent } from '@hailandx/commerce';
 import { BackHeader, browserClient, colorOf, errText, Icon, mediaUrl, Notice, Screen, Switch } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
+import { Chargement } from '@hailandx/ui';
 
-interface Offer { id: string; section_id: string | null; price_gnf: number; compare_at_gnf: number | null; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
+interface Offer { id: string; section_id: string | null; price_gnf: number; compare_at_gnf: number | null; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; product_id: string; catalog_products: { name: string; slug: string } | null }
 interface Section { id: string; name: string }
 
 /** Produits de ma boutique : recherche, rayons en puces, visibilité d'un geste, sélection groupée (masquer, afficher, promotion) ; l'ajout, la modification et la duplication ont leur écran. */
@@ -18,6 +19,7 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const [sharing, setSharing] = useState<ShareTarget | null>(null);
   const sb = browserClient();
   const [offers, setOffers] = useState<Offer[] | null>(null);
+  const [market, setMarket] = useState<Map<string, number>>(new Map());
   const [sections, setSections] = useState<Section[]>([]);
   const [rayon, setRayon] = useState<string>('tous');
   const [q, setQ] = useState('');
@@ -33,11 +35,20 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const load = useCallback(async () => {
     if (!sb) return;
     const [o, s] = await Promise.all([
-      sb.from('offers').select('id,section_id,price_gnf,compare_at_gnf,active,photo_paths,offer_variants(stock),catalog_products(name,slug)').eq('shop_id', shopId).order('created_at', { ascending: false }),
+      sb.from('offers').select('id,section_id,price_gnf,compare_at_gnf,active,photo_paths,product_id,offer_variants(stock),catalog_products(name,slug)').eq('shop_id', shopId).order('created_at', { ascending: false }),
       sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name'),
     ]);
-    setOffers((o.data as unknown as Offer[]) ?? []);
+    const mine = (o.data as unknown as Offer[]) ?? [];
+    setOffers(mine);
     setSections((s.data as Section[]) ?? []);
+    // Concurrence par les prix (HAILANDX.md §39) : meilleur prix des AUTRES boutiques sur les mêmes fiches.
+    const ids = [...new Set(mine.map((x) => x.product_id))];
+    if (ids.length) {
+      const { data } = await sb.from('offers').select('product_id,price_gnf,shops!inner(status)').in('product_id', ids.slice(0, 300)).eq('active', true).neq('shop_id', shopId).eq('shops.status', 'ouverte');
+      const best = new Map<string, number>();
+      for (const r of (data as { product_id: string; price_gnf: number }[] | null) ?? []) best.set(r.product_id, Math.min(best.get(r.product_id) ?? Infinity, r.price_gnf));
+      setMarket(best);
+    }
   }, [sb, shopId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -113,7 +124,7 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
       {current && <button type="button" onClick={() => removeSection(current)} className="self-start text-[12.5px] font-bold text-muted underline">Supprimer le rayon « {current.name} »</button>}
       <Notice msg={msg} />
 
-      {offers === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {offers === null && <Chargement />}
       {offers && all.length === 0 && (
         <div className="flex flex-col items-center gap-2 rounded-[22px] border border-dashed border-line px-5 py-8 text-center">
           <p className="text-[15px] font-extrabold">Aucun produit pour l’instant</p>
@@ -138,6 +149,9 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[14px] font-extrabold">{name}</span>
                   <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
+                  {market.has(o.product_id) && (o.price_gnf <= market.get(o.product_id)!
+                    ? <span className="text-[11.5px] font-extrabold text-ok">Meilleur prix sur HailandX</span>
+                    : <span className={`text-[11.5px] font-extrabold ${gapPercent(o.price_gnf, market.get(o.product_id)!) > 15 ? 'text-[#9a2b16]' : 'text-[#9a6b00]'}`}>+{gapPercent(o.price_gnf, market.get(o.product_id)!)} % au-dessus du meilleur prix ({formatGnf(market.get(o.product_id)!)})</span>)}
                 </span>
               </Link>
               {!selecting && o.active && o.catalog_products && (

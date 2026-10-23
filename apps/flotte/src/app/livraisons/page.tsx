@@ -7,6 +7,7 @@ import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { Stat, WARN } from '@/components/Frame';
 import { Ico } from '@/components/Icons';
+import { Chargement } from '@hailandx/ui';
 
 interface Row { id: string; delivered_at: string; delivery_fee_gnf: number; cod_amount_gnf: number; distance_km: number | null; shops: { name: string } | null }
 interface Cash { cash_balance_gnf: number; cash_limit_gnf: number }
@@ -67,7 +68,7 @@ export default function Livraisons() {
         {cash && cash.cash_balance_gnf >= cash.cash_limit_gnf && <p className={WARN}>Plafond atteint : reversez vos espèces à l’équipe Hailand.</p>}
       </section>
 
-      {rows === null && <p className="text-[14px] font-medium text-night-muted">Chargement…</p>}
+      {rows === null && <Chargement />}
       {rows?.length === 0 && <p className="text-[14px] font-medium text-night-muted">Aucune livraison terminée pour l’instant.</p>}
       {groups.map(([day, list]) => (
         <section key={day} aria-label={day} className="flex flex-col gap-2">

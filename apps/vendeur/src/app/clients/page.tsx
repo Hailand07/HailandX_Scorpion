@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { formatGnf } from '@hailandx/commerce';
 import { BackHeader, browserClient, Chips, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { Chargement } from '@hailandx/ui';
 
 interface Client { client: string; quartier: string | null; orders: number; total_gnf: number; first_at: string; last_at: string }
 type Filter = 'tous' | 'fideles' | 'partis';
@@ -44,7 +45,7 @@ function Clients({ shopId }: { shopId: string }) {
         ))}
       </div>
       <Chips label="Filtrer les clients" value={filter} onChange={setFilter} items={[{ id: 'tous', label: 'Tous' }, { id: 'fideles', label: `Fidèles · ${loyal.length}` }, { id: 'partis', label: `Pas revenus depuis 30 j · ${gone.length}` }]} />
-      {rows === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {rows === null && <Chargement />}
       {rows && list.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">{all.length === 0 ? 'Vos clients apparaîtront ici après leur première commande.' : 'Personne dans ce filtre.'}</p>}
       {list.length > 0 && (
         <section className="overflow-hidden rounded-[22px] border border-line-soft bg-card">

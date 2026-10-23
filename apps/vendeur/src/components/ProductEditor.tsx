@@ -6,6 +6,8 @@ import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, formatGnf, r
 import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
+import { PriceCompare } from './PriceCompare';
+import { Chargement } from '@hailandx/ui';
 
 interface Variant { key: number; id: string; label: string; stock: number }
 interface Section { id: string; name: string }
@@ -170,7 +172,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       </Screen>
     );
   }
-  if (existing === undefined) return <Screen><BackHeader icon="close" href="/produits" title="Modifier le produit" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (existing === undefined) return <Screen><BackHeader icon="close" href="/produits" title="Modifier le produit" label="Fermer" /><Chargement /></Screen>;
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
   const nPhotos = kept.length + files.length;
@@ -216,6 +218,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
             <span className="text-[13px] font-extrabold text-muted">GNF</span>
           </span>
         </label>
+        <PriceCompare productId={editing ? existing?.catalog_products?.id : linked?.id} shopId={shop.id} price={Number.isFinite(priceN) ? priceN : 0} />
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[11.5px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
           <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
             <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="numeric" placeholder="210 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />

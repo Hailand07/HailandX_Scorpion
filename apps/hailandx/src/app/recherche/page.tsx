@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Badge, PhotoSlot, VerifiedMark } from '@hailandx/ui';
-import { formatGnf } from '@hailandx/commerce';
+import { formatGnf, groupByProduct } from '@hailandx/commerce';
 import { getCatalog, norm, offerKey, trustFor } from '@/lib/catalog';
 import { RecentSearches, RememberSearch } from '@/components/RecentSearches';
 
@@ -32,8 +32,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
   const hit = (text: string) => words.every((w) => norm(text).includes(w));
   const shopHits = words.length ? shops.filter((s) => hit(`${s.name} ${s.tagline}`)) : [];
   const trustOf = (slug: string) => { const sh = shops.find((x) => x.slug === slug); return sh ? trustFor(sh) : 0; };
-  let productHits = words.length || filtered ? products.filter((p) => (!words.length || hit(`${p.name} ${p.category} ${shops.find((s) => s.slug === p.shopSlug)?.name ?? ''}`))
-    && (!cat || p.category === cat) && (!min || p.priceGnf >= min) && (!max || p.priceGnf <= max) && (!delai || p.etaMinutes <= delai) && (!confiance || trustOf(p.shopSlug) >= 70)) : [];
+  // Un produit vendu par plusieurs boutiques = une seule ligne, au meilleur prix parmi les offres retenues (HAILANDX.md §39).
+  let productHits = groupByProduct(words.length || filtered ? products.filter((p) => (!words.length || hit(`${p.name} ${p.category} ${shops.find((s) => s.slug === p.shopSlug)?.name ?? ''}`))
+    && (!cat || p.category === cat) && (!min || p.priceGnf >= min) && (!max || p.priceGnf <= max) && (!delai || p.etaMinutes <= delai) && (!confiance || trustOf(p.shopSlug) >= 70)) : []).map((g) => ({ ...g.best, sellers: g.sellers }));
   if (tri === 'prix_asc') productHits = [...productHits].sort((a, b) => a.priceGnf - b.priceGnf);
   else if (tri === 'prix_desc') productHits = [...productHits].sort((a, b) => b.priceGnf - a.priceGnf);
   else if (tri === 'delai') productHits = [...productHits].sort((a, b) => a.etaMinutes - b.etaMinutes);
@@ -114,8 +115,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
             return (
               <Link key={offerKey(p)} href={`/p/${p.slug}?b=${p.shopSlug}`} className="flex items-center gap-3 rounded-[18px] border border-line-soft bg-card p-2.5">
                 <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-[14px]"><PhotoSlot src={p.photoUrl} color={p.color} className="h-14" label={p.name} /></span>
-                <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate text-[14px] font-extrabold">{p.name}</span><span className="truncate text-[12px] font-semibold text-muted">{shop?.name} · ≈ {p.etaMinutes} min</span></span>
-                <span className="shrink-0 font-display text-[14px] font-semibold">{formatGnf(p.priceGnf)}</span>
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5"><span className="truncate text-[14px] font-extrabold">{p.name}</span><span className="truncate text-[12px] font-semibold text-muted">{p.sellers > 1 ? <span className="font-extrabold text-blue-ink">{p.sellers} vendeurs</span> : shop?.name} · ≈ {p.etaMinutes} min</span></span>
+                <span className="flex shrink-0 flex-col items-end">{p.sellers > 1 && <span className="text-[10.5px] font-bold text-muted">dès</span>}<span className="font-display text-[14px] font-semibold">{formatGnf(p.priceGnf)}</span></span>
               </Link>
             );
           })}

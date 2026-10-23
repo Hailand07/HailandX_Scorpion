@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { browserClient, Icon, ICONS, useSession, signOutHailand } from '@hailandx/kit';
 import { phoneText } from '@/lib/format';
+import { Chargement } from '@hailandx/ui';
 
 /** Chiffres de la vue d'ensemble (fn_console_overview) : servent aussi aux pastilles de la barre latérale. */
 export interface Overview {
@@ -68,7 +69,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
 
   if (path === '/connexion') return <>{children}</>;
   if (!sb) return <Center title="Base non configurée" text="Les variables publiques Supabase manquent sur ce déploiement." />;
-  if (session === undefined || session === null || access === 'chargement') return <Center title="Hailand Console" text="Chargement…" />;
+  if (session === undefined || session === null || access === 'chargement') return <Chargement />;
   if (access === 'refuse') {
     return (
       <Center title="Réservé à l’équipe Hailand" text="Ce numéro n’a pas accès à la console. Si vous faites partie de l’équipe, demandez au fondateur de vous ajouter.">

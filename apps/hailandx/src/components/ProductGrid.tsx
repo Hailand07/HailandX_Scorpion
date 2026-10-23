@@ -5,13 +5,16 @@ import { useEffect, useRef, useState } from 'react';
 import { PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
 import { discountPercent, formatGnf } from '@hailandx/commerce';
 
-export interface GridItem { key: string; href: string; name: string; priceGnf: number; photoUrl: string | null; color: string; shopName: string; etaMinutes: number; compareAtGnf?: number | null }
+export interface GridItem { key: string; href: string; name: string; priceGnf: number; photoUrl: string | null; color: string; shopName: string; etaMinutes: number; compareAtGnf?: number | null;
+  /** Nombre de boutiques qui vendent ce produit : à partir de 2, la carte annonce « dès … » et « N vendeurs » au lieu de la boutique. */
+  sellers?: number }
 
 const PAGE = 16;
 
-/** Carte produit commune (grille et rangées) : photo, nom, prix, boutique. */
+/** Carte produit commune (grille et rangées) : photo, nom, prix, boutique (ou nombre de vendeurs quand plusieurs boutiques le proposent). */
 export function ProductCard({ p, wide = false }: { p: GridItem; wide?: boolean }) {
   const pct = discountPercent(p.priceGnf, p.compareAtGnf);
+  const many = (p.sellers ?? 1) > 1;
   return (
     <Link href={p.href} className={`flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card ${wide ? '' : 'w-[150px] shrink-0 snap-start'}`}>
       <span className="relative block">
@@ -21,8 +24,10 @@ export function ProductCard({ p, wide = false }: { p: GridItem; wide?: boolean }
       </span>
       <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
         <span className="line-clamp-2 min-h-[2.4em] text-[13px] font-bold leading-tight">{p.name}</span>
-        <span className="flex flex-wrap items-baseline gap-x-1.5"><Price className="text-[15px]">{formatGnf(p.priceGnf)}</Price>{pct && <span className="text-[11.5px] font-semibold text-muted line-through">{formatGnf(p.compareAtGnf!)}</span>}</span>
-        <span className="flex min-w-0 items-center gap-1 text-[11.5px] font-semibold text-muted"><VerifiedMark size={13} /><span className="truncate">{p.shopName}</span></span>
+        <span className="flex flex-wrap items-baseline gap-x-1.5">{many && <span className="text-[11px] font-bold text-muted">dès</span>}<Price className="text-[15px]">{formatGnf(p.priceGnf)}</Price>{pct && <span className="text-[11.5px] font-semibold text-muted line-through">{formatGnf(p.compareAtGnf!)}</span>}</span>
+        {many
+          ? <span className="flex min-w-0 items-center gap-1 text-[11.5px] font-extrabold text-blue-ink"><span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue" /><span className="truncate">{p.sellers} vendeurs · comparez</span></span>
+          : <span className="flex min-w-0 items-center gap-1 text-[11.5px] font-semibold text-muted"><VerifiedMark size={13} /><span className="truncate">{p.shopName}</span></span>}
       </span>
     </Link>
   );

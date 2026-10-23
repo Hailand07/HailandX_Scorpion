@@ -8,3 +8,4 @@ export * from './dashboard';
 export * from './fiche';
 export * from './promo';
 export * from './hours';
+export * from './market';

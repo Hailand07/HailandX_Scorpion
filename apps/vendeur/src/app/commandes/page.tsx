@@ -5,6 +5,7 @@ import { formatGnf, type ParcelStatus, sellerTab, type SellerTab } from '@hailan
 import { browserClient, Chips, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { orderCode, payLabel, statusPill } from '@/lib/orders';
+import { Chargement } from '@hailandx/ui';
 
 interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; discount_gnf: number; created_at: string; orders: { payment_method: string; payment_status: string } | null; order_items: { id: string; name_snapshot: string; quantity: number }[] }
 
@@ -48,7 +49,7 @@ function Orders({ shopId }: { shopId: string }) {
         { id: 'preparer', label: `À préparer${count('preparer') ? ` · ${count('preparer')}` : ''}` }, { id: 'route', label: `En livraison${count('route') ? ` · ${count('route')}` : ''}` },
         { id: 'terminees', label: 'Terminées' }, { id: 'problemes', label: `Problèmes${count('problemes') ? ` · ${count('problemes')}` : ''}` },
       ]} />}
-      {parcels === null && <p className="text-[14px] font-semibold text-muted">Chargement…</p>}
+      {parcels === null && <Chargement />}
       {parcels && list.length === 0 && (
         <p className="mt-2 rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">
           {needle ? 'Aucune commande ne correspond.' : tab === 'problemes' ? 'Aucun problème signalé. Bravo.' : tab === 'preparer' ? 'Rien à préparer pour l’instant. Partagez un produit depuis Marketing pour attirer des clients.' : 'Rien ici pour l’instant.'}

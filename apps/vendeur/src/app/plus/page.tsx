@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { maskPhone } from '@hailandx/commerce';
 import { browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
+import { Chargement } from '@hailandx/ui';
 
 /** Menu (ex-« Plus ») : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
 export default function PlusPage() {
@@ -13,7 +14,7 @@ export default function PlusPage() {
   const [unread, setUnread] = useState(0);
   useEffect(() => { if (state === 'visiteur') router.replace('/connexion?next=/plus'); }, [state, router]);
   useEffect(() => { const sb = browserClient(); if (sb && session) void unreadNotifications(sb, 'vendeur').then(setUnread); }, [session]);
-  if (state !== 'pret' || !session) return <Screen className="pt-6"><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (state !== 'pret' || !session) return <Screen className="pt-6"><Chargement /></Screen>;
 
   const open = shop?.status === 'ouverte';
   const owner = shop?.role === 'proprietaire';

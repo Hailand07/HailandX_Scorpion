@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Wordmark } from '@hailandx/ui';
-import { brandsOf, buildFeed, formatGnf, matchesFilters, parseFilters, type CatalogFilters, type FeedCandidate } from '@hailandx/commerce';
+import { brandsOf, buildFeed, formatGnf, groupByProduct, matchesFilters, parseFilters, type CatalogFilters, type FeedCandidate } from '@hailandx/commerce';
 import { getCatalog, offerKey, trustFor } from '@/lib/catalog';
 import { DeliverTo } from '@/components/DeliverTo';
 import { LienHailand, NotificationBell, VENDEUR_URL } from '@hailandx/kit';
@@ -21,14 +21,17 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const sp = await searchParams;
   const { cat: catParam, compte, tri: triParam } = sp;
   const { shops: SHOPS, products: PRODUCTS, source } = await getCatalog();
+  // Concurrence par les prix (HAILANDX.md §39) : un produit vendu par plusieurs boutiques = UNE carte, au meilleur prix en stock.
+  const groups = groupByProduct(PRODUCTS);
+  const groupOf = new Map(groups.map((g) => [g.slug, g]));
   const counts = new Map<string, number>();
-  for (const p of PRODUCTS) counts.set(p.category, (counts.get(p.category) ?? 0) + 1);
+  for (const g of groups) counts.set(g.best.category, (counts.get(g.best.category) ?? 0) + 1);
   const CATEGORIES = [...counts.keys()].sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b, 'fr'));
   const cat = catParam && CATEGORIES.includes(catParam) ? catParam : undefined;
   const tri: Tri = triParam && triParam in TRIS ? (triParam as Tri) : 'pertinence';
   const shopBySlug = (slug: string) => SHOPS.find((s) => s.slug === slug);
   const productByKey = (key: string) => PRODUCTS.find((p) => offerKey(p) === key);
-  const candidates: FeedCandidate[] = PRODUCTS.map((p) => {
+  const candidates: FeedCandidate[] = groups.map(({ best: p }) => {
     const shop = shopBySlug(p.shopSlug)!;
     return { id: offerKey(p), shopId: shop.slug, category: p.category, score: p.score, shopTrust: trustFor(shop), shopIsNew: shop.isNew, etaMinutes: p.etaMinutes };
   });
@@ -40,7 +43,7 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ c
   const ranked = (category: string, f: CatalogFilters = {}): GridItem[] =>
     buildFeed(candidates, { category, perGroup: Infinity, rotation: Math.floor(Date.now() / 3_600_000) }).filter((c) => matchesFilters(productByKey(c.id)!, f)).map((c) => {
       const p = productByKey(c.id)!;
-      return { key: c.id, href: `/p/${p.slug}?b=${p.shopSlug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shopBySlug(p.shopSlug)?.name ?? '', etaMinutes: p.etaMinutes, compareAtGnf: p.compareAtGnf };
+      return { key: c.id, href: `/p/${p.slug}?b=${p.shopSlug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shopBySlug(p.shopSlug)?.name ?? '', etaMinutes: p.etaMinutes, compareAtGnf: p.compareAtGnf, sellers: groupOf.get(p.slug)?.sellers };
     });
   const grid = cat ? ranked(cat, filters) : [];
   const href = (o: Record<string, string | number | undefined>) => {

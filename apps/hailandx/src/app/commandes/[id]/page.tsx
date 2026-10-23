@@ -1,7 +1,7 @@
 'use client';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, QrScanner } from '@hailandx/ui';
+import { Badge, QrScanner, Chargement } from '@hailandx/ui';
 import { BackHeader, browserClient, DisputeThread, ProofPhoto, useSession } from '@hailandx/kit';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
@@ -64,7 +64,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
       {order && order.payment_method === 'orange_money' && <PaymentBox order={order} onDone={() => load()} />}
       {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover_proof', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
-      {!order ? <p className="text-[14px] font-medium text-muted">Chargement…</p> : (
+      {!order ? <Chargement /> : (
         <>
           {parcels.map((p) => {
             const step = buyerStep(p.status);

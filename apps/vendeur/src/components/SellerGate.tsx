@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useMyShop, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { BackHeader, Screen } from '@hailandx/kit';
+import { Chargement } from '@hailandx/ui';
 
 export interface SellerCtx { shop: MyShop; decls: MyDecl[]; decl: MyDecl | null; uid: string; reload: () => Promise<void> }
 
@@ -13,7 +14,7 @@ export interface SellerCtx { shop: MyShop; decls: MyDecl[]; decl: MyDecl | null;
  */
 export function SellerGate({ title, allowClosed = false, ownerOnly = false, children }: { title: string; allowClosed?: boolean; ownerOnly?: boolean; children: (ctx: SellerCtx) => ReactNode }) {
   const { state, shop, decls, decl, uid, reload } = useMyShop();
-  if (state === 'chargement') return <Screen><BackHeader href="/" title={title} label="Retour au tableau de bord" /><p className="text-[14px] font-semibold text-muted">Chargement…</p></Screen>;
+  if (state === 'chargement') return <Screen><BackHeader href="/" title={title} label="Retour au tableau de bord" /><Chargement /></Screen>;
   if (state === 'visiteur' || !uid) {
     return (
       <Screen><BackHeader href="/" title={title} label="Retour" />

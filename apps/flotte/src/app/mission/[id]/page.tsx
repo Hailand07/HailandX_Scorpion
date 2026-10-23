@@ -1,7 +1,7 @@
 'use client';
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { QrScanner } from '@hailandx/ui';
+import { QrScanner, Chargement } from '@hailandx/ui';
 import { MAX_HANDOVER_ATTEMPTS, formatGnf, formatGnPhone } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
@@ -265,7 +265,7 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
     );
   }
   if (gone) return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6"><p className="text-[14px] font-medium text-night-muted">Cette mission n’est plus à vous (annulée, remise ou reprise).</p><Link href="/" className={cta}>Retour</Link></main>;
-  if (!info || !target || !targetAt) return <main className="mx-auto max-w-md px-5 pt-6"><p className="text-[14px] font-medium text-night-muted">Chargement de la mission…</p></main>;
+  if (!info || !target || !targetAt) return <main className="mx-auto max-w-md px-5 pt-6"><Chargement texte="Chargement de la mission" /></main>;
 
   const left = Math.max(0, MAX_HANDOVER_ATTEMPTS - info.handover_failures);
   const stopName = leg === 'pickup' ? info.pickup.name ?? 'la boutique' : `l’acheteur${info.dropoff.quartier ? ` · ${info.dropoff.quartier}` : ''}`;
