@@ -8,6 +8,8 @@ export type ProductView = SampleProduct & {
   offerId?: string; photoUrl?: string | null; variantId?: string | null; inStock?: boolean; productId?: string; sectionId?: string | null; variants?: { id: string; label: string; stock: number }[];
   /** Fiche détaillée (HAILANDX.md §33) : toutes les photos de l'offre, description et caractéristiques de la fiche commune, note et état du vendeur. */
   photoUrls?: string[]; categoryId?: string | null; description?: string | null; attributes?: Record<string, unknown>; offerNote?: string | null; condition?: 'neuf' | 'occasion';
+  /** Prix barré (HAILANDX.md §37) : ancien prix, toujours supérieur au prix de vente. */
+  compareAtGnf?: number | null;
 };
 
 export interface Catalog {
@@ -31,7 +33,7 @@ interface ShopRow {
   shop_scores: { trust: number; rating: number; review_count: number; reliability: number; sales: number; prep_minutes: number | null } | null;
 }
 interface OfferRow {
-  id: string; price_gnf: number; photo_paths: string[] | null; section_id: string | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null;
+  id: string; price_gnf: number; compare_at_gnf: number | null; photo_paths: string[] | null; section_id: string | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null;
   catalog_products: { id: string; slug: string; name: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null; categories: { name: string } | null } | null;
   shops: { slug: string; status: string } | null;
 }
@@ -56,7 +58,7 @@ async function loadCatalog(): Promise<Catalog> {
   try {
     const [s, o] = await Promise.all([
       sb.from('shops').select('slug,name,tagline,created_at,logo_path,cover_path,whatsapp,shop_scores(trust,rating,review_count,reliability,sales,prep_minutes)').eq('status', 'ouverte').order('created_at', { ascending: false }).limit(60),
-      sb.from('offers').select('id,price_gnf,photo_paths,section_id,description,condition,offer_variants(id,label,stock),catalog_products(id,slug,name,category_id,description,attributes,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
+      sb.from('offers').select('id,price_gnf,compare_at_gnf,photo_paths,section_id,description,condition,offer_variants(id,label,stock),catalog_products(id,slug,name,category_id,description,attributes,categories(name)),shops!inner(slug,status)').eq('active', true).eq('shops.status', 'ouverte').limit(300),
     ]);
     if (s.error || o.error) throw s.error ?? o.error;
     const shops = (s.data as unknown as ShopRow[]).map(shopFromRow);
@@ -70,7 +72,7 @@ async function loadCatalog(): Promise<Catalog> {
       products.push({
         variantId: v?.id ?? null, inStock: vs.length === 0 || v !== null,
         slug: r.catalog_products.slug, offerId: r.id, productId: r.catalog_products.id, sectionId: r.section_id, variants: vs, photoUrl: mediaUrl(r.photo_paths?.[0]), name: r.catalog_products.name, shopSlug: r.shops.slug,
-        category: r.catalog_products.categories?.name ?? 'Autres', priceGnf: r.price_gnf,
+        category: r.catalog_products.categories?.name ?? 'Autres', priceGnf: r.price_gnf, compareAtGnf: r.compare_at_gnf,
         color: colorOf(r.catalog_products.slug), score: 0.5, etaMinutes: etaFor(prepBySlug.get(r.shops.slug)),
         photoUrls: (r.photo_paths ?? []).map((x) => mediaUrl(x)).filter((x): x is string => Boolean(x)),
         categoryId: r.catalog_products.category_id, description: r.catalog_products.description, attributes: r.catalog_products.attributes ?? {},
@@ -84,7 +86,7 @@ async function loadCatalog(): Promise<Catalog> {
 }
 
 /** Lecture mise en cache 30 s (la vitrine reste vivante sans interroger la base à chaque visite). */
-export const getCatalog: () => Promise<Catalog> = unstable_cache(loadCatalog, ['catalog-v3'], { revalidate: 30 });
+export const getCatalog: () => Promise<Catalog> = unstable_cache(loadCatalog, ['catalog-v4'], { revalidate: 30 });
 
 /** Normalise pour la recherche : minuscules, sans accents. */
 export const norm = (s: string): string => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

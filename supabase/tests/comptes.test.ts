@@ -61,7 +61,7 @@ describe('suppression de compte : vérifications', () => {
 describe('suppression de compte : purge', () => {
   it('l’acheteur annule sa commande puis supprime son compte : tout ce qui le concerne disparaît, rien d’autre', async () => {
     const parcel = (await one<{ id: string }>('select id from parcels limit 1')).id;
-    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1)', [parcel]));
+    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1, $2)', [parcel, 'Rupture de stock']));
     await as(db, U.acheteur, () => db.query('select fn_toggle_favorite($1, true)', [productId]));
     await as(db, U.acheteur, () => db.query('select fn_follow_shop($1, true)', [shopId]));
     await db.exec(`insert into profiles (id, full_name, phone) values ('${U.acheteur}', 'Acheteur', '224600000000'), ('${U.vendeur}', 'Vendeur', '224611111111')`);

@@ -3,23 +3,25 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
-import { formatGnf } from '@hailandx/commerce';
+import { discountPercent, formatGnf } from '@hailandx/commerce';
 
-export interface GridItem { key: string; href: string; name: string; priceGnf: number; photoUrl: string | null; color: string; shopName: string; etaMinutes: number }
+export interface GridItem { key: string; href: string; name: string; priceGnf: number; photoUrl: string | null; color: string; shopName: string; etaMinutes: number; compareAtGnf?: number | null }
 
 const PAGE = 16;
 
 /** Carte produit commune (grille et rangées) : photo, nom, prix, boutique. */
 export function ProductCard({ p, wide = false }: { p: GridItem; wide?: boolean }) {
+  const pct = discountPercent(p.priceGnf, p.compareAtGnf);
   return (
     <Link href={p.href} className={`flex flex-col overflow-hidden rounded-[20px] border border-line-soft bg-card ${wide ? '' : 'w-[150px] shrink-0 snap-start'}`}>
       <span className="relative block">
         <PhotoSlot src={p.photoUrl} color={p.color} className={wide ? 'h-[150px]' : 'h-[130px]'} label={p.name} />
         <span className="absolute bottom-2 right-2 rounded-full bg-white/90 px-2 py-1 text-[10.5px] font-bold">≈ {p.etaMinutes} min</span>
+        {pct && <span className="absolute left-2 top-2 rounded-full bg-ink px-2 py-1 text-[11px] font-extrabold text-lime">−{pct} %</span>}
       </span>
       <span className="flex flex-col gap-0.5 px-3 pb-3 pt-2.5">
         <span className="line-clamp-2 min-h-[2.4em] text-[13px] font-bold leading-tight">{p.name}</span>
-        <Price className="text-[15px]">{formatGnf(p.priceGnf)}</Price>
+        <span className="flex flex-wrap items-baseline gap-x-1.5"><Price className="text-[15px]">{formatGnf(p.priceGnf)}</Price>{pct && <span className="text-[11.5px] font-semibold text-muted line-through">{formatGnf(p.compareAtGnf!)}</span>}</span>
         <span className="flex min-w-0 items-center gap-1 text-[11.5px] font-semibold text-muted"><VerifiedMark size={13} /><span className="truncate">{p.shopName}</span></span>
       </span>
     </Link>

@@ -5,7 +5,22 @@ import { browserClient, errText, HAILANDX_URL, Icon } from '@hailandx/kit';
 
 /** Ce qu'on partage : un produit (lien direct vers sa page) ou toute la boutique. */
 export interface ShareTarget { shopId: string; shopSlug: string; shopName: string; offerId?: string; productSlug?: string; name?: string; priceGnf?: number }
-type Net = 'whatsapp' | 'tiktok' | 'facebook' | 'autre';
+export type Net = 'whatsapp' | 'tiktok' | 'facebook' | 'autre';
+
+/** Lien suivi d'un produit ou de la boutique pour ce réseau : réutilisé s'il existe déjà, sinon créé (`fallback` sans base). */
+export async function trackedLink(target: ShareTarget, net: Net, fallback: string): Promise<string> {
+  const sb = browserClient();
+  if (!sb) return fallback;
+  const kind = target.offerId ? 'produit' : 'boutique';
+  let q = sb.from('share_links').select('code').eq('shop_id', target.shopId).eq('kind', kind).eq('source', net).limit(1);
+  if (target.offerId) q = q.contains('offer_ids', [target.offerId]);
+  const found = await q.maybeSingle();
+  if (found.data) return `${HAILANDX_URL}/s/${(found.data as { code: string }).code}`;
+  const code = `${net.slice(0, 2)}${Math.random().toString(36).slice(2, 8)}`;
+  const { error } = await sb.from('share_links').insert({ code, shop_id: target.shopId, kind, offer_ids: target.offerId ? [target.offerId] : [], source: net });
+  if (error) throw new Error(errText(error));
+  return `${HAILANDX_URL}/s/${code}`;
+}
 
 /**
  * Partager un produit ou la boutique (HAILANDX.md §36), comme Shopify : le client qui clique arrive DIRECTEMENT sur le produit.
@@ -18,20 +33,7 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
   const label = target.name ?? target.shopName;
   const text = target.productSlug ? `${label}${target.priceGnf ? ` — ${formatGnf(target.priceGnf)}` : ''}\nLivré à votre porte avec HailandX :` : `Ma boutique ${target.shopName} sur HailandX :`;
 
-  /** Lien suivi pour ce réseau : réutilisé s'il existe déjà pour ce produit, sinon créé. */
-  async function tracked(net: Net): Promise<string> {
-    const sb = browserClient();
-    if (!sb) return direct;
-    const kind = target.offerId ? 'produit' : 'boutique';
-    let q = sb.from('share_links').select('code').eq('shop_id', target.shopId).eq('kind', kind).eq('source', net).limit(1);
-    if (target.offerId) q = q.contains('offer_ids', [target.offerId]);
-    const found = await q.maybeSingle();
-    if (found.data) return `${HAILANDX_URL}/s/${(found.data as { code: string }).code}`;
-    const code = `${net.slice(0, 2)}${Math.random().toString(36).slice(2, 8)}`;
-    const { error } = await sb.from('share_links').insert({ code, shop_id: target.shopId, kind, offer_ids: target.offerId ? [target.offerId] : [], source: net });
-    if (error) throw new Error(errText(error));
-    return `${HAILANDX_URL}/s/${code}`;
-  }
+  const tracked = (net: Net) => trackedLink(target, net, direct);
 
   async function share(net: Net) {
     setBusy(net); setNote(null);

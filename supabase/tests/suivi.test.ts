@@ -58,7 +58,7 @@ describe('suivi du colis', () => {
 describe('ventes du vendeur', () => {
   it('ventes par jour : une ligne par jour, les colis annulés ne comptent pas', async () => {
     const p2 = await place('whatsapp');
-    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1)', [p2]));
+    await as(db, U.vendeur, () => db.query('select fn_parcel_cancel($1, $2)', [p2, 'Rupture de stock']));
     const rows = await as(db, U.vendeur, () => q<{ parcels: number; revenue_gnf: string }>('select * from fn_shop_sales($1, 7)', [shopId]));
     expect(rows).toHaveLength(7);
     const today = rows[rows.length - 1]!;
