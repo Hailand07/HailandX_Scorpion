@@ -7,7 +7,7 @@ import { addToCart, cartCount, useCart, type CartLine } from '@/lib/cart';
 type Line = Omit<CartLine, 'qty'>;
 
 /** Barre d'achat de la fiche produit : ajouter au panier, ou acheter tout de suite. Inactive sur les produits d'exemple. */
-export function BuyBar({ line, available, variants = [] }: { line: Line | null; available: boolean; variants?: { id: string; label: string; stock: number }[] }) {
+export function BuyBar({ line, available, variants = [], closedLabel }: { line: Line | null; available: boolean; variants?: { id: string; label: string; stock: number }[]; closedLabel?: string }) {
   const router = useRouter();
   const count = cartCount(useCart());
   const [added, setAdded] = useState(false);
@@ -32,7 +32,7 @@ export function BuyBar({ line, available, variants = [] }: { line: Line | null; 
         {count > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue px-1 text-[11px] font-extrabold text-white">{count}</span>}
       </Link>
       {!can ? (
-        <span className="flex h-[54px] flex-1 items-center justify-center rounded-2xl bg-sand text-[14px] font-extrabold text-muted">{chosen ? 'Rupture de stock' : 'Produit d’exemple'}</span>
+        <span className="flex h-[54px] flex-1 items-center justify-center rounded-2xl bg-sand text-[14px] font-extrabold text-muted">{closedLabel ?? (chosen ? 'Rupture de stock' : 'Produit d’exemple')}</span>
       ) : (
         <>
           <button type="button" onClick={() => { addToCart(chosen!); setAdded(true); setTimeout(() => setAdded(false), 2000); }} className="flex h-[54px] flex-1 items-center justify-center rounded-2xl border border-line text-[14.5px] font-extrabold">{added ? 'Ajouté ✓' : 'Ajouter'}</button>

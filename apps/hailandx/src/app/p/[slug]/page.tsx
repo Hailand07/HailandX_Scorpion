@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark, Wordmark } from '@hailandx/ui';
-import { ago, brandOf, discountPercent, formatGnf, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
+import { ago, brandOf, discountPercent, formatGnf, onVacation, keyFacts, rankOffers, readAttributes, specRows, type Offer, similarProducts } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, offerKey, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
@@ -199,6 +199,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
             ['Remis seulement à vous', 'Le livreur remet le colis contre votre code à 4 chiffres, avec une photo de remise.'],
             ['Paiement à la livraison', 'En espèces, à la remise. Orange Money quand il est proposé à la commande.'],
             ['Un problème ?', 'Signalez-le dans les 72 h après la remise depuis votre commande : l’équipe Hailand tranche.'],
+            ...(shop.policy ? [[`Échanges chez ${shop.name}`, shop.policy]] : []),
           ].map(([t, d]) => (
             <li key={t} className="flex flex-col gap-0.5 px-4 py-3"><span className="text-[13.5px] font-extrabold">{t}</span><span className="text-[12.5px] font-semibold leading-snug text-muted">{d}</span></li>
           ))}
@@ -289,7 +290,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
       )}
 
       <RecordView item={viewed} />
-      <BuyBar available={p.inStock !== false} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
+      <BuyBar available={p.inStock !== false && !onVacation(shop.vacationUntil)} closedLabel={onVacation(shop.vacationUntil) ? `Boutique en congé jusqu’au ${new Date(shop.vacationUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : undefined} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
     </main>
   );
 }

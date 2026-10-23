@@ -9,7 +9,7 @@ import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
 interface Offer { id: string; section_id: string | null; price_gnf: number; compare_at_gnf: number | null; active: boolean; photo_paths: string[] | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string; slug: string } | null }
 interface Section { id: string; name: string }
 
-/** Produits de ma boutique (v2) : recherche, rayons en puces, visibilité d'un geste ; l'ajout et la modification ont leur écran. */
+/** Produits de ma boutique : recherche, rayons en puces, visibilité d'un geste, sélection groupée (masquer, afficher, promotion) ; l'ajout, la modification et la duplication ont leur écran. */
 export default function ProductsPage() {
   return <SellerGate title="Produits">{({ shop }) => <Products shopId={shop.id} shopSlug={shop.slug} shopName={shop.name} />}</SellerGate>;
 }
@@ -24,6 +24,9 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const [adding, setAdding] = useState(false);
   const [sname, setSname] = useState('');
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  // Sélection groupée (maquette v6 A4) : masquer, afficher, promotion en un geste sur plusieurs produits.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
 
   useEffect(() => { if (new URLSearchParams(window.location.search).get('filtre') === 'rupture') setRayon('rupture'); }, []);
 
@@ -50,6 +53,25 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
     const { error } = await sb!.from('offers').update({ active }).eq('id', o.id);
     if (error) { setMsg({ tone: 'err', text: errText(error) }); await load(); }
   }
+  /** Applique la même modification aux produits sélectionnés, un par un (chaque prix est arrondi à 500 GNF). */
+  async function bulk(kind: 'masquer' | 'afficher' | 'promo10' | 'promo20' | 'stop') {
+    const chosen = all.filter((o) => picked.has(o.id));
+    let failed = 0;
+    for (const o of chosen) {
+      const base = o.compare_at_gnf ?? o.price_gnf;
+      const patch = kind === 'masquer' ? { active: false } : kind === 'afficher' ? { active: true }
+        : kind === 'stop' ? (o.compare_at_gnf ? { price_gnf: o.compare_at_gnf, compare_at_gnf: null } : null)
+        : { price_gnf: Math.max(500, Math.round((base * (kind === 'promo10' ? 0.9 : 0.8)) / 500) * 500), compare_at_gnf: base };
+      if (!patch) continue;
+      const { error } = await sb!.from('offers').update(patch).eq('id', o.id);
+      if (error) failed++;
+    }
+    setMsg(failed ? { tone: 'err', text: `${failed} produit${failed > 1 ? 's' : ''} n’ont pas pu être modifiés.` } : { tone: 'ok', text: `${chosen.length} produit${chosen.length > 1 ? 's' : ''} modifié${chosen.length > 1 ? 's' : ''}.` });
+    setPicked(new Set()); setSelecting(false);
+    await load();
+  }
+  const pick = (id: string) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
   async function addSection() {
     const name = sname.trim();
     if (name.length < 2) return setMsg({ tone: 'err', text: 'Donnez un nom au rayon (2 lettres au minimum).' });
@@ -68,7 +90,10 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const current = sections.find((s) => s.id === rayon);
   return (
     <Screen className="pb-28">
-      <BackHeader href="/" title="Produits" label="Retour au tableau de bord" right={offers ? <span className="text-[13px] font-bold text-muted">{visible} visible{visible > 1 ? 's' : ''} sur {all.length}</span> : null} />
+      <BackHeader href="/" title="Produits" label="Retour au tableau de bord" right={offers && all.length > 0 ? (
+        <button type="button" onClick={() => { setSelecting((x) => !x); setPicked(new Set()); }} className="h-10 rounded-full border border-line bg-card px-3.5 text-[12.5px] font-extrabold">{selecting ? 'Terminer' : 'Sélectionner'}</button>
+      ) : null} />
+      {offers && <p className="-mt-1 text-[12.5px] font-bold text-muted">{visible} visible{visible > 1 ? 's' : ''} sur {all.length}</p>}
       <label className="flex h-[46px] items-center gap-2.5 rounded-[14px] border border-line bg-card px-3.5">
         <Icon name="search" size={17} stroke={2} className="text-muted" />
         <input value={q} onChange={(e) => setQ(e.target.value)} type="search" placeholder="Chercher dans mes produits" aria-label="Chercher dans mes produits" className="h-full min-w-0 flex-1 bg-transparent text-[16px] font-medium outline-none" />
@@ -102,29 +127,45 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
           const photo = mediaUrl(o.photo_paths?.[0]);
           const name = o.catalog_products?.name ?? 'Produit';
           return (
-            <div key={o.id} className={`flex items-center gap-3 rounded-[18px] border border-line-soft bg-card py-2.5 pl-2.5 pr-3 ${o.active ? '' : 'opacity-55'}`}>
-              <Link href={`/produits/${o.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+            <div key={o.id} className={`flex items-center gap-3 rounded-[18px] border bg-card py-2.5 pl-2.5 pr-3 ${selecting && picked.has(o.id) ? 'border-blue' : 'border-line-soft'} ${o.active ? '' : 'opacity-55'}`}>
+              {selecting && (
+                <button type="button" role="checkbox" aria-checked={picked.has(o.id)} aria-label={`Sélectionner ${name}`} onClick={() => pick(o.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${picked.has(o.id) ? 'bg-blue text-white' : 'border-2 border-[#c9c4b6]'}`}>
+                  {picked.has(o.id) && <Icon name="check" size={15} stroke={3} />}
+                </button>
+              )}
+              <Link href={selecting ? '#' : `/produits/${o.id}`} onClick={(e) => { if (selecting) { e.preventDefault(); pick(o.id); } }} className="flex min-w-0 flex-1 items-center gap-3">
                 {photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-[14px] object-cover" /> : <span className="h-[52px] w-[52px] shrink-0 rounded-[14px]" style={{ background: colorOf(name) }} />}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[14px] font-extrabold">{name}</span>
                   <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
                 </span>
               </Link>
-              {o.active && o.catalog_products && (
+              {!selecting && o.active && o.catalog_products && (
                 <button type="button" onClick={() => setSharing({ shopId, shopSlug, shopName, offerId: o.id, productSlug: o.catalog_products!.slug, name, priceGnf: o.price_gnf })} aria-label={`Partager le lien de ${name}`} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-line">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" /><path d="m16 6-4-4-4 4" /><path d="M12 2v13" /></svg>
                 </button>
               )}
-              <Switch on={o.active} onChange={(v) => toggle(o, v)} label={`Visible dans la boutique : ${name}`} />
+              {!selecting && <Switch on={o.active} onChange={(v) => toggle(o, v)} label={`Visible dans la boutique : ${name}`} />}
             </div>
           );
         })}
       </div>
 
       {sharing && <ShareSheet target={sharing} onClose={() => setSharing(null)} />}
+      {selecting ? (
+        <div className="fixed inset-x-3 bottom-[96px] z-30 mx-auto flex max-w-[calc(28rem-1.5rem)] flex-col gap-2 rounded-[20px] bg-ink p-2.5 text-white shadow-[0_10px_30px_rgba(18,20,28,0.25)]">
+          <span className="px-1.5 text-[12.5px] font-extrabold">{picked.size} produit{picked.size > 1 ? 's' : ''} sélectionné{picked.size > 1 ? 's' : ''}</span>
+          <div className="grid grid-cols-5 gap-1.5">
+            {([['masquer', 'Masquer'], ['afficher', 'Afficher'], ['promo10', 'Promo −10 %'], ['promo20', 'Promo −20 %'], ['stop', 'Fin promo']] as const).map(([k, l]) => (
+              <button key={k} type="button" disabled={picked.size === 0} onClick={() => void bulk(k)} className="flex h-[52px] items-center justify-center rounded-xl bg-white/10 px-1 text-center text-[11.5px] font-extrabold leading-tight disabled:opacity-40">{l}</button>
+            ))}
+          </div>
+        </div>
+      ) : (
       <Link href="/produits/nouveau" className="fixed inset-x-5 bottom-[104px] z-30 mx-auto flex h-[54px] max-w-[calc(28rem-2.5rem)] items-center justify-center gap-2 rounded-[18px] bg-ink text-[15px] font-extrabold text-white shadow-[0_8px_24px_rgba(18,20,28,0.22)]">
         <Icon name="plus" size={18} stroke={2.4} />Ajouter un produit
       </Link>
+      )}
     </Screen>
   );
 }

@@ -7,6 +7,7 @@ import { SellerGate } from '@/components/SellerGate';
 interface Src { source: string; parcels: number; revenue_gnf: number }
 interface ShareLink { id: string; code: string; kind: string; source: string | null; clicks: number }
 interface Score { trust: number; rating: number; review_count: number; reliability: number; prep_minutes: number | null }
+interface Sold { name_snapshot: string; quantity: number; price_gnf_snapshot: number }
 interface OfferLite { id: string; photo_paths: string[] | null; catalog_products: { name: string } | null }
 const SRC: Record<string, string> = { application: 'HailandX', tiktok: 'TikTok', whatsapp: 'WhatsApp', facebook: 'Facebook', autre: 'Autre' };
 type Period = '7' | '30' | '90';
@@ -21,6 +22,7 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
   const [period, setPeriod] = useState<Period>('7');
   const [series, setSeries] = useState<SalesDay[] | null>(null);
   const [sources, setSources] = useState<Src[]>([]);
+  const [sold, setSold] = useState<Sold[]>([]);
   const [links, setLinks] = useState<ShareLink[]>([]);
   const [score, setScore] = useState<Score | null>(null);
   const [offers, setOffers] = useState<OfferLite[]>([]);
@@ -33,7 +35,12 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
   const loadSales = useCallback(async () => {
     if (!sb) return;
     const days = Number(period);
-    const [a, b] = await Promise.all([sb.rpc('fn_shop_sales', { p_shop: shopId, p_days: days }), sb.rpc('fn_shop_sources', { p_shop: shopId, p_days: days })]);
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const [a, b, c] = await Promise.all([
+      sb.rpc('fn_shop_sales', { p_shop: shopId, p_days: days }), sb.rpc('fn_shop_sources', { p_shop: shopId, p_days: days }),
+      sb.from('order_items').select('name_snapshot,quantity,price_gnf_snapshot,parcels!inner(shop_id,status,created_at)').eq('parcels.shop_id', shopId).neq('parcels.status', 'annule').gte('parcels.created_at', since).limit(1000),
+    ]);
+    setSold((c.data as unknown as Sold[]) ?? []);
     setSeries(((a.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })));
     setSources(((b.data as Src[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })));
   }, [sb, shopId, period]);
@@ -67,6 +74,11 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
   const best = Math.max(1, ...sources.map((s) => s.revenue_gnf));
   const noPhoto = offers.filter((o) => !(o.photo_paths ?? []).length).length;
   const tip = noPhoto ? `Pour monter : ajoutez une photo réelle à ${noPhoto} produit${noPhoto > 1 ? 's' : ''}.` : score && score.review_count < 5 ? 'Pour monter : vos clients notent après la remise ; préparez vite et emballez bien.' : null;
+  // Produits les plus vendus sur la période (quantités et chiffre, colis annulés exclus).
+  const top = [...sold.reduce((m, i) => { const x = m.get(i.name_snapshot) ?? { qty: 0, gnf: 0 }; m.set(i.name_snapshot, { qty: x.qty + i.quantity, gnf: x.gnf + i.quantity * i.price_gnf_snapshot }); return m; }, new Map<string, { qty: number; gnf: number }>())]
+    .sort((x, y) => y[1].gnf - x[1].gnf).slice(0, 5);
+  // Du clic à la commande, par réseau : clics des liens suivis (depuis leur création) et commandes de la période.
+  const nets = SOURCES.map((n) => ({ n, clicks: links.filter((l) => (l.source ?? 'autre') === n).reduce((t, l) => t + l.clicks, 0), orders: sources.find((x) => x.source === n)?.parcels ?? 0 })).filter((x) => x.clicks || x.orders);
   const rating = score && score.review_count > 0 ? Number(score.rating).toFixed(1).replace('.', ',') : null;
 
   return (
@@ -96,6 +108,32 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
           </div>
         ))}
       </section>
+
+      <section aria-label="Produits les plus vendus" className="flex flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
+        <h2 className="text-[14.5px] font-extrabold">Produits les plus vendus</h2>
+        {top.length === 0 && <p className="text-[13px] font-semibold text-muted">Pas encore de vente sur la période.</p>}
+        {top.map(([name, x], i) => (
+          <div key={name} className="flex items-center gap-2.5 text-[13px] font-bold">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-sand text-[12px] font-extrabold">{i + 1}</span>
+            <span className="min-w-0 flex-1 truncate">{name}</span>
+            <span className="shrink-0 text-muted">{x.qty} vendu{x.qty > 1 ? 's' : ''}</span>
+            <span className="shrink-0 font-extrabold">{formatGnf(x.gnf)}</span>
+          </div>
+        ))}
+      </section>
+
+      {nets.length > 0 && (
+        <section aria-label="Du clic à la commande" className="flex flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
+          <h2 className="text-[14.5px] font-extrabold">Du clic à la commande</h2>
+          <p className="-mt-1 text-[12px] font-semibold text-muted">Clics sur vos liens suivis et commandes venues de chaque réseau : le réseau où vos clients achètent le plus mérite vos publications.</p>
+          {nets.map((x) => (
+            <div key={x.n} className="flex items-center justify-between text-[13px] font-bold">
+              <span>{SRC[x.n]}</span>
+              <span className="text-muted">{x.clicks} clic{x.clicks > 1 ? 's' : ''} · {x.orders} commande{x.orders > 1 ? 's' : ''}{x.clicks ? ` · ${Math.round((x.orders / x.clicks) * 1000) / 10} %` : ''}</span>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section id="liens" aria-label="Liens suivis" className="flex scroll-mt-4 flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
         <h2 className="text-[14.5px] font-extrabold">Liens suivis</h2>

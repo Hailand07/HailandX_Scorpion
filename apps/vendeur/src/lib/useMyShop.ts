@@ -2,7 +2,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { browserClient, useSession } from '@hailandx/kit';
 
-export interface MyShop { id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null; whatsapp: string | null }
+export interface MyShop {
+  id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null; whatsapp: string | null;
+  /** Boutique en ligne (HAILANDX.md §37) : horaires par jour, congés, politique d'échange. */
+  hours: Record<string, [string, string] | null> | null; vacation_until: string | null; vacation_note: string | null; policy: string | null;
+  /** Rôle du compte connecté : le propriétaire voit tout ; un employé ne voit ni l'argent, ni les réglages, ni l'équipe. */
+  role: 'proprietaire' | 'employe';
+}
 export interface MyDecl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number; certification_status: string | null; level: number }
 
 /** Demande de certification de la boutique, vue de la console : à vérifier par l'équipe, transmise à HailandMap ou refusée (avec motif). */
@@ -26,7 +32,8 @@ export function useMyShop() {
     const sb = browserClient();
     if (!sb || !uid) return;
     const [s, d] = await Promise.all([
-      sb.from('shops').select('id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp').eq('owner_id', uid).limit(1).maybeSingle(),
+      // Boutique dont le compte est membre (propriétaire d'abord, sinon employé).
+      sb.from('shop_members').select('role,shops(id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp,hours,vacation_until,vacation_note,policy)').eq('user_id', uid).order('role', { ascending: false }).limit(1).maybeSingle(),
       sb.from('declarations').select('id,declared_label,hailand_code,detected_level,certification_status').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
     const list = (d.data as Omit<MyDecl, 'level'>[]) ?? [];
@@ -34,7 +41,8 @@ export function useMyShop() {
       const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id });
       return { ...x, level: typeof r.data === 'number' ? r.data : x.detected_level };
     }));
-    const myShop = (s.data as MyShop | null) ?? null;
+    const m = s.data as unknown as { role: MyShop['role']; shops: Omit<MyShop, 'role'> | null } | null;
+    const myShop: MyShop | null = m?.shops ? { ...m.shops, role: m.role } : null;
     const c = myShop ? await sb.from('certification_priorities').select('declaration_id,status,console_note').eq('shop_id', myShop.id) : null;
     setCerts((c?.data as MyCert[] | null) ?? []);
     setShop(myShop);
