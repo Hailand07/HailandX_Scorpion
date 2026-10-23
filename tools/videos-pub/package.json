@@ -1,0 +1,20 @@
+{
+  "name": "hailandx-videos-pub",
+  "private": true,
+  "type": "module",
+  "description": "Prototype de vidéos publicitaires de produits (HAILANDX.md §38) — hors des espaces de travail npm, installé à part.",
+  "scripts": {
+    "photos": "sh photos.sh",
+    "musique": "node synth.mjs jordan public/jordan.wav && node synth.mjs iphone public/iphone.wav",
+    "rendu": "remotion render src/index.ts"
+  },
+  "dependencies": {
+    "@remotion/bundler": "4.0.380",
+    "@remotion/cli": "4.0.380",
+    "@remotion/google-fonts": "4.0.380",
+    "@remotion/renderer": "4.0.380",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.380"
+  }
+}

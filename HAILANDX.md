@@ -546,6 +546,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-23 | §37 validé : maquettes v6 ; barre du bas à 5 onglets ; Commandes (recherche, fiche d'une commande, annulation avec motif) ; Marketing (codes promo, promotions à prix barré, visuel prêt à publier, affiche QR) ; HailandX : prix barré, code promo à la commande. Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` (⚠️ à appliquer avant fusion) ; BASE_DE_DONNEES révision 7. |
 | 2026-10-23 | Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` appliquée en production (accord du fondateur ; fin par l'éditeur SQL) et vérifiée. |
 | 2026-10-23 | §37 terminé côté code : accueil « Bien démarrer » et conseil du jour, sélection groupée et duplication de produits, Clients, Boutique en ligne (horaires, vacances, politique, mis en avant), statistiques enrichies, Équipe avec droits limités. Migration `2026-10-29_hailandx_vendeur_boutique_clients_equipe.sql` appliquée en production (accord du fondateur) et vérifiée ; BASE_DE_DONNEES révision 10. |
+| 2026-10-23 | §38 : prototype de vidéos publicitaires de produits (`tools/videos-pub`, musique générée sans droits) ; intégration à HailandX Vendeur reportée à la demande du fondateur (fonctionnement, coûts et décisions à prendre notés). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -908,3 +909,17 @@ Les points 3 (annulation), 4 (prix barré), 5, 6 (codes promo) et 7 (horaires, v
   - **Statistiques (8)** : produits les plus vendus, du clic à la commande par réseau. ⚠️ Les visites des pages produit ne sont pas encore comptées (seulement les clics des liens suivis).
   - **Équipe (9)** (`/equipe`, propriétaire) : ajout d'un employé par numéro (compte Hailand existant, 5 au plus, prévenu par notification), retrait ; un employé ne voit ni Argent, ni Réglages, ni Boutique en ligne, ni Équipe (la base le garantit : `shops_update` et `ledger_read` réservés au propriétaire).
   - 🗄️ Migration `2026-10-29_hailandx_vendeur_boutique_clients_equipe.sql` (tests `vendeur-equipe.test.ts`, 6 cas) — ✅ **appliquée en production le 2026-10-23** (colonnes par Claude ; politiques et fonctions par le fondateur dans l'éditeur SQL) et vérifiée (politiques propriétaire, fonctions, droits, contrôle des congés dans `fn_place_order`).
+
+## 38. Vidéos publicitaires automatiques des produits (2026-10-23) — 🧪 prototype validé, ⏸️ intégration reportée par le fondateur
+
+**Fait** : prototype dans `tools/videos-pub` (Remotion + musique générée par `synth.mjs`, sans droits à payer). Deux pubs de 20 s (Jordan, iPhone) en 7 scènes calées sur la musique ; tous les arguments viennent de la fiche et de l'offre réelles. Le fondateur a apprécié la transition de fin HailandX et les thèmes par produit ; il a demandé plus de contenu produit (fait en v2).
+
+**Fonctionnement prévu (💡 proposé, à décider)** — un programme écrit à l'avance, aucune intervention humaine ni de Claude par vidéo :
+1. HailandX Vendeur → Marketing → « Créer ma vidéo » (choix du produit) ;
+2. une ligne dans une future table de demandes (migration à valider) ; un **service de rendu** (petit serveur ≈ 20–40 $/mois au départ, ou AWS Lambda à l'usage) lit la fiche (photos, prix, prix barré, caractéristiques de la catégorie, points forts, tailles, stock, garanties, lien suivi), choisit le **modèle de la catégorie** (Mode, Tech, Général d'abord) et une musique de la bibliothèque, fabrique la vidéo (≈ 2–3 min sur un petit serveur) et la range dans le stockage ;
+3. notification « vidéo prête » ; le vendeur la regarde, l'enregistre ou la partage (lien suivi intégré).
+Ni Vercel ni le téléphone du vendeur ne conviennent pour le rendu.
+
+**Coûts et maîtrise** : une vidéo par produit gardée et refaite seulement si la fiche change ; quota par vendeur (ex. 3 gratuites par mois) ; musiques composées une fois. Licence Remotion : gratuite pour une structure de 3 personnes au plus, sinon offre « Automators » 0,01 $ par rendu avec 100 $/mois minimum (⚠️ à vérifier au moment de lancer).
+
+**Décisions attendues du fondateur** : taille de l'équipe (licence), hébergement et budget du serveur de rendu, quota par vendeur. **Qualité** : les photos détourées (sans fond) rendent bien mieux ; prévoir un guide photo ou un détourage automatique (⚠️ outil à choisir).
