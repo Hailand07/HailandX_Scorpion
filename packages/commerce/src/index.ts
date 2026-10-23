@@ -7,3 +7,4 @@ export * from './phone';
 export * from './dashboard';
 export * from './fiche';
 export * from './promo';
+export * from './hours';

@@ -4,6 +4,7 @@ import { Badge, VerifiedMark } from '@hailandx/ui';
 import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
+import { hoursSummary, isOpenNow, onVacation } from '@hailandx/commerce';
 import { FollowButton } from '@/components/FollowButton';
 import { ShopProducts, type Section } from '@/components/ShopProducts';
 
@@ -23,7 +24,11 @@ export default async function ShopPage({ params }: Params) {
   const cat = await getCatalog();
   const s = cat.shops.find((x) => x.slug === slug);
   if (!s) notFound();
-  const products = cat.products.filter((p) => p.shopSlug === s.slug);
+  // Produits mis en avant par le vendeur d'abord (HAILANDX.md §37).
+  const products = cat.products.filter((p) => p.shopSlug === s.slug).sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+  const away = onVacation(s.vacationUntil);
+  const open = isOpenNow(s.hours);
+  const summary = hoursSummary(s.hours);
   // Identifiant, rayons et abonnés : lus à la demande (la vitrine mise en cache ne les porte pas). Boutiques d'exemple : pas de suivi.
   let shopId: string | null = null; let sections: Section[] = []; let followers = 0;
   const sb = cat.source === 'base' ? serverClient() : null;
@@ -47,6 +52,18 @@ export default async function ShopPage({ params }: Params) {
           <h1 className="flex items-center gap-2 font-display text-[22px] font-semibold tracking-tight">{s.name}<VerifiedMark size={20} /></h1>
           <span className="text-[13px] font-semibold text-muted">{[s.tagline, s.place].filter(Boolean).join(' · ')}</span>
         </div>
+        {away && (
+          <p role="status" className="rounded-2xl bg-[#fff1e6] px-4 py-3 text-[13px] font-bold text-[#8a3a0c]">
+            En congé jusqu’au {new Date(s.vacationUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} inclus : les commandes reprennent ensuite.{s.vacationNote ? ` « ${s.vacationNote} »` : ''}
+          </p>
+        )}
+        {summary && !away && (
+          <p className="flex items-center gap-2 text-[13px] font-bold">
+            <span className={`h-2 w-2 shrink-0 rounded-full ${open ? 'bg-ok' : 'bg-[#c9c4b6]'}`} />
+            <span className={open ? 'text-ok' : 'text-muted'}>{open ? 'Ouvert maintenant' : 'Fermé pour le moment'}</span>
+            <span className="truncate font-semibold text-muted">· {summary}</span>
+          </p>
+        )}
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">★ {s.stats.rating.toFixed(1).replace('.', ',')}</div><div className="text-[11.5px] font-semibold text-muted">{s.stats.reviewCount} avis vérifiés</div></div>
           <div className="rounded-2xl border border-line-soft bg-card px-3 py-2.5"><div className="font-display text-[17px] font-semibold">{Math.round(s.stats.reliability * 100)} %</div><div className="text-[11.5px] font-semibold text-muted">livrés sans litige</div></div>
@@ -60,6 +77,12 @@ export default async function ShopPage({ params }: Params) {
       </section>
 
       <ShopProducts shopSlug={s.slug} products={products} sections={sections} />
+      {s.policy && (
+        <section aria-labelledby="politique" className="mx-5 mt-2 flex flex-col gap-1 rounded-2xl border border-line-soft bg-card px-4 py-3">
+          <h2 id="politique" className="text-[13px] font-extrabold">Échanges et garantie de la boutique</h2>
+          <p className="whitespace-pre-line text-[13px] font-semibold leading-snug text-muted">{s.policy}</p>
+        </section>
+      )}
     </main>
   );
 }

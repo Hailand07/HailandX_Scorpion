@@ -11,7 +11,7 @@ type Field = 'name' | 'tagline' | 'category' | 'whatsapp' | 'address' | null;
 
 /** Réglages de la boutique (v2) : vitrine (bandeau, logo, nom, présentation, catégorie), contact WhatsApp, adresse. */
 export default function SettingsPage() {
-  return <SellerGate title="Réglages de la boutique" allowClosed>{(ctx) => <Settings {...ctx} />}</SellerGate>;
+  return <SellerGate title="Réglages de la boutique" allowClosed ownerOnly>{(ctx) => <Settings {...ctx} />}</SellerGate>;
 }
 
 function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {

@@ -1,21 +1,21 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ago, barHeights, formatGnf, periodStats, type SalesDay, shortGnf } from '@hailandx/commerce';
-import { browserClient, HAILANDX_URL, Icon, ICONS, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
+import { ago, barHeights, formatGnf, onVacation, periodStats, type SalesDay } from '@hailandx/commerce';
+import { browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareRow } from './ShareRow';
 
 interface Review { rating: number; comment: string | null; created_at: string }
-interface OfferStock { id: string; active: boolean; offer_variants: { stock: number }[] | null; catalog_products: { name: string } | null }
+interface OfferStock { id: string; active: boolean; photo_paths: string[] | null; compare_at_gnf: number | null; offer_variants: { stock: number }[] | null; catalog_products: { name: string } | null }
 interface Data {
   series: SalesDay[]; prep: { created_at: string }[]; disputes: number; recent: Review[];
-  score: { trust: number; rating: number; review_count: number } | null; offers: OfferStock[]; balance: number; questions: number;
+  score: { trust: number; rating: number; review_count: number } | null; offers: OfferStock[]; balance: number; questions: number; shares: number; promos: number;
 }
 type Period = 'jour' | 'semaine' | 'mois';
 const DAYS: Record<Period, number> = { jour: 1, semaine: 7, mois: 30 };
 
-/** Ma boutique — tableau de bord (v3) : les ventes, ce qui attend une action, l'argent, la confiance ; Commandes et Produits sont dans la barre du bas (pas de doublon). */
+/** Accueil (maquette v6 A1) : bien démarrer, ventes, à faire, conseil du jour, argent et confiance. Tout le reste est dans la barre du bas et le Menu (pas de doublon). */
 export function Dashboard({ shop }: { shop: MyShop }) {
   const [d, setD] = useState<Data | null>(null);
   const [period, setPeriod] = useState<Period>('jour');
@@ -23,15 +23,17 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   const load = useCallback(async () => {
     const sb = browserClient(); if (!sb) return;
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const [sales, prep, disputes, recent, score, offers, ledger, questions] = await Promise.all([
+    const [sales, prep, disputes, recent, score, offers, ledger, questions, shares, promos] = await Promise.all([
       sb.rpc('fn_shop_sales', { p_shop: shop.id, p_days: 60 }),
       sb.from('parcels').select('created_at').eq('shop_id', shop.id).eq('status', 'attente_vendeur').order('created_at'),
       sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id).eq('status', 'litige'),
       sb.from('reviews').select('rating,comment,created_at').eq('shop_id', shop.id).gte('created_at', week).order('created_at', { ascending: false }),
       sb.from('shop_scores').select('trust,rating,review_count').eq('shop_id', shop.id).maybeSingle(),
-      sb.from('offers').select('id,active,offer_variants(stock),catalog_products(name)').eq('shop_id', shop.id),
+      sb.from('offers').select('id,active,photo_paths,compare_at_gnf,offer_variants(stock),catalog_products(name)').eq('shop_id', shop.id),
       sb.from('ledger_entries').select('amount_gnf').eq('account', 'shop').eq('account_id', shop.id),
       sb.rpc('fn_shop_questions', { p_shop: shop.id }),
+      sb.from('share_links').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id),
+      sb.from('promo_codes').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id),
     ]);
     setD({
       series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })),
@@ -42,6 +44,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       offers: (offers.data as unknown as OfferStock[]) ?? [],
       balance: ((ledger.data as { amount_gnf: number }[]) ?? []).reduce((n, e) => n + e.amount_gnf, 0),
       questions: ((questions.data as { answer: string | null }[]) ?? []).filter((q) => !q.answer).length,
+      shares: shares.count ?? 0, promos: promos.count ?? 0,
     });
   }, [shop.id]);
 
@@ -65,14 +68,31 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   if (empty.length) todo.push({ href: '/produits?filtre=rupture', badge: <Icon name="alert" size={18} stroke={2.2} />, tone: 'bg-[#fff1e6] text-[#c2410c]', title: `${empty.length} produit${empty.length > 1 ? 's' : ''} en rupture`, sub: empty.map((o) => o.catalog_products?.name).filter(Boolean).slice(0, 2).join(', ') + ' · stock 0' });
   if (d && !live.length) todo.push({ href: '/produits/nouveau', badge: <Icon name="plus" size={18} stroke={2.4} />, tone: 'bg-lime text-ink', title: 'Ajoutez votre premier produit', sub: 'Photo, prix, stock : deux minutes' });
 
-  const tiles: { href: string; icon: keyof typeof ICONS; label: string; sub: string }[] = [
-    { href: '/argent', icon: 'wallet', label: 'Argent', sub: d ? `${shortGnf(d.balance)} GNF` : '…' },
-    { href: '/statistiques', icon: 'chart', label: 'Statistiques', sub: week?.trendPct != null ? `${week.trendPct > 0 ? '+' : ''}${week.trendPct} % · 7 j` : '7 derniers jours' },
-    { href: '/avis', icon: 'star', label: 'Avis', sub: rating ? `${rating} ★ · ${d!.score!.review_count}` : 'Pas encore' },
-    { href: '/questions', icon: 'help', label: 'Questions', sub: d ? (d.questions ? `${d.questions} sans réponse` : 'À jour') : '…' },
-    { href: '/reglages', icon: 'sliders', label: 'Réglages', sub: 'Logo, WhatsApp' },
-    { href: '/aide', icon: 'info', label: 'Aide', sub: 'Guides, contact' },
+  // « Bien démarrer » (maquette v6 A1) : disparaît quand tout est fait.
+  const owner = shop.role === 'proprietaire';
+  const noPhoto = live.filter((o) => !(o.photo_paths ?? []).length);
+  const steps: { done: boolean; label: string; href: string }[] = d ? [
+    { done: !!shop.logo_path, label: 'Ajouter mon logo', href: '/reglages' },
+    { done: live.length >= 5, label: `Mettre 5 produits en vente (${Math.min(live.length, 5)}/5)`, href: '/produits/nouveau' },
+    { done: live.length > 0 && noPhoto.length === 0, label: 'Une vraie photo sur chaque produit', href: '/produits' },
+    { done: d.shares > 0, label: 'Partager un produit sur WhatsApp ou TikTok', href: '/marketing' },
+    { done: d.promos > 0, label: 'Créer mon premier code promo', href: '/marketing/codes' },
+    { done: !!shop.hours, label: 'Indiquer mes horaires', href: '/boutique' },
+  ].filter((x) => owner || !['/reglages', '/boutique'].includes(x.href)) : [];
+  const doneCount = steps.filter((x) => x.done).length;
+
+  // Conseil du jour : le plus utile d'abord, sinon un conseil général qui change chaque jour.
+  const GENERAL = [
+    'Un statut WhatsApp par jour avec un visuel prêt à publier : vos clients pensent à vous.',
+    'Répondez aux questions dans l’heure : une réponse rapide fait souvent la vente.',
+    'Préparez vite : les boutiques qui préparent en moins de 30 minutes montent dans l’indice de confiance.',
+    'Un prix barré honnête (−10 %) attire l’œil sur la vitrine HailandX.',
   ];
+  const tip = !d ? null
+    : noPhoto.length ? `${noPhoto.length} produit${noPhoto.length > 1 ? 's' : ''} sans photo : les produits avec 3 vraies photos se vendent bien mieux.`
+    : live.length && !live.some((o) => o.compare_at_gnf) && !d.promos ? 'Aucune promotion en cours : essayez −10 % sur votre produit le plus vu (Marketing → Promotions).'
+    : GENERAL[new Date().getUTCDate() % GENERAL.length]!;
+
 
   return (
     <Screen className="gap-3.5">
@@ -82,11 +102,23 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         </span>
         <span className="flex min-w-0 flex-1 flex-col">
           <span className="truncate font-display text-[20px] font-semibold tracking-tight">{shop.name}</span>
-          <span className="flex items-center gap-1.5 text-[12px] font-bold text-[#0f7a5c]"><span className="h-[7px] w-[7px] rounded-full bg-[#0f7a5c]" />Ouverte · adresse certifiée</span>
+          {onVacation(shop.vacation_until)
+            ? <Link href={owner ? '/boutique' : '/'} className="flex items-center gap-1.5 text-[12px] font-bold text-[#c2410c]"><span className="h-[7px] w-[7px] rounded-full bg-[#c2410c]" />En congé · commandes fermées</Link>
+            : <span className="flex items-center gap-1.5 text-[12px] font-bold text-[#0f7a5c]"><span className="h-[7px] w-[7px] rounded-full bg-[#0f7a5c]" />Ouverte · adresse certifiée{owner ? '' : ' · employé'}</span>}
         </span>
         <NotificationBell scope="vendeur" />
         <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-line bg-card"><Icon name="eye" /></LienHailand>
       </header>
+
+      {d && doneCount < steps.length && (
+        <section aria-label="Bien démarrer" className="flex flex-col gap-1 rounded-[22px] border border-line-soft bg-card px-4 pb-2 pt-3.5">
+          <div className="flex items-baseline justify-between"><h2 className="text-[15px] font-extrabold">Bien démarrer</h2><span className="text-[12px] font-extrabold text-ok">{doneCount} sur {steps.length}</span></div>
+          <span className="my-1.5 block h-1.5 overflow-hidden rounded-full bg-[#efece4]"><span className="block h-full rounded-full bg-ok" style={{ width: `${(doneCount / steps.length) * 100}%` }} /></span>
+          {steps.map((x) => x.done
+            ? <span key={x.label} className="flex items-center gap-2.5 py-1.5 text-[13.5px] font-bold text-muted line-through"><span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-ok text-white"><Icon name="check" size={13} stroke={3} /></span>{x.label}</span>
+            : <Link key={x.label} href={x.href} className="flex items-center gap-2.5 py-1.5 text-[13.5px] font-extrabold"><span aria-hidden="true" className="h-[22px] w-[22px] shrink-0 rounded-full border-2 border-[#c9c4b6]" /><span className="flex-1">{x.label}</span><Icon name="chevron" size={15} stroke={2} className="text-[#9a9db0]" /></Link>)}
+        </section>
+      )}
 
       <section aria-label="Mes ventes" className="flex flex-col gap-3.5 rounded-[24px] bg-ink p-4 text-white">
         <Segmented dark label="Période" value={period} onChange={setPeriod} items={[{ id: 'jour', label: 'Aujourd’hui' }, { id: 'semaine', label: '7 jours' }, { id: 'mois', label: '30 jours' }]} />
@@ -115,12 +147,21 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         ))}
       </section>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        <Link href="/argent" className="flex flex-col gap-1 rounded-[20px] border border-line-soft bg-card p-3.5">
-          <span className="text-[12px] font-bold text-muted">Hailand vous doit</span>
-          <span className="font-display text-[19px] font-semibold">{d ? formatGnf(d.balance, false) : '…'}</span>
-          <span className="text-[12px] font-extrabold text-blue">GNF · voir</span>
-        </Link>
+      {tip && (
+        <section aria-label="Conseil du jour" className="flex items-start gap-3 rounded-[22px] border border-line-soft bg-card p-4">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#fdf6dc] text-[#8a6400]"><Icon name="star" size={19} /></span>
+          <span className="flex flex-col gap-1"><span className="text-[13px] font-extrabold">Conseil du jour</span><span className="text-[13px] font-semibold leading-snug text-muted">{tip}</span></span>
+        </section>
+      )}
+
+      <div className={`grid gap-2.5 ${owner ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        {owner && (
+          <Link href="/argent" className="flex flex-col gap-1 rounded-[20px] border border-line-soft bg-card p-3.5">
+            <span className="text-[12px] font-bold text-muted">Hailand vous doit</span>
+            <span className="font-display text-[19px] font-semibold">{d ? formatGnf(d.balance, false) : '…'}</span>
+            <span className="text-[12px] font-extrabold text-blue">GNF · voir</span>
+          </Link>
+        )}
         <Link href="/statistiques" className="flex flex-col gap-1.5 rounded-[20px] border border-line-soft bg-card p-3.5">
           <span className="text-[12px] font-bold text-muted">Indice de confiance</span>
           <span className="font-display text-[19px] font-semibold">{d?.score?.trust ?? '…'}<span className="text-[12px] text-muted"> / 100</span></span>
@@ -128,17 +169,6 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         </Link>
       </div>
 
-      <section aria-label="Gérer ma boutique" className="flex flex-col gap-2.5">
-        <h2 className="mx-1 mt-1 font-display text-[17px] font-semibold">Gérer ma boutique</h2>
-        <div className="grid grid-cols-3 gap-2.5">
-          {tiles.map((t) => (
-            <Link key={t.href} href={t.href} className="flex min-h-[92px] flex-col gap-2 rounded-[18px] border border-line-soft bg-card px-2.5 py-3">
-              <span className="flex h-[34px] w-[34px] items-center justify-center rounded-[11px] bg-sand"><Icon name={t.icon} size={18} /></span>
-              <span className="flex flex-col"><span className="text-[13.5px] font-extrabold">{t.label}</span><span className="truncate text-[11.5px] font-bold text-muted">{t.sub}</span></span>
-            </Link>
-          ))}
-        </div>
-      </section>
 
       <ShareRow shop={shop} />
     </Screen>

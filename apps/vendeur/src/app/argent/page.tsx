@@ -9,7 +9,7 @@ const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annul
 
 /** Argent (v2) : ce que Hailand doit à la boutique, l'argent bloqué en attente de remise, et les mouvements. */
 export default function MoneyPage() {
-  return <SellerGate title="Argent">{({ shop }) => <Money shopId={shop.id} />}</SellerGate>;
+  return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} />}</SellerGate>;
 }
 
 function Money({ shopId }: { shopId: string }) {

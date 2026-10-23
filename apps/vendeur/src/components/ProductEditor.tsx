@@ -20,7 +20,8 @@ const rand = () => Math.random().toString(36).slice(2, 6);
  * Ajouter ou modifier un produit (v2), en plein écran : photos, nom (fiche commune si le produit existe déjà), prix,
  * variantes et stock, rayon. Seulement boutique ouverte (la base l'impose aussi : déclencheur offers_require_open_shop).
  */
-export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: string; offerId?: string }) {
+/** `copyFrom` : dupliquer un produit existant (nouvelle fiche pré-remplie : nom « (copie) », photos, prix, caractéristiques, variantes). */
+export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; uid: string; offerId?: string; copyFrom?: string }) {
   const router = useRouter();
   const sb = browserClient();
   const editing = Boolean(offerId);
@@ -55,19 +56,21 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
     if (!sb) return;
     sb.from('shop_sections').select('id,name').eq('shop_id', shop.id).order('position').order('name').then(({ data }) => setSections((data as Section[]) ?? []));
     sb.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? []));
-    if (!offerId) return;
-    sb.from('offers').select('id,price_gnf,compare_at_gnf,section_id,active,photo_paths,description,condition,offer_variants(id,label,stock),catalog_products(id,name,slug,category_id,description,attributes,created_by)').eq('id', offerId).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
+    const source = offerId ?? copyFrom;
+    if (!source) return;
+    sb.from('offers').select('id,price_gnf,compare_at_gnf,section_id,active,photo_paths,description,condition,offer_variants(id,label,stock),catalog_products(id,name,slug,category_id,description,attributes,created_by)').eq('id', source).eq('shop_id', shop.id).maybeSingle().then(({ data }) => {
       const o = (data as unknown as Existing | null) ?? null;
-      setExisting(o);
+      if (editing) setExisting(o);
       if (!o) return;
       setPrice(String(o.price_gnf)); setCompareAt(o.compare_at_gnf ? String(o.compare_at_gnf) : ''); setSection(o.section_id); setActive(o.active); setKept(o.photo_paths ?? []);
       setCondition(o.condition ?? 'neuf'); setNote(o.description ?? '');
       const cp = o.catalog_products;
+      if (cp && !editing) setName(`${cp.name} (copie)`.slice(0, 120));
       if (cp) { setCat(cp.category_id); setDesc(cp.description ?? ''); const d = readAttributes(cp.attributes); setValues(d.values); setPoints([...d.points, '', '', ''].slice(0, Math.max(3, d.points.length))); }
       const vs = (o.offer_variants ?? []).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
-      if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: v.id, label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
+      if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: editing ? v.id : '', label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
     });
-  }, [sb, shop.id, offerId]);
+  }, [sb, shop.id, offerId, copyFrom, editing]);
 
   // Fiche commune : si quelqu'un vend déjà ce produit, on y ajoute son offre (même fiche, plusieurs vendeurs).
   useEffect(() => {
@@ -176,7 +179,10 @@ export function ProductEditor({ shop, uid, offerId }: { shop: MyShop; uid: strin
   return (
     <Screen className="gap-3 pb-32">
       <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'}
-        right={editing && existing?.active && existing.catalog_products ? <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3.5 text-[12.5px] font-extrabold">Partager</button> : null} />
+        right={editing && existing ? <span className="flex gap-1.5">
+          <Link href={`/produits/nouveau?depuis=${existing.id}`} className="flex h-10 items-center rounded-full border border-line px-3 text-[12.5px] font-extrabold">Dupliquer</Link>
+          {existing.active && existing.catalog_products && <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3 text-[12.5px] font-extrabold">Partager</button>}
+        </span> : copyFrom ? <span className="rounded-full bg-blue-soft px-3 py-1.5 text-[12px] font-extrabold text-blue-ink">Copie</span> : null} />
       {sharing && editing && existing?.catalog_products && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: existing.id, productSlug: existing.catalog_products.slug, name: existing.catalog_products.name, priceGnf: existing.price_gnf }} onClose={() => setSharing(false)} />}
       <Notice msg={msg} />
 

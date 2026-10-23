@@ -13,7 +13,7 @@ const TABS = [
   { href: '/commandes', label: 'Commandes', match: (p: string) => p.startsWith('/commandes'), icon: <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="m3 8 9 5 9-5" /><path d="M12 13v8" /></> },
   { href: '/produits', label: 'Produits', match: (p: string) => p.startsWith('/produits'), icon: <><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" /><path d="M7.5 7.5h.01" /></> },
   { href: '/marketing', label: 'Marketing', match: (p: string) => p.startsWith('/marketing'), icon: <><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></> },
-  { href: '/plus', label: 'Menu', match: (p: string) => ['/plus', '/argent', '/statistiques', '/avis', '/questions', '/reglages', '/notifications', '/aide'].some((x) => p.startsWith(x)), icon: <path d="M4 6h16M4 12h16M4 18h16" /> },
+  { href: '/plus', label: 'Menu', match: (p: string) => ['/plus', '/argent', '/statistiques', '/clients', '/boutique', '/equipe', '/avis', '/questions', '/reglages', '/notifications', '/aide'].some((x) => p.startsWith(x)), icon: <path d="M4 6h16M4 12h16M4 18h16" /> },
 ];
 
 /**
@@ -29,8 +29,8 @@ export function VendeurNav() {
   const refresh = useCallback(async () => {
     const sb = browserClient(); const uid = session?.user.id;
     if (!sb || !uid) { setOpen(false); return; }
-    const { data } = await sb.from('shops').select('id,status').eq('owner_id', uid).limit(1).maybeSingle();
-    const s = data as { id: string; status: string } | null;
+    const { data } = await sb.from('shop_members').select('role,shops(id,status)').eq('user_id', uid).order('role', { ascending: false }).limit(1).maybeSingle();
+    const s = (data as unknown as { shops: { id: string; status: string } | null } | null)?.shops ?? null;
     setOpen(s?.status === 'ouverte');
     if (s?.status === 'ouverte') {
       const { count } = await sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', s.id).eq('status', 'attente_vendeur');
