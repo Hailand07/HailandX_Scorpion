@@ -547,6 +547,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-23 | Migration `2026-10-28_hailandx_vendeur_commandes_marketing.sql` appliquée en production (accord du fondateur ; fin par l'éditeur SQL) et vérifiée. |
 | 2026-10-23 | §37 terminé côté code : accueil « Bien démarrer » et conseil du jour, sélection groupée et duplication de produits, Clients, Boutique en ligne (horaires, vacances, politique, mis en avant), statistiques enrichies, Équipe avec droits limités. Migration `2026-10-29_hailandx_vendeur_boutique_clients_equipe.sql` appliquée en production (accord du fondateur) et vérifiée ; BASE_DE_DONNEES révision 10. |
 | 2026-10-23 | §38 : prototype de vidéos publicitaires de produits (`tools/videos-pub`, musique générée sans droits) ; intégration à HailandX Vendeur reportée à la demande du fondateur (fonctionnement, coûts et décisions à prendre notés). |
+| 2026-10-23 | Correctif (signalé par le fondateur) : l'écran de bienvenue de HailandX s'affichait par-dessus un lien de produit à la toute première visite. Il ne s'affiche plus qu'à l'ouverture de l'accueil ; un visiteur arrivé par un lien (produit, boutique, `/s/…`) va directement à la page cliquée et l'écran est marqué comme vu (`WelcomeGate`). Vérifié dans un navigateur neuf : produit et boutique directs, accueil avec l'écran. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
