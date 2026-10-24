@@ -3,8 +3,8 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Wordmark, Chargement } from '@hailandx/ui';
-import { formatGnf, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
-import { browserClient, Icon, LienHailand, lienEnregistrement, useSession } from '@hailandx/kit';
+import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
+import { browserClient, Icon, LienHailand, lienEnregistrement, useSession, useWallet } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { currentSource } from '@/lib/source';
 
@@ -28,7 +28,8 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [pay, setPay] = useState<'livraison' | 'orange_money'>('livraison');
+  const [pay, setPay] = useState<'livraison' | 'orange_money' | 'hailandpay'>('livraison');
+  const { wallet } = useWallet();
   const [promo, setPromo] = useState('');
   const [promoCheck, setPromoCheck] = useState<{ code: string; discount: number; lines: { shop_name: string; discount_gnf: number; reason: string | null }[] } | null>(null);
   const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
@@ -68,6 +69,7 @@ function Checkout() {
     setError(null);
     const n = normalizeGnPhone(phone);
     if (!n) return setError('Entrez un numéro guinéen valide pour que le livreur puisse vous joindre.');
+    if (pay === 'hailandpay' && (!wallet || wallet.balance < toPay)) return setError('Solde HailandPay insuffisant : rechargez votre portefeuille (argent de test) ou choisissez un autre moyen.');
     if (!decl) return setError('Choisissez une adresse de livraison.');
     setBusy(true);
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
@@ -89,6 +91,7 @@ function Checkout() {
     setPromoCheck({ code, discount: rows.reduce((a, r) => a + r.discount_gnf, 0), lines: rows });
   }
   const discount = promoCheck?.discount ?? 0;
+  const toPay = Math.max(0, cartSubtotal(lines) - discount) + feeTotal;
 
   const Head = (
     <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><h1 className="font-display text-[20px] font-semibold">Commande</h1></div>
@@ -133,6 +136,13 @@ function Checkout() {
             <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> Orange Money
             <span className="ml-auto text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
           </label>
+          <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'hailandpay' ? 'border-2 border-ink' : 'border border-line'}`}>
+            <input type="radio" name="pay" disabled={!wallet} checked={pay === 'hailandpay'} onChange={() => setPay('hailandpay')} /> <span>Hailand<span className="text-blue">Pay</span></span>
+            <span className="ml-auto text-[11.5px]">{wallet ? `${formatSyli(wallet.balance)} · TEST` : '…'}</span>
+          </label>
+          {pay === 'hailandpay' && wallet && (wallet.balance >= toPay
+            ? <p className="text-[12.5px] font-medium text-muted">Payé tout de suite en Syli (argent de test, 1 Syli = 1 GNF). L’argent reste bloqué par Hailand jusqu’à la remise du colis, et vous est rendu si la commande est annulée. Solde après paiement : <b className="text-ink">{formatSyli(wallet.balance - toPay)}</b>.</p>
+            : <p className="text-[12.5px] font-bold text-[#a3321f]">Solde insuffisant ({formatSyli(wallet.balance)} pour {formatSyli(toPay)}). <Link href="/compte/hailandpay/recharger" className="text-blue-ink underline">Recharger</Link></p>)}
           {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez à l’étape suivante. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
@@ -154,7 +164,7 @@ function Checkout() {
                 <div key={x.shop_id} className="flex justify-between gap-3"><span className="min-w-0 truncate text-muted">Livraison depuis {x.shop_name} · {Number(x.distance_km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</span><span className="shrink-0">{formatGnf(x.fee_gnf)}</span></div>
               ))}
               {quote.length > 1 && <p className="text-[12px] font-semibold leading-snug text-muted">Vos articles viennent de {quote.length} boutiques : {quote.length} colis, chacun livré depuis sa boutique, avec ses propres frais.</p>}
-              <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(Math.max(0, cartSubtotal(lines) - discount) + feeTotal)}</span></div>
+              <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(toPay)}</span></div>
             </>
           ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>

@@ -554,6 +554,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-24 | §41 : migration `2026-10-30_hailandx_corrections_simulation.sql` appliquée en production et vérifiée. |
 | 2026-10-24 | §42 : plan **HailandPay** (portefeuille, paiement, envoi entre comptes, recharge de test jusqu'à 50 M) avec le **Syli**, argent de test (1 Syli = 1 GNF) ; étape 0 : maquettes v8 publiées — en attente de validation du fondateur. |
 | 2026-10-24 | §42 étape 1 : base HailandPay (`2026-10-31_hailandpay.sql`, ⏳ à appliquer) — portefeuilles, paiement des commandes, règlements et remboursements automatiques, recharge, envoi, retrait, crédit d'équipe, contrôle d'équilibre ; 12 tests. |
+| 2026-10-24 | §42 : migration HailandPay appliquée et vérifiée ; étapes 2 et 3 — écrans HailandPay dans HailandX (portefeuille, recharge, envoi par numéro ou QR, réception, retrait simulé, paiement à la commande), Vendeur (portefeuille de la boutique), Flotte (gains), Console (vue d'ensemble, équilibre, crédit / débit) ; 338 tests. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -999,7 +1000,7 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 
 **Mise en production (2026-10-24)** : partie 1 appliquée par Claude (anciennes fonctions renommées `fn_parcel_cancel_ancienne`, sans droits), le reste collé par le fondateur dans l'éditeur SQL (les questions de confirmation du connecteur expiraient). Vérifié : fonctions et droits, compte `courier_cash` (solde d'ouverture 1 877 000 GNF du livreur d'essai), `disputes.refund_gnf`, plafond par défaut 15 M, liens corrigés, devis de livraison (35 000 / 29 000 GNF, identiques à la simulation), ventes « encaissé » (4 613 000 sur 5 463 000 GNF chez HailandShop). Les PR peuvent être fusionnées.
 
-## 42. HailandPay et le Syli, argent de test (2026-10-24) — ✅ étape 0 validée ; ✅ étape 1 (base) codée et testée, ⏳ à appliquer ; étapes 2 à 4 à venir
+## 42. HailandPay et le Syli, argent de test (2026-10-24) — ✅ étapes 0 à 3 (maquettes, base appliquée, écrans HailandX, Vendeur, Flotte, Console) ; ⏳ étape 4 (essai complet) en attente d'accord
 
 **Demande du fondateur** : « ajouter de l'argent propre à Hailand afin de pouvoir simuler, vérifier les ajustements ou améliorations, afin que lorsque l'argent réel sera apte à être mis en place, tout soit déjà ok… on va appeler l'opérateur HailandPay ». Décisions du 2026-10-24 : monnaie **Syli** ; **recharge de test en libre-service jusqu'à 50 000 000 Syli** par compte ; **envois entre comptes dès maintenant**.
 
@@ -1024,7 +1025,7 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 
 ⚠️ **Avant l'argent réel** : garder de l'argent réel pour le compte des gens (soldes de portefeuille) exige en principe un **agrément de la BCRG** (établissement de monnaie électronique) — ⚠️ à vérifier. Le Syli d'essai n'est pas concerné. Au passage au réel : s'appuyer sur un opérateur agréé, ou obtenir l'agrément.
 
-**Étape 1 — base (2026-10-24)** ✅ code et tests ; ⏳ migration à appliquer (à coller dans l'éditeur SQL) : `supabase/migrations/2026-10-31_hailandpay.sql`, tests `supabase/tests/hailandpay.test.ts` (12 scénarios) ; suite complète 334 vérifications.
+**Étape 1 — base (2026-10-24)** ✅ code et tests ; ✅ migration appliquée par le fondateur (éditeur SQL) et vérifiée (essai annulé : recharge, recherche « Compte Hailand · 6•• •• 19 », envoi de 250 000 Syli) : `supabase/migrations/2026-10-31_hailandpay.sql`, tests `supabase/tests/hailandpay.test.ts` (12 scénarios) ; suite complète 334 vérifications.
 - Tables `wallets` (compte ou boutique, solde jamais négatif, total rechargé) et `wallet_movements` (historique) ; lecture par le titulaire et l'équipe, **aucune écriture directe**.
 - `private.wallet_move` : le seul chemin qui change un solde (verrou, refus « solde HailandPay insuffisant », historique et grand livre écrits ensemble).
 - Paiement : `fn_place_order(…, 'hailandpay')` débite à la commande, `payment_status = bloque` ; rien à encaisser pour le livreur.
@@ -1033,3 +1034,10 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 - Scripts de remise à zéro des comptes : sauvegardent et vident aussi `wallets` et `wallet_movements`.
 - Sans effet sur les applications en ligne tant qu'elles ne proposent pas HailandPay (les autres moyens de paiement sont inchangés) : la migration peut être appliquée avant l'étape 2.
 
+**Étapes 2 et 3 — écrans (2026-10-24)** ✅ code, types, 338 tests, builds des 4 applications ; ⏳ pas encore essayé à l'écran avec un vrai compte (étape 4) :
+- Paquets communs : `@hailandx/commerce` `syli.ts` (`formatSyli`, plafond et paliers de recharge, libellés des 13 mouvements, QR `hailandpay:<numéro>`, 4 tests) ; `@hailandx/kit` `HailandPay.tsx` (`useWallet` → `fn_wallet_me`, `TestBand` « argent de test, sans valeur réelle », `WalletCard`, `MovementList`, `WithdrawForm` → `fn_wallet_withdraw`) ; 7 icônes ajoutées ; notifications de type `paiement` avec l'icône 💳.
+- **HailandX** (maquettes A1 à A4) : `/compte/hailandpay` (solde, bloqué, Recharger · Envoyer · Recevoir · Retirer, historique) ; `recharger` (paliers 1 / 5 / 10 / 20 M, jauge du plafond de 50 M) ; `envoyer` (numéro ou QR → nom masqué → montant → confirmation « sans frais, ne s'annule pas » → envoyé) ; `recevoir` (QR et numéro, partager / copier) ; `retirer` (simulé : Orange Money, Soutra Money, PayCard, banque). Ligne **HailandPay** avec le solde dans Compte. **Paiement à la commande** : choix « HailandPay » avec le solde, le solde après paiement, refus et lien « Recharger » si le solde ne suffit pas ; suivi de commande : « Payé avec HailandPay » (bloqué jusqu'à la remise / versé au vendeur / rendu) et « vos Syli sont rendus » en cas d'annulation.
+- **HailandX Vendeur** (B1) : page Argent → bloc **HailandPay** de la boutique (solde, à recevoir à la remise, « Vers mon portefeuille » → `fn_shop_wallet_to_owner`, retrait simulé, mouvements).
+- **Hailand Flotte** (C1) : Mes livraisons → **gains HailandPay** (solde du portefeuille, total gagné sur les livraisons payées en Syli, retrait simulé, lien vers HailandX).
+- **Hailand Console** (D1) : nouvelle page **HailandPay (test)** → `fn_hailandpay_overview` (Syli dans les portefeuilles, bloqués, recharges, crédits / débits de l'équipe, retraits, **contrôle d'équilibre** solde = grand livre, 30 derniers mouvements) ; **créditer / débiter** un compte (numéro) ou une boutique avec motif obligatoire et confirmation (`fn_wallet_admin_adjust`, inscrit au journal, titulaire prévenu).
+- Étape 4 proposée : rejouer en Syli le scénario de la simulation §40 (commandes payées HailandPay, remise, annulation, litige remboursé, envoi entre les deux comptes, passage boutique → propriétaire, retrait, crédit d'équipe) puis vérifier l'équilibre dans la Console ; **écritures en production : accord du fondateur requis**.

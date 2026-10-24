@@ -14,3 +14,4 @@ export * from './account';
 export * from './passage';
 export * from './compte';
 export * from './LienHailand';
+export * from './HailandPay';

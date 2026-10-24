@@ -81,7 +81,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ""}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
                 {p.discount_gnf > 0 && <div className="flex justify-between text-[12.5px] font-bold text-ok"><span>Code promo {p.promo_code}</span><span>− {formatGnf(p.discount_gnf)}</span></div>}
                 <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>
-                {p.status === 'annule' && p.cancel_reason && <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé {p.cancelled_by === 'vendeur' ? 'par la boutique' : p.cancelled_by === 'equipe' ? 'par l’équipe Hailand' : ''} : « {p.cancel_reason} »{order.payment_method === 'orange_money' ? ' — vous êtes remboursé.' : ''}</p>}
+                {p.status === 'annule' && p.cancel_reason && <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé {p.cancelled_by === 'vendeur' ? 'par la boutique' : p.cancelled_by === 'equipe' ? 'par l’équipe Hailand' : ''} : « {p.cancel_reason} »{order.payment_method === 'orange_money' ? ' — vous êtes remboursé.' : order.payment_method === 'hailandpay' ? ' — vos Syli sont rendus dans votre portefeuille HailandPay.' : ''}</p>}
                 {codes[p.id] && (p.status === 'accepte' || p.status === 'retire') && (
                   <div className="flex flex-col items-center gap-1 rounded-2xl bg-lime px-4 py-3">
                     <span className="text-[12px] font-extrabold">Code de remise — à donner au livreur à la porte</span>
@@ -99,6 +99,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             <div className="flex justify-between"><span className="text-muted">Articles{parcels.some((x) => x.discount_gnf > 0) ? ' (après réduction)' : ''}</span><span>{formatGnf(order.subtotal_gnf)}</span></div>
             <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{formatGnf(order.delivery_fee_gnf)}</span></div>
             <div className="flex justify-between text-[15px] font-extrabold"><span>Total {order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
+            {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
         </>
       )}

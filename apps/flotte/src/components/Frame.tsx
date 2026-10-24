@@ -78,7 +78,7 @@ export function Menu({ courier, onClose, onSignOut }: { courier: MenuCourier; on
           <span className="flex min-w-0 flex-1 flex-col"><span className="truncate font-display text-[17px] font-semibold">{courier.full_name}</span><span className="text-[12.5px] font-bold text-night-muted">Livreur Hailand · {VEHICULE[courier.vehicle] ?? courier.vehicle}</span></span>
           <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 items-center justify-center rounded-xl text-night-muted">{Ico.close(20)}</button>
         </div>
-        <Link href="/livraisons" className={item} onClick={onClose}><Line icon={Ico.route(20)} label="Mes livraisons" sub="Historique et gains" /></Link>
+        <Link href="/livraisons" className={item} onClick={onClose}><Line icon={Ico.route(20)} label="Mes livraisons" sub="Historique, gains et HailandPay" /></Link>
         <Link href="/livraisons#especes" className={item} onClick={onClose}><Line icon={Ico.wallet(20)} label="Espèces à reverser" sub={formatGnf(courier.cash_balance_gnf)} /></Link>
         <Link href="/aide" className={item} onClick={onClose}><Line icon={Ico.help(20)} label="Aide" sub="Client absent, colis refusé, problème de code…" /></Link>
         <button type="button" onClick={onSignOut} className="flex items-center gap-3.5 py-3.5 text-left text-[15px] font-extrabold text-[#ffb4a8]">{Ico.logout(20)}Se déconnecter</button>
