@@ -18,6 +18,9 @@ export default function DisputesPage() {
   const [reports, setReports] = useState<Report[] | null>(null);
   const [questions, setQuestions] = useState<Question[] | null>(null);
   const [notes, setNotes] = useState<Record<string, string>>({});
+  // Remboursement partiel (A7) : montant des articles rendu à l'acheteur ; vide = tout le colis.
+  const [refunds, setRefunds] = useState<Record<string, string>>({});
+  const refundOf = (id: string) => { const n = Number((refunds[id] ?? '').replace(/\D/g, '')); return n > 0 ? n : null; };
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -33,9 +36,14 @@ export default function DisputesPage() {
   const note = (id: string) => notes[id]?.trim() || null;
   const after = async () => { setConfirm(null); await load(); };
 
-  const resolve = (d: Dispute, side: 'acheteur' | 'vendeur') => run(
-    sb.rpc('fn_resolve_dispute', { p_dispute: d.id, p_in_favor_of: side, p_note: note(d.id) }),
-    side === 'acheteur' ? 'Tranché en faveur de l’acheteur : colis annulé, remboursement à effectuer (page Argent).' : 'Tranché en faveur du vendeur : livraison confirmée.', after);
+  const resolve = (d: Dispute, side: 'acheteur' | 'vendeur') => {
+    const partial = side === 'acheteur' && refundOf(d.id) !== null && refundOf(d.id)! < (d.parcels?.subtotal_gnf ?? Infinity);
+    return run(
+      sb.rpc('fn_resolve_dispute', { p_dispute: d.id, p_in_favor_of: side, p_note: note(d.id), p_refund_gnf: side === 'acheteur' ? refundOf(d.id) : null }),
+      side === 'vendeur' ? 'Tranché en faveur du vendeur : livraison confirmée.'
+        : partial ? `Tranché en faveur de l’acheteur : remboursement partiel de ${formatGnf(refundOf(d.id)!)} à effectuer (page Argent).`
+        : 'Tranché en faveur de l’acheteur : colis annulé, remboursement à effectuer (page Argent).', after);
+  };
   const moderate = (r: Report, hide: boolean) => run(
     sb.rpc('fn_moderate_review', { p_report: r.id, p_hide: hide, p_note: note(r.id) }), hide ? 'Avis masqué : il ne compte plus dans l’indice de confiance.' : 'Avis maintenu.', after);
 
@@ -61,9 +69,13 @@ export default function DisputesPage() {
             <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Note de décision (facultative, gardée au journal ; pour l’expliquer aux parties, écrivez-leur dans les échanges)
               <textarea rows={2} maxLength={500} value={notes[d.id] ?? ''} onChange={(e) => setNotes((x) => ({ ...x, [d.id]: e.target.value }))} className="rounded-[14px] border border-line px-3 py-2.5 text-[14px] font-semibold outline-none focus:border-blue" />
             </label>
+            <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Remboursement à l’acheteur (GNF, si décision en sa faveur)
+              <input inputMode="numeric" value={refunds[d.id] ?? ''} onChange={(e) => setRefunds((x) => ({ ...x, [d.id]: e.target.value }))} placeholder={d.parcels ? `Vide = tout le colis (${formatGnf(d.parcels.subtotal_gnf)})` : 'Vide = tout le colis'} className="h-11 rounded-[14px] border border-line px-3 text-[14px] font-semibold outline-none focus:border-blue" />
+              <span className="text-[12px] font-semibold text-muted">Un montant plus petit que les articles = remboursement partiel : le colis reste livré, la boutique rend cette somme (commission comprise).</span>
+            </label>
             {confirm === d.id ? (
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={busy} onClick={() => resolve(d, 'acheteur')} className={btn.dark}>Confirmer : pour l’acheteur (colis annulé)</button>
+                <button type="button" disabled={busy} onClick={() => resolve(d, 'acheteur')} className={btn.dark}>{refundOf(d.id) !== null && d.parcels && refundOf(d.id)! < d.parcels.subtotal_gnf ? `Confirmer : rembourser ${formatGnf(refundOf(d.id)!)} à l’acheteur` : 'Confirmer : pour l’acheteur (colis annulé)'}</button>
                 <button type="button" disabled={busy} onClick={() => resolve(d, 'vendeur')} className={btn.line}>Confirmer : pour le vendeur (livré)</button>
                 <button type="button" onClick={() => setConfirm(null)} className={btn.line}>Annuler</button>
               </div>

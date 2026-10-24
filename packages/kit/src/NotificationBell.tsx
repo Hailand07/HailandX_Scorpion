@@ -3,10 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { browserClient } from './supabase';
 import { useSession } from './useSession';
-import { unreadNotifications } from './Notifications';
+import { unreadNotifications, type NotificationScope } from './Notifications';
 
 /** Cloche : nombre de notifications non lues (relevé toutes les 30 s tant que la page est ouverte). */
-export function NotificationBell({ className = '', scope = 'acheteur' }: { className?: string; scope?: 'acheteur' | 'vendeur' }) {
+export function NotificationBell({ className = '', scope = 'acheteur' }: { className?: string; scope?: NotificationScope }) {
   const session = useSession();
   const [count, setCount] = useState(0);
   const poll = useCallback(async () => {

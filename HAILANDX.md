@@ -550,6 +550,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-23 | Correctif (signalé par le fondateur) : l'écran de bienvenue de HailandX s'affichait par-dessus un lien de produit à la toute première visite. Il ne s'affiche plus qu'à l'ouverture de l'accueil ; un visiteur arrivé par un lien (produit, boutique, `/s/…`) va directement à la page cliquée et l'écran est marqué comme vu (`WelcomeGate`). Vérifié dans un navigateur neuf : produit et boutique directs, accueil avec l'écran. |
 | 2026-10-23 | §39 : concurrence par les prix — une carte par produit (« dès … · N vendeurs ») sur l'accueil, les catégories et la recherche ; page produit « Meilleur prix », « Moins cher chez … », comparateur trié par prix avec l'écart ; offre recommandée pesée 45 % confiance / 40 % prix (proportionnel) / 15 % délai ; repère de prix dans HailandX Vendeur (fiche produit et liste). 25 offres de démonstration pour HailandShop sur les fiches de Djigo Shop (`supabase/maintenance/2026-10-23_catalogue_demo_hailandshop.md`). Chargement « HX » animé commun (`Chargement`, `loading.tsx`) dans les 4 applications, copié dans NavigationX et HailandMap ; ECOSYSTEME révision 104. |
 | 2026-10-23 | §40 : simulation complète acheteur ↔ vendeur en production (accord du fondateur) avec le 610 01 04 19 et le 623 77 01 66 : 12 commandes en espèces, livraisons, faux code, avis 2 à 5★, signalement, litige tranché et remboursé, annulations, codes promo, questions, versements. Rapport : 14 points dont 2 anomalies à corriger en priorité (annulation attribuée à l'équipe, notifications de litige du vendeur dans la mauvaise application). Données : `supabase/maintenance/2026-10-23_simulation_achats.md`. |
+| 2026-10-24 | §41 : corrections A1 à A14 de la simulation (migration `2026-10-30_hailandx_corrections_simulation.sql`, ⏳ à appliquer) : annulation selon le rôle réel, liens de notification (Vendeur, Console), centre de notifications de la Console, plafond qui compte les missions en cours (15 M par défaut), vendeur prévenu de la remise, « remettre en stock ? », remboursement partiel, textes, frais de livraison affichés avant de commander, espèces des livreurs au grand livre, tolérance de remise plafonnée, commandé / encaissé ; NavigationX : bâtiment à toucher quand la position dépasse ±50 m. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -970,4 +971,28 @@ Demande du fondateur : « une utilisation complète entre acheteur et vendeur…
 | A14 🟡 | Retrait en boutique sans contrôle de position (le QR suffit). | À garder tel quel ou ajouter la position (au choix). |
 
 **Non vérifié** : les écrans (pas de code de connexion pour ces numéros dans cette session) ; les photos de remise (chemin valide, aucun fichier) ; Orange Money (non réglé) ; toutes les dates sont réelles (activité concentrée sur le 23 octobre).
+
+## 41. Corrections de la simulation (2026-10-24) ✅ code et tests ; ⏳ migration à appliquer en production
+
+Accord du fondateur : « corrige A1 et A2 puis A3 à A6 ainsi que le reste ; laisse à 15 millions le plafond ; frais de livraison, choisis la meilleure option, celle des autres entreprises ; ne retire pas le rôle administrateur aux comptes vendeurs ».
+Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (idempotente), tests `supabase/tests/corrections.test.ts` (10 scénarios) ; suite complète 322 vérifications.
+
+| # | Correction |
+|---|---|
+| A1 | `fn_parcel_cancel` : **vendeur**, puis **acheteur**, puis **équipe** — un administrateur qui vend ou achète annule avec son vrai rôle (motif exigé du vendeur). |
+| A2 | Notifications de litige du vendeur → `/vendeur/commandes/<colis>` (HailandX Vendeur, fiche de la commande). Les notifications déjà envoyées sont corrigées par la migration. |
+| A3 | Notifications d'équipe → `/console/litiges` ; HailandX acheteur ne montre plus `/vendeur…` ni `/console…` ; **Hailand Console** a un onglet **Notifications** (pastille des non lues). |
+| A4 | `fn_courier_accept` compte l'argent en main **et** les espèces des missions acceptées ou en route ; plafond par défaut des nouveaux livreurs **15 000 000 GNF** (celui du livreur d'essai reste à 15 M). |
+| A5 | À la remise, le vendeur reçoit « Colis remis au client — X GNF ajoutés à votre solde (commission déduite) ». |
+| A6 | Annuler (Vendeur) : case « Remettre les articles en stock » — décochée d'office pour « Rupture de stock » (`p_restock`). |
+| A7 | Litige : la Console peut **rembourser une partie** (montant facultatif ; vide = tout le colis). Partiel : le colis reste livré ; la boutique rend la somme moins la commission, Hailand rend la commission (`disputes.refund_gnf`). |
+| A8 | Textes : « Nouvelle commande · 800 000 GNF — Pagne wax (Bleu) ×2 · quartier. À préparer. » (envoyée quand articles et montant sont connus) ; « Commande annulée par le client » ; « Litige tranché en votre faveur / en faveur de l'acheteur / du vendeur » avec le montant ; pas de double « Colis remis » après un litige. |
+| A9 | **Frais de livraison** : un colis et un frais **par boutique** (pratique de Jumia, Amazon, Instacart : chaque boutique est un point de départ différent), mais désormais **affichés avant de commander** (`fn_delivery_quote`) : « Livraison depuis X · 12,3 km · 32 000 GNF » par boutique, explication quand il y en a plusieurs, **total à payer**. |
+| A10 | Grand livre : compte `courier_cash` (espèces chez les livreurs) alimenté à la remise et vidé au reversement ; solde d'ouverture pour les espèces déjà en main ; tuile « Espèces chez les livreurs » dans Console → Argent. |
+| A11 | Remise : tolérance de 150 m autour du point **désigné sur la carte** ; sans point désigné, 150 m + précision GPS **plafonnée à 100 m** (250 m au plus, au lieu de 650 m). **NavigationX** : au-delà de ±50 m, le bâtiment deviné n'est plus validable d'un geste — l'utilisateur le **touche sur la vue satellite** (le point devient l'adresse de livraison). |
+| A12 | Gardé tel quel à la demande du fondateur (les comptes vendeurs restent administrateurs) ; A1 rend ce cumul sans effet sur les annulations. |
+| A13 | `fn_shop_sales` renvoie aussi `delivered_gnf` : l'accueil Vendeur affiche « Commandé … · dont … encaissés », les statistiques aussi. |
+| A14 | Retrait en boutique : **gardé sans contrôle de position** — le QR n'existe que sur le téléphone du vendeur, le livreur est donc forcément devant lui ; une position GPS imprécise bloquerait des retraits légitimes. La position est déjà enregistrée dans `delivery_events` quand elle est connue. |
+
+**Ordre de mise en ligne** : appliquer la migration **avant** de fusionner (les écrans appellent `fn_delivery_quote`, `p_restock`, `p_refund_gnf`, `delivered_gnf`).
 

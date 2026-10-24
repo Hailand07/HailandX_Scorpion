@@ -168,15 +168,18 @@ function CancelSheet({ parcel, onClose, onDone }: { parcel: string; onClose: () 
   const [other, setOther] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Remettre les articles en rayon ? Non par défaut quand c'est une rupture (il n'y a plus rien à vendre).
+  const [restock, setRestock] = useState(true);
   const reason = choice === 'autre' ? other.trim() : choice;
+  const pick = (r: string) => { setChoice(r); setRestock(r !== 'Rupture de stock'); };
 
   async function confirm() {
     if (reason.length < 3) return setErr('Choisissez ou écrivez le motif : le client le verra.');
     setBusy(true); setErr(null);
-    const { error } = await browserClient()!.rpc('fn_parcel_cancel', { p_parcel: parcel, p_reason: reason });
+    const { error } = await browserClient()!.rpc('fn_parcel_cancel', { p_parcel: parcel, p_reason: reason, p_restock: restock });
     setBusy(false);
     if (error) return setErr(errText(error));
-    onDone('Commande annulée. Le client est prévenu avec votre motif ; s’il avait payé, il est remboursé.');
+    onDone(`Commande annulée. Le client est prévenu avec votre motif ; s’il avait payé, il est remboursé.${restock ? ' Les articles sont remis en stock.' : ' Le stock n’a pas été modifié.'}`);
   }
 
   return (
@@ -187,11 +190,17 @@ function CancelSheet({ parcel, onClose, onDone }: { parcel: string; onClose: () 
         <div role="radiogroup" aria-label="Motif" className="flex flex-col gap-1.5">
           {[...CANCEL_REASONS, 'autre'].map((r) => (
             <label key={r} className={`flex min-h-[48px] items-center gap-3 rounded-2xl px-4 text-[14px] font-bold ${choice === r ? 'border-2 border-ink' : 'border border-line'}`}>
-              <input type="radio" name="motif" checked={choice === r} onChange={() => setChoice(r)} />{r === 'autre' ? 'Autre motif' : r}
+              <input type="radio" name="motif" checked={choice === r} onChange={() => pick(r)} />{r === 'autre' ? 'Autre motif' : r}
             </label>
           ))}
           {choice === 'autre' && <input value={other} onChange={(e) => setOther(e.target.value)} maxLength={300} placeholder="Expliquez en quelques mots" aria-label="Autre motif" className="h-12 rounded-2xl border border-line px-4 text-[15px] font-semibold outline-none focus:border-blue" />}
         </div>
+        {choice && (
+          <label className="flex min-h-[48px] items-center justify-between gap-3 rounded-2xl bg-bg px-4 text-[14px] font-bold">
+            <span className="flex flex-col"><span>Remettre les articles en stock</span><span className="text-[12px] font-semibold text-muted">{restock ? 'Ils redeviennent disponibles à la vente.' : 'Le stock affiché ne change pas.'}</span></span>
+            <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} className="h-5 w-5" />
+          </label>
+        )}
         {err && <p role="alert" className="text-[13px] font-bold text-[#a3321f]">{err}</p>}
         <button type="button" disabled={busy} onClick={confirm} className="h-[52px] rounded-2xl bg-[#a3321f] text-[15px] font-extrabold text-white disabled:opacity-50">{busy ? 'Annulation…' : 'Annuler la commande'}</button>
       </div>

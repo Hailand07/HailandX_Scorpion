@@ -152,7 +152,7 @@ describe('reversements et lecture', () => {
     expect((await as(db, U.livreur, () => q('select distinct account from ledger_entries'))).map((r) => r.account)).toEqual(['courier']);
     expect((await as(db, U.acheteur, () => q('select distinct account from ledger_entries'))).map((r) => r.account)).toEqual(['buyer']);
     expect((await as(db, U.vendeur2, () => q('select 1 from ledger_entries')))).toHaveLength(0);
-    expect((await as(db, U.admin, () => q('select distinct account from ledger_entries order by 1'))).map((r) => r.account)).toEqual(['buyer', 'courier', 'escrow', 'platform', 'shop']);
+    expect((await as(db, U.admin, () => q('select distinct account from ledger_entries order by 1'))).map((r) => r.account)).toEqual(['buyer', 'courier', 'courier_cash', 'escrow', 'platform', 'shop']);
     expect(await as(db, U.admin, () => refused(db.query(`insert into ledger_entries (account, kind, amount_gnf) values ('platform', 'faux', 1)`)))).toMatch(/permission denied/);
     expect(await as(db, U.acheteur, () => refused(db.query(`update payments set status = 'paye'`)))).toMatch(/permission denied/);
     expect(await as(db, 'anon', () => refused(db.query('select * from payments')))).toMatch(/permission denied/);

@@ -32,6 +32,18 @@ function Checkout() {
   const [promo, setPromo] = useState('');
   const [promoCheck, setPromoCheck] = useState<{ code: string; discount: number; lines: { shop_name: string; discount_gnf: number; reason: string | null }[] } | null>(null);
   const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
+  // Frais de livraison connus AVANT de commander (A9) : un colis par boutique, chacun avec ses frais (comme Jumia ou Amazon).
+  const [quote, setQuote] = useState<{ shop_id: string; shop_name: string; distance_km: number; fee_gnf: number }[] | null>(null);
+  const offerKey = lines.map((l) => l.offerId).sort().join(',');
+  useEffect(() => {
+    if (!sb || !decl || !offerKey) { setQuote(null); return; }
+    let live = true;
+    sb.rpc('fn_delivery_quote', { p_declaration: decl, p_offers: offerKey.split(',') }).then(({ data, error }) => {
+      if (live) setQuote(error ? null : ((data as { shop_id: string; shop_name: string; distance_km: number; fee_gnf: number }[]) ?? []));
+    });
+    return () => { live = false; };
+  }, [sb, decl, offerKey]);
+  const feeTotal = (quote ?? []).reduce((n, x) => n + x.fee_gnf, 0);
 
   useEffect(() => {
     if (!sb || !session) return;
@@ -136,7 +148,15 @@ function Checkout() {
         <section className="flex flex-col gap-1 text-[13.5px] font-semibold">
           <div className="flex justify-between"><span className="text-muted">Articles</span><span>{formatGnf(cartSubtotal(lines))}</span></div>
           {discount > 0 && <div className="flex justify-between text-ok"><span>Réduction</span><span>− {formatGnf(discount)}</span></div>}
-          <div className="flex justify-between"><span className="text-muted">Livraison</span><span>calculée à la validation</span></div>
+          {quote && quote.length > 0 ? (
+            <>
+              {quote.map((x) => (
+                <div key={x.shop_id} className="flex justify-between gap-3"><span className="min-w-0 truncate text-muted">Livraison depuis {x.shop_name} · {Number(x.distance_km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</span><span className="shrink-0">{formatGnf(x.fee_gnf)}</span></div>
+              ))}
+              {quote.length > 1 && <p className="text-[12px] font-semibold leading-snug text-muted">Vos articles viennent de {quote.length} boutiques : {quote.length} colis, chacun livré depuis sa boutique, avec ses propres frais.</p>}
+              <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(Math.max(0, cartSubtotal(lines) - discount) + feeTotal)}</span></div>
+            </>
+          ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>
         {error && <p role="alert" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a1c]">{error}</p>}
         <Button type="submit" disabled={busy || !decl}>{busy ? 'Envoi…' : 'Passer la commande'}</Button>

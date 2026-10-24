@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { browserClient, Icon, ICONS, useSession, signOutHailand } from '@hailandx/kit';
+import { browserClient, Icon, ICONS, unreadNotifications, useSession, signOutHailand } from '@hailandx/kit';
 import { phoneText } from '@/lib/format';
 import { Chargement } from '@hailandx/ui';
 
@@ -24,6 +24,7 @@ export function useConsole(): Ctx {
 
 const NAV: { href: string; label: string; icon: keyof typeof ICONS; badge?: (o: Overview) => number }[] = [
   { href: '/', label: 'Vue d’ensemble', icon: 'home' },
+  { href: '/notifications', label: 'Notifications', icon: 'bell' },
   { href: '/certifications', label: 'Certifications', icon: 'shield', badge: (o) => o.certifs_pending },
   { href: '/boutiques', label: 'Boutiques', icon: 'shop' },
   { href: '/livreurs', label: 'Livreurs', icon: 'truck', badge: (o) => o.couriers_pending + o.cash_over_limit },
@@ -48,12 +49,14 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<'chargement' | 'refuse' | 'ok'>('chargement');
   const [role, setRole] = useState<'fondateur' | 'operateur'>('operateur');
   const [overview, setOverview] = useState<Overview | null>(null);
+  const [unread, setUnread] = useState(0);
 
   const refresh = useCallback(async () => {
     if (!sb) return;
-    const { data } = await sb.rpc('fn_console_overview');
+    const [{ data }, n] = await Promise.all([sb.rpc('fn_console_overview'), unreadNotifications(sb, 'console')]);
     const row = Array.isArray(data) ? data[0] : data;
     if (row) setOverview(row as Overview);
+    setUnread(n);
   }, [sb]);
 
   useEffect(() => {
@@ -90,7 +93,7 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
           <div className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
             {NAV.map((n) => {
               const on = isActive(path, n.href);
-              const b = overview && n.badge ? n.badge(overview) : 0;
+              const b = n.href === '/notifications' ? unread : overview && n.badge ? n.badge(overview) : 0;
               return (
                 <Link key={n.href} href={n.href} aria-current={on ? 'page' : undefined}
                   className={`flex h-[42px] shrink-0 items-center gap-2.5 rounded-xl px-3 text-[14px] ${on ? 'bg-lime font-extrabold text-ink' : 'font-bold text-[#c9cede] hover:bg-night-card'}`}>
