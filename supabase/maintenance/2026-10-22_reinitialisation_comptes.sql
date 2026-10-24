@@ -70,6 +70,10 @@ do $q$ begin
     execute 'create table sauvegarde_20261022.promo_codes as table public.promo_codes';
     execute 'create table sauvegarde_20261022.promo_uses as table public.promo_uses';
   end if;
+  if to_regclass('public.wallet_movements') is not null then
+    execute 'create table sauvegarde_20261022.wallets as table public.wallets';
+    execute 'create table sauvegarde_20261022.wallet_movements as table public.wallet_movements';
+  end if;
 end $q$;
 
 -- ── 2. Données d'usage : tout est vidé (y compris celles des administrateurs) ─────────────────────────────────────────────
@@ -80,6 +84,7 @@ declare t text := 'public.notifications, public.dispute_messages, public.dispute
 begin
   if to_regclass('public.product_questions') is not null then t := 'public.product_questions, ' || t; end if;
   if to_regclass('public.promo_uses') is not null then t := 'public.promo_uses, public.promo_codes, ' || t; end if;
+  if to_regclass('public.wallet_movements') is not null then t := 'public.wallet_movements, public.wallets, ' || t; end if;
   execute 'truncate table ' || t;
 end $q$;
 
