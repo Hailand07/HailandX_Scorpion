@@ -87,7 +87,10 @@ describe('favoris', () => {
 describe('notifications', () => {
   it('une commande prévient le vendeur ; un livreur qui retire prévient l’acheteur', async () => {
     const n = await newParcel(); parcel = n.p; order = n.o;
-    expect(await as(db, U.vendeur, () => q<{ title: string }>(`select title from notifications where kind <> 'certification' order by id`))).toEqual([{ title: 'Nouvelle commande' }]);
+    const sellerNotes = await as(db, U.vendeur, () => q<{ title: string; link: string }>(`select title, link from notifications where kind <> 'certification' order by id`));
+    expect(sellerNotes).toHaveLength(1);
+    expect(sellerNotes[0]!.title).toMatch(/^Nouvelle commande · [\d  ]+ GNF$/);
+    expect(sellerNotes[0]!.link).toBe(`/vendeur/commandes/${parcel}`);
     await deliver(parcel);
     expect((await as(db, U.acheteur, () => q<{ title: string; link: string }>('select title, link from notifications order by id'))).map((r) => r.title)).toEqual(['Un livreur a accepté votre colis', 'Votre colis est en route']);
     expect((await as(db, U.acheteur, () => one<{ link: string }>('select link from notifications order by id limit 1'))).link).toBe(`/commandes/${order}`);
@@ -118,7 +121,8 @@ describe('messages de litige', () => {
     expect(await titles(U.vendeur)).toContain('Nouveau message dans un litige');
     expect(await titles(U.admin)).toContain('Litige à traiter');
     await as(db, U.admin, () => db.query(`select fn_resolve_dispute($1, 'vendeur', 'colis bien remis')`, [dispute]));
-    expect(await titles(U.acheteur)).toContain('Litige tranché');
+    expect(await titles(U.acheteur)).toContain('Litige tranché en faveur du vendeur');
+    expect(await titles(U.vendeur)).toContain('Litige tranché en votre faveur');
     expect(await as(db, U.acheteur, () => refused(db.query(`select fn_dispute_post($1, 'encore')`, [dispute])))).toMatch(/tranché/);
   });
 });

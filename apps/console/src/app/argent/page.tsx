@@ -6,7 +6,7 @@ import { phoneText } from '@/lib/format';
 
 interface Owed { shopId: string; name: string; amount: number }
 interface Refund { buyer_id: string; amount_gnf: number; buyer_phone: string | null }
-interface Totals { platform: number; escrow: number; courier: number }
+interface Totals { platform: number; escrow: number; courier: number; cash: number }
 
 /**
  * Argent : ce que Hailand doit verser aux boutiques et rembourser aux acheteurs (grand livre), et les soldes globaux.
@@ -28,12 +28,13 @@ export default function MoneyPage() {
     ]);
     const names = new Map(((shops.data as { id: string; name: string }[]) ?? []).map((s) => [s.id, s.name]));
     const byShop = new Map<string, number>();
-    const t: Totals = { platform: 0, escrow: 0, courier: 0 };
+    const t: Totals = { platform: 0, escrow: 0, courier: 0, cash: 0 };
     for (const r of (led.data as { account: string; account_id: string | null; amount_gnf: number }[]) ?? []) {
       if (r.account === 'shop' && r.account_id) byShop.set(r.account_id, (byShop.get(r.account_id) ?? 0) + r.amount_gnf);
       if (r.account === 'platform') t.platform += r.amount_gnf;
       if (r.account === 'escrow') t.escrow += r.amount_gnf;
       if (r.account === 'courier') t.courier += r.amount_gnf;
+      if (r.account === 'courier_cash') t.cash += r.amount_gnf;
     }
     setOwed([...byShop].filter(([, v]) => v > 0).map(([id, v]) => ({ shopId: id, name: names.get(id) ?? 'Boutique', amount: v })).sort((a, b) => b.amount - a.amount));
     setRefunds((due.data as Refund[]) ?? []);
@@ -48,9 +49,10 @@ export default function MoneyPage() {
   return (
     <>
       <PageHead title="Argent" sub="Grand livre Hailand" />
-      <section aria-label="Soldes" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <section aria-label="Soldes" className="grid grid-cols-2 gap-3 xl:grid-cols-5">
         <Tile label="Commission Hailand (cumul)" value={totals ? formatGnf(totals.platform) : '…'} />
         <Tile label="En séquestre" value={totals ? formatGnf(totals.escrow) : '…'} sub="Payé, pas encore livré" />
+        <Tile label="Espèces chez les livreurs" value={totals ? formatGnf(totals.cash) : '…'} sub="Encaissées, pas encore reversées" />
         <Tile label="À verser aux boutiques" value={owed ? formatGnf(owedTotal) : '…'} sub={owed ? `${owed.length} boutique${owed.length > 1 ? 's' : ''}` : ''} />
         <Tile label="À rembourser" value={refunds ? formatGnf(refundTotal) : '…'} sub={refunds ? `${refunds.length} acheteur${refunds.length > 1 ? 's' : ''}` : ''} />
       </section>

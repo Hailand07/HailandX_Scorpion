@@ -36,7 +36,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       sb.from('promo_codes').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id),
     ]);
     setD({
-      series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })),
+      series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf), delivered_gnf: Number(x.delivered_gnf ?? 0) })),
       prep: (prep.data as { created_at: string }[]) ?? [],
       disputes: disputes.count ?? 0,
       recent: (recent.data as Review[]) ?? [],
@@ -124,9 +124,9 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         <Segmented dark label="Période" value={period} onChange={setPeriod} items={[{ id: 'jour', label: 'Aujourd’hui' }, { id: 'semaine', label: '7 jours' }, { id: 'mois', label: '30 jours' }]} />
         <div className="flex items-end justify-between gap-3">
           <span className="flex flex-col gap-0.5">
-            <span className="text-[12px] font-bold text-white/65">Ventes</span>
+            <span className="text-[12px] font-bold text-white/65">Commandé</span>
             <span className="font-display text-[30px] font-semibold tracking-tight">{stats ? formatGnf(stats.revenue, false) : '…'} <span className="text-[14px] text-white/65">GNF</span></span>
-            <span className="text-[12.5px] font-bold text-white/75">{stats ? `${stats.parcels} commande${stats.parcels > 1 ? 's' : ''}` : ' '}</span>
+            <span className="text-[12.5px] font-bold text-white/75">{stats ? `${stats.parcels} commande${stats.parcels > 1 ? 's' : ''} · dont ${formatGnf(stats.delivered)} encaissés` : ' '}</span>
           </span>
           {stats?.trendPct != null && <span className="whitespace-nowrap rounded-full bg-lime/15 px-2.5 py-1 text-[12px] font-extrabold text-lime">{stats.trendPct > 0 ? '+' : ''}{stats.trendPct} % {period === 'jour' ? 'vs hier' : 'vs avant'}</span>}
         </div>

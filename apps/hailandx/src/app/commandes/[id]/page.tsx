@@ -127,7 +127,13 @@ function Review({ parcel, onDone }: { parcel: string; onDone: () => void }) {
 }
 
 const REASONS: [string, string][] = [['non_recu', 'Je n’ai pas reçu le colis'], ['endommage', 'Le produit est abîmé'], ['different', 'Ce n’est pas ce que j’ai commandé'], ['autre', 'Autre problème']];
-const RESOLUTION: Record<string, string> = { acheteur: 'Décision de l’équipe Hailand : en votre faveur. Le colis est annulé ; l’équipe vous contacte pour le remboursement.', vendeur: 'Décision de l’équipe Hailand : la livraison est confirmée.' };
+/** Décision du litige : remboursement total (colis annulé) ou partiel (le colis reste livré), ou livraison confirmée. */
+const resolutionText = (d: { resolution: string | null; refund_gnf: number | null }, status: string) =>
+  d.resolution === 'acheteur'
+    ? status === 'annule'
+      ? 'Décision de l’équipe Hailand : en votre faveur. Le colis est annulé ; l’équipe vous contacte pour le remboursement.'
+      : `Décision de l’équipe Hailand : en votre faveur. Remboursement partiel de ${formatGnf(d.refund_gnf ?? 0)} ; l’équipe vous contacte pour vous le remettre.`
+    : 'Décision de l’équipe Hailand : la livraison est confirmée.';
 
 /** Signaler un problème (colis en route ou remis depuis moins de 72 h) ; suivi de la décision de l'équipe. */
 function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelStatus; onDone: () => void }) {
@@ -136,11 +142,11 @@ function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelSta
   const [reason, setReason] = useState('non_recu');
   const [details, setDetails] = useState('');
   const [err, setErr] = useState<string | null>(null);
-  const [dispute, setDispute] = useState<{ id: string; status: string; resolution: string | null } | null | undefined>(undefined);
-  useEffect(() => { sb?.from('disputes').select('id,status,resolution').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setDispute((data as { id: string; status: string; resolution: string | null } | null) ?? null)); }, [sb, parcel, status]);
+  const [dispute, setDispute] = useState<{ id: string; status: string; resolution: string | null; refund_gnf: number | null } | null | undefined>(undefined);
+  useEffect(() => { sb?.from('disputes').select('id,status,resolution,refund_gnf').eq('parcel_id', parcel).maybeSingle().then(({ data }) => setDispute((data as { id: string; status: string; resolution: string | null; refund_gnf: number | null } | null) ?? null)); }, [sb, parcel, status]);
   if (dispute === undefined) return null;
   if (dispute) {
-    return <div className="flex flex-col gap-2"><p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">{dispute.status === 'ouvert' ? 'Problème signalé : l’équipe Hailand examine votre demande et vous recontacte.' : RESOLUTION[dispute.resolution ?? 'vendeur']}</p><DisputeThread disputeId={dispute.id} open={dispute.status === 'ouvert'} mine="acheteur" /></div>;
+    return <div className="flex flex-col gap-2"><p className="rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-semibold">{dispute.status === 'ouvert' ? 'Problème signalé : l’équipe Hailand examine votre demande et vous recontacte.' : resolutionText(dispute, status)}</p><DisputeThread disputeId={dispute.id} open={dispute.status === 'ouvert'} mine="acheteur" /></div>;
   }
   if (status !== 'retire' && status !== 'remis') return null;
   if (!open) return <button type="button" onClick={() => setOpen(true)} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Signaler un problème</button>;

@@ -41,7 +41,7 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
       sb.from('order_items').select('name_snapshot,quantity,price_gnf_snapshot,parcels!inner(shop_id,status,created_at)').eq('parcels.shop_id', shopId).neq('parcels.status', 'annule').gte('parcels.created_at', since).limit(1000),
     ]);
     setSold((c.data as unknown as Sold[]) ?? []);
-    setSeries(((a.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })));
+    setSeries(((a.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf), delivered_gnf: Number(x.delivered_gnf ?? 0) })));
     setSources(((b.data as Src[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf) })));
   }, [sb, shopId, period]);
   const loadRest = useCallback(async () => {
@@ -87,7 +87,7 @@ function Stats({ shopId, certified }: { shopId: string; certified: boolean }) {
       <Chips label="Période" value={period} onChange={setPeriod} items={[{ id: '7', label: '7 jours' }, { id: '30', label: '30 jours' }, { id: '90', label: '90 jours' }]} />
 
       <section aria-label="Ventes par jour" className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-4">
-        <div className="flex items-baseline justify-between gap-3"><h2 className="text-[14.5px] font-extrabold">Ventes par jour</h2><span className="font-display text-[15px] font-semibold">{stats ? formatGnf(stats.revenue) : '…'}</span></div>
+        <div className="flex items-baseline justify-between gap-3"><h2 className="text-[14.5px] font-extrabold">Ventes par jour</h2><span className="flex flex-col items-end"><span className="font-display text-[15px] font-semibold">{stats ? formatGnf(stats.revenue) : '…'}</span>{stats && <span className="text-[11.5px] font-bold text-muted">commandé · {formatGnf(stats.delivered)} encaissés</span>}</span></div>
         <div role="img" aria-label={`Ventes par jour sur ${period} jours`} className={`grid h-[110px] items-end ${short ? 'gap-2' : 'gap-[2px]'}`} style={{ gridTemplateColumns: `repeat(${Math.max(1, (series ?? []).length)}, minmax(0, 1fr))` }}>
           {(series ?? []).map((d, i) => <span key={d.day} title={`${new Date(d.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${formatGnf(d.revenue_gnf)}`} className={`block ${short ? 'rounded-md' : 'rounded-t-[3px]'} ${i === (series ?? []).length - 1 ? 'bg-blue' : d.revenue_gnf ? 'bg-[#d9defc]' : 'bg-line'}`} style={{ height: `${heights[i]}%` }} />)}
         </div>

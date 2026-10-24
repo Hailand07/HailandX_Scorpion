@@ -4,8 +4,9 @@ import { buyerStep, type ParcelStatus } from './parcel';
 
 // ── Ventes ─────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-export interface SalesDay { day: string; parcels: number; revenue_gnf: number }
-export interface PeriodStats { revenue: number; parcels: number; previous: number; trendPct: number | null }
+/** Ventes d'un jour : `revenue_gnf` = commandé (colis non annulés), `delivered_gnf` = encaissé (colis remis). */
+export interface SalesDay { day: string; parcels: number; revenue_gnf: number; delivered_gnf?: number }
+export interface PeriodStats { revenue: number; parcels: number; previous: number; trendPct: number | null; delivered: number }
 
 /**
  * Ventes des `days` derniers jours (aujourd'hui compris) et comparaison avec les `days` jours d'avant.
@@ -20,6 +21,7 @@ export function periodStats(series: SalesDay[], days: number): PeriodStats {
   return {
     revenue,
     parcels: cur.reduce((n, d) => n + d.parcels, 0),
+    delivered: cur.reduce((n, d) => n + Number(d.delivered_gnf ?? 0), 0),
     previous,
     trendPct: prev.length === days && previous > 0 ? Math.round(((revenue - previous) / previous) * 100) : null,
   };
