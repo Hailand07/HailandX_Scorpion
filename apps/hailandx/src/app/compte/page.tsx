@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { browserClient, GroupTitle, Icon, LienHailand, ListRow, Screen, unreadNotifications, useSession, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
-import { maskPhone } from '@hailandx/commerce';
+import { browserClient, GroupTitle, Icon, LienHailand, ListRow, Screen, unreadNotifications, useSession, useWallet, VENDEUR_URL, signOutHailand } from '@hailandx/kit';
+import { formatSyli, maskPhone } from '@hailandx/commerce';
 import { Chargement } from '@hailandx/ui';
 
 /** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
 export default function AccountPage() {
   const session = useSession();
+  const { wallet } = useWallet();
   const [counts, setCounts] = useState<{ fav: number; addr: number; unread: number } | null>(null);
 
   useEffect(() => {
@@ -53,6 +54,7 @@ export default function AccountPage() {
       <section aria-label="Mes achats" className="flex flex-col gap-2">
         <GroupTitle>Mes achats</GroupTitle>
         <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
+          <ListRow href="/compte/hailandpay" icon="wallet" label="HailandPay" value={wallet ? <span className="text-[13px] font-bold text-muted">{formatSyli(wallet.balance)} · TEST</span> : null} />
           <ListRow href="/favoris" icon="heart" label="Favoris" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.fav}</span> : null} />
           <ListRow href="/adresse" icon="pin" label="Adresses de livraison" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.addr}</span> : null} last />
         </div>

@@ -9,3 +9,4 @@ export * from './fiche';
 export * from './promo';
 export * from './hours';
 export * from './market';
+export * from './syli';

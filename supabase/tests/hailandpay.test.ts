@@ -71,7 +71,7 @@ describe('envoi entre comptes', () => {
     expect(await bal(U.acheteur)).toBe(49750000);
     expect(await bal(U.acheteur2)).toBe(250000);
     const recu = await as(db, U.acheteur2, () => one<{ title: string; body: string; link: string }>(`select title, body, link from notifications where kind = 'paiement'`));
-    expect(recu).toEqual({ title: 'Vous avez reçu 250 000 Syli', body: 'Aïssatou D. : « Pour le tissu » (argent de test HailandPay)', link: '/compte/hailandpay' });
+    expect(recu).toEqual({ title: 'Vous avez reçu 250 000 Syli', body: 'De Aïssatou D. · 6•• •• 01 : « Pour le tissu » (argent de test HailandPay)', link: '/compte/hailandpay' });
     const hist = await as(db, U.acheteur2, () => q<{ kind: string; amount: string; counterparty_label: string }>('select kind, amount::int amount, counterparty_label from wallet_movements'));
     expect(hist).toEqual([{ kind: 'reception', amount: 250000, counterparty_label: 'Aïssatou D. · 6•• •• 01' }]);
   });
@@ -133,6 +133,22 @@ describe('annulations et litiges : retour immédiat dans le portefeuille', () =>
     expect(await shopBal()).toBe(shopBefore - 92000);
     expect(await imbalanced()).toBe(0);
   });
+  it('litige remboursé en totalité : articles ET frais rendus (repris à la boutique), articles remis en stock, textes en Syli', async () => {
+    const o = await order('hailandpay', 3);
+    expect(await deliver(o.id)).toBe('remis');
+    const remis = await as(db, U.vendeur, () => one<{ body: string }>(`select body from notifications where title = 'Colis remis au client' order by created_at desc, id desc limit 1`));
+    expect(remis.body).toBe('1 104 000 Syli versés dans le portefeuille HailandPay de la boutique (commission Hailand déduite).');
+    const stock = async () => n((await one<{ stock: number }>('select stock from offer_variants where id = $1', [variant])).stock);
+    const s0 = await stock(); const shopBefore = await shopBal(); const buyerBefore = await bal(U.acheteur);
+    const d = (await as(db, U.acheteur, () => one<{ fn_open_dispute: string }>('select fn_open_dispute($1, $2)', [o.id, 'endommage']))).fn_open_dispute;
+    expect(await as(db, U.admin, () => one<{ r: string }>('select fn_resolve_dispute($1, $2, $3) r', [d, 'acheteur', 'pagnes déchirés']))).toEqual({ r: 'annule' });
+    expect(await bal(U.acheteur)).toBe(buyerBefore + o.subtotal_gnf + o.delivery_fee_gnf);
+    expect(await shopBal()).toBe(shopBefore - 1104000 - o.delivery_fee_gnf);
+    expect(await stock()).toBe(s0 + 3);
+    const txt = await as(db, U.acheteur, () => one<{ body: string }>(`select body from notifications where title = 'Litige tranché en votre faveur' order by created_at desc, id desc limit 1`));
+    expect(txt.body).toMatch(/ Syli rendus dans votre portefeuille HailandPay \(articles et livraison\)\.$/);
+    expect(await imbalanced()).toBe(0);
+  });
 });
 
 describe('boutique, retrait, équipe', () => {
@@ -153,6 +169,7 @@ describe('boutique, retrait, équipe', () => {
     await as(db, U.admin, () => db.query('select fn_wallet_admin_adjust($1, $2, $3)', [5000000, 'Essai de la boutique', '620 00 00 02']));
     expect(await bal(U.acheteur2)).toBe(5250000);
     await as(db, U.admin, () => db.query('select fn_wallet_admin_adjust($1, $2, $3, $4)', [-50000, 'Correction', null, shop]));
+    expect(await as(db, U.vendeur, () => one(`select title, link from notifications where kind = 'paiement' order by created_at desc, id desc limit 1`))).toEqual({ title: "L'équipe Hailand a débité 50 000 Syli (boutique)", link: '/vendeur/argent' });
     const j = await q<{ action: string; motif: string }>(`select action, motif from console_journal where action like 'hailandpay%' order by id`);
     expect(j).toEqual([{ action: 'hailandpay_credit', motif: 'Essai de la boutique' }, { action: 'hailandpay_debit', motif: 'Correction' }]);
   });

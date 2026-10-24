@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { formatGnf, maskPhone } from '@hailandx/commerce';
 import { BackHeader, browserClient, Icon, Screen, useSession } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
+import { ShopWallet } from '@/components/ShopWallet';
 
 interface Entry { id: number; kind: string; amount_gnf: number; created_at: string; parcel_id: string | null }
 const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Versement reçu de Hailand' };
@@ -59,6 +60,7 @@ function Money({ shopId }: { shopId: string }) {
           </div>
         )}
       </section>
+      <ShopWallet shopId={shopId} />
       <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">La commission Hailand{commission !== null ? ` (${String(commission).replace('.', ',')} %)` : ''} est déduite du prix des articles. Les frais de livraison sont payés par l’acheteur et ne vous concernent pas.</p>
     </Screen>
   );

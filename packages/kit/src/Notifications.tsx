@@ -7,7 +7,7 @@ import { useSession } from './useSession';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface N { id: number; kind: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string }
-const KIND: Record<string, string> = { commande: '🛍', suivi: '🚚', litige: '⚠️', avis: '★', certification: '✅', question: '❓', reponse: '💬' };
+const KIND: Record<string, string> = { commande: '🛍', suivi: '🚚', litige: '⚠️', avis: '★', certification: '✅', question: '❓', reponse: '💬', paiement: '💳' };
 
 /**
  * Chaque application ne montre que ses notifications, d'après le début du lien : « /vendeur… » (HailandX Vendeur),
