@@ -559,6 +559,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-24 | §42 : corrections H1 à H5 appliquées en production (`2026-11-01_hailandpay_corrections_essai.sql`) — textes en Syli, envoyeur reconnaissable, boutique prévenue d'un crédit / débit de l'équipe, **remboursement total par litige : frais de livraison rendus (repris à la boutique) et articles remis en stock** ; 339 tests. |
 | 2026-10-24 | Écosystème révision 113 : tracé des contours façon OpenStreetMap dans HailandMap — aucun changement de code dans HailandX. |
 | 2026-10-25 | §43 : paiement en ligne par **Chap Chap Pay** (Orange Money, MTN MoMo, PayCard, carte…) — migration `2026-11-02_chapchappay.sql` (⏳ à appliquer), routes démarrer / notification signée / vérifier, écrans HailandX, Console (3 modes), Vendeur ; 13 tests ; libellé Vendeur des commandes HailandPay corrigé. |
+| 2026-10-25 | §43 : mise en service en mode test ; **premier paiement Chap Chap Pay réussi** (Orange Money de test, argent bloqué au séquestre) ; message « stock insuffisant » rendu lisible (nom du produit au lieu de l'identifiant). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1084,3 +1085,7 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 4. Console → Paramètres → Paiement en ligne → « Chap Chap Pay — test, équipe » (motif).
 5. Essai par l'équipe avec les comptes de test, puis rapport.
 6. KYC validé → clés de **Production** dans Vercel → mode « ouvert à tous ».
+
+**Mise en service (2026-10-25)** ✅ migration collée et vérifiée, clés posées dans Vercel (routes : « signature invalide » sans signature, donc configurées), mode « Chap Chap Pay — test, équipe ».
+- **Essai 1 ✅ (fondateur, compte 623, Orange Money de test 720000001)** : commande de 6 620 000 GNF → page Chap Chap Pay → retour → `payments` : `chapchappay`, `paye`, `provider_status = success`, `provider_method = orange_money`, `provider_test = true`, référence `ECOM-ORA-…` ; commande `bloque`, une écriture « paiement » au séquestre.
+- Essai 2 bloqué avant le paiement : le canapé n'avait plus de stock (2 exemplaires : une commande en espèces du 2026-10-24 et l'essai 1). Refus correct, mais le message montrait l'identifiant de l'offre → corrigé : nom du produit, de la variante et de la boutique (`src/lib/orderError.ts`, 2 tests). À refaire avec un autre produit (compte 720000002 : échec attendu).

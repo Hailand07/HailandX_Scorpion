@@ -7,6 +7,7 @@ import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoC
 import { browserClient, Icon, LienHailand, lienEnregistrement, useSession, useWallet } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { currentSource } from '@/lib/source';
+import { explainOrderError } from '@/lib/orderError';
 
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
@@ -76,7 +77,7 @@ function Checkout() {
     const code = promoCheck && promoCheck.discount > 0 ? promoCheck.code : null;
     const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: pay, p_source: currentSource(), ...(code ? { p_promo: code } : {}) });
     setBusy(false);
-    if (err) return setError(err.message.replace(/^.*?:\s*/, '').slice(0, 200) || 'La commande n’a pas pu être passée.');
+    if (err) return setError(explainOrderError(err.message.replace(/^.*?:\s*/, ''), lines).slice(0, 300) || 'La commande n’a pas pu être passée.');
     clearCart();
     router.replace(`/commandes/${data as string}${pay === 'orange_money' ? '?paiement=payer' : ''}`);
   }
