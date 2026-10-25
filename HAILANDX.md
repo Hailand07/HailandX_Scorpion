@@ -561,6 +561,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-25 | §43 : paiement en ligne par **Chap Chap Pay** (Orange Money, MTN MoMo, PayCard, carte…) — migration `2026-11-02_chapchappay.sql` (⏳ à appliquer), routes démarrer / notification signée / vérifier, écrans HailandX, Console (3 modes), Vendeur ; 13 tests ; libellé Vendeur des commandes HailandPay corrigé. |
 | 2026-10-25 | §43 : mise en service en mode test ; **premier paiement Chap Chap Pay réussi** (Orange Money de test, argent bloqué au séquestre) ; message « stock insuffisant » rendu lisible (nom du produit au lieu de l'identifiant). |
 | 2026-10-25 | §43 : annulation automatique (toutes les heures, `pg_cron`) des commandes en ligne impayées après 72 h, stock rendu ; paiement tardif compté à rembourser ; migration `2026-11-03_annulation_impayes.sql` (⏳ à appliquer) ; 357 tests. |
+| 2026-10-25 | §43 : tarifs Chap Chap Pay notés (2 % + 200 GNF, carte 2,5 % + 200 GNF, à la charge de Hailand) ; annulation automatique appliquée en production (tâche horaire planifiée). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1097,3 +1098,18 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 - `fn_pay_start` refuse une commande entièrement annulée ; le suivi de commande n'affiche plus « Payer » pour elle.
 - Tests : 3 scénarios de plus dans `supabase/tests/chapchappay.test.ts` (8) ; suite complète 357.
 - ⚠️ Au premier passage, la commande en ligne impayée du 2026-10-21 (`0a3a2c16…`, essai) sera annulée et son stock rendu.
+
+**Tarifs Chap Chap Pay (tableau de bord du fondateur, 2026-10-25)** ✅ E-Commerce : PayCard, Orange Money, MTN MoMo, Kulu, Soutra Money, Akiba **2 % + 200 GNF** par paiement ; carte bancaire **2,5 % + 200 GNF**. Avec `fee_handling = deduct` (choisi), ces frais sont **pris sur la part de Hailand** : le client paie le prix affiché. Exemples (commission 8 % des articles + 20 % des frais de livraison) : commande de 210 000 + 29 000 GNF → frais Chap Chap Pay 4 980, revenu Hailand 22 600, reste 17 620 ; 55 000 + 29 000 → frais 1 880, revenu 10 200 ; 6 500 000 + 35 000 → frais 130 900, revenu 527 000. La commission couvre toujours les frais. ⚠️ Coûts non couverts : une commande payée puis annulée est remboursée en entier, les frais (≈ 2 %) restent perdus pour Hailand ; les envois d'argent aux vendeurs et aux clients (Orange Money, virement) ont leurs propres frais, non comptés au grand livre.
+**Annulation automatique en service (2026-10-25)** ✅ `pg_cron` 1.6.4 activé, tâche `hailandx-commandes-impayees` planifiée (minute 17 de chaque heure), déclencheur du paiement tardif en place.
+
+## 44. Tarifs de livraison réglables dans la Console (2026-10-25) — ✅ code et tests ; ⏳ migration à appliquer
+
+**Demande du fondateur** : « rendre les tarifs modifiables dans la console » ; vérifier la formule avec son exemple (moto-taxi rond-point T8 → sa maison certifiée à Samatran Plateau : **7 000 GNF**).
+**Mesure de l'exemple** ✅ : rond-point T8 = OSM way 690247427 (croisement Transversale 8 / autoroute Le Prince), centre **9.677143, -13.543619** ; maison du fondateur = bâtiment certifié de sa déclaration (base, code `GN-CKY-01-05-016-0001`), point **9.692995, -13.564368**. **À vol d'oiseau : 2 877 m** ; par la route (OSRM) 3,65 km, ~6 min (rapport ≈ 1,27).
+**Constat** : avec la formule de départ (6 000 + 2 100 × km, minimum 8 000, arrondi à 500), la livraison T8 → Samatran coûte **12 000 GNF**, soit ≈ 1,7 fois le moto-taxi. Une grille « B » 4 000 + 1 100 × km, minimum 6 000 donne **7 000 GNF** (proposée, au fondateur de choisir).
+**Code** :
+- Base : `supabase/migrations/2026-11-04_tarifs_livraison.sql` — 3 réglages `delivery_base_gnf` (6000), `delivery_per_km_gnf` (2100), `delivery_min_gnf` (8000) ; calcul unique `private.delivery_fee(km)` utilisé par `fn_delivery_quote` et `fn_place_order` (même résultat qu'avant tant que les réglages ne changent pas) ; aperçu `fn_delivery_fee_preview(km)` ; `fn_console_setting_update` accepte ces clés (base et minimum 0 à 1 000 000 GNF, prix par km 0 à 100 000). Seulement des `create or replace` et un `insert … on conflict do nothing` : applicable par `apply_migration` avec l'accord du fondateur.
+- Console → Paramètres : les 3 réglages en GNF, avec un **aperçu avant / après** (T8 → Samatran 2,9 km, 1, 5 et 10 km) ; motif obligatoire, journal ; s'applique aux nouvelles commandes seulement.
+- Tests : `supabase/tests/tarifs.test.ts` (2 : valeurs de départ = 12 000 à 2,88 km ; grille B = 7 000 enregistré sur la commande ; seul le fondateur modifie, bornes contrôlées), `apps/console/src/lib/format.test.ts`.
+**Tronçon** (question du fondateur) : un tronçon est une portion de trajet entre deux repères connus (carrefour, rond-point, marché) ; les taxis collectifs et souvent les motos fixent leur prix par tronçon (prix fixe par portion, additionné). Notre formule « prise en charge + prix au km » en est l'équivalent continu. 💡 Plus tard : un tarif par moyen de déplacement (moto, tricycle, voiture) — non codé.
+
