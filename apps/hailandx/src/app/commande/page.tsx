@@ -52,10 +52,11 @@ function Checkout() {
     const uid = session.user.id;
     if (session.user.phone) setPhone(formatGnPhone(session.user.phone.startsWith('+') ? session.user.phone : `+${session.user.phone}`));
     (async () => {
-      // Paiement en ligne (Chap Chap Pay) : ouvert à tous en mode « chapchappay » ; en essai (« simulation », « chapchappay_test »), réservé à l'équipe.
+      // Paiement en ligne (Chap Chap Pay ou Djomy) : ouvert à tous en mode « chapchappay » ou « djomy » ; en essai (« simulation », « …_test »), réservé à l'équipe.
       const [m, a] = await Promise.all([sb.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(), sb.rpc('is_admin')]);
       const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
-      setOmAvailable({ ok: mode === 'chapchappay' || a.data === true, trial: mode !== 'chapchappay' });
+      const open = mode === 'chapchappay' || mode === 'djomy';
+      setOmAvailable({ ok: open || a.data === true, trial: !open });
       const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false });
       const list = (data as Decl[]) ?? [];
       const lv: Record<string, number> = {};

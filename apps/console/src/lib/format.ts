@@ -26,7 +26,7 @@ export const SETTING_LABEL: Record<string, string> = {
 
 const SHOP_STATUS: Record<string, string> = { preparation: 'en préparation', bientot: 'bientôt', ouverte: 'ouverte', suspendue: 'suspendue' };
 const COURIER_STATUS: Record<string, string> = { candidat: 'candidat', valide: 'validé', suspendu: 'suspendu' };
-const PAYMENT_MODE: Record<string, string> = { simulation: 'essai (simulation)', chapchappay_test: 'Chap Chap Pay — test, équipe', chapchappay: 'Chap Chap Pay — ouvert à tous' };
+const PAYMENT_MODE: Record<string, string> = { simulation: 'essai (simulation)', chapchappay_test: 'Chap Chap Pay — test, équipe', chapchappay: 'Chap Chap Pay — ouvert à tous', djomy_test: 'Djomy — test, équipe', djomy: 'Djomy — ouvert à tous' };
 
 /** « 800 » (points de base) → « 8 % » ; « 825 » → « 8,25 % ». */
 export const bpsToPct = (v: string | number | null | undefined): string => {
