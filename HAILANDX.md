@@ -557,6 +557,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-24 | §42 : migration HailandPay appliquée et vérifiée ; étapes 2 et 3 — écrans HailandPay dans HailandX (portefeuille, recharge, envoi par numéro ou QR, réception, retrait simulé, paiement à la commande), Vendeur (portefeuille de la boutique), Flotte (gains), Console (vue d'ensemble, équilibre, crédit / débit) ; 338 tests. |
 | 2026-10-24 | §42 étape 4 : essai complet en Syli en production (5 commandes HailandPay, annulations, livraisons, 3 litiges, envoi, retraits, crédit et débit de l'équipe) ; montants et équilibre justes ; anomalies H1 à H5 (textes, nom de l'envoyeur, boutique prévenue, frais et stock au remboursement) ; recette de retrait `supabase/maintenance/2026-10-24_essai_syli.md`. |
 | 2026-10-24 | §42 : corrections H1 à H5 appliquées en production (`2026-11-01_hailandpay_corrections_essai.sql`) — textes en Syli, envoyeur reconnaissable, boutique prévenue d'un crédit / débit de l'équipe, **remboursement total par litige : frais de livraison rendus (repris à la boutique) et articles remis en stock** ; 339 tests. |
+| 2026-10-24 | Écosystème révision 113 : tracé des contours façon OpenStreetMap dans HailandMap — aucun changement de code dans HailandX. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
