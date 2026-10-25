@@ -1139,7 +1139,7 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 💡 **Suite** : refus du colis à la porte / client injoignable signalé par le livreur (mêmes frais, avec preuve photo et position) — non codé.
 **En service (2026-10-25)** ✅ migration appliquée par Claude avec l'accord du fondateur (« oui applique la migration ») ; vérifié : 4 colonnes, 5 fonctions, réglages `cancel_fee_accepte_bps` 5000 / `cancel_fee_retire_bps` 10000. Les fonctions remplacées étaient identiques au dépôt (empreintes comparées).
 
-## 46. Relevé d'adresse par la Flotte → certification niveau 3 dans HailandMap (2026-10-25) — 📄 décidé, 💡 plan proposé, rien n'est codé
+## 46. Relevé d'adresse par la Flotte → certification niveau 3 dans HailandMap (2026-10-25) — 📄 plan validé, ⏸ en attente (le fondateur dira quand commencer), rien n'est codé
 
 **Décisions du fondateur (2026-10-25)** ✅ :
 - La Flotte relève l'emplacement du client **à chaque passage chez un client de niveau 1 ou 2** (première commande ou suivante) : « dès qu'il y a passage de la flotte, il y a passage au niveau 3 ».
@@ -1153,4 +1153,6 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 - Étape 2 — Flotte : relevé guidé juste après la remise, hors ligne possible, envoi en un geste.
 - Étape 3 — HailandMap : onglet « Relevés Flotte » (prioritaire), carte centrée sur les points numérotés, fiches pré-remplies dans l'assistant de tracé, « Certifier » (rattache l'adresse du client, niveau 3, prime payée) ou « Refuser » avec motif ; question d'occupation ajoutée au formulaire.
 - Étape 4 — HailandX (avis au client, notification « adresse certifiée grâce à votre livraison »), Console (prime réglable, taux d'acceptation par livreur), NavigationX (même question d'occupation), essai réel.
+**Précisions du fondateur (2026-10-25)** ✅ : on commence par l'**étape 0 (maquettes)** ; **photo de l'entrée obligatoire** ; les **questions au client se posent après la remise** du colis (« le client sera de bonne humeur à la réception »). **Mise en attente** : « note ce plan, on en viendra après » — ne rien coder avant sa demande.
+**Déroulé retenu pour le livreur** (après la remise) : 1) deux questions au client — qui habite ici (une famille · logements séparés · commerce/bureau/autre) et comment est le lieu (bâtiment seul · cour) ; 2) vue satellite centrée sur le livreur, entrée pré-placée à sa position GPS, bâtiments touchés et numérotés 1, 2, 3… ; 3) fiche courte par numéro (type pré-rempli, niveaux ; logements séparés : portes par étage + « le client habite ici », étage et porte) ; 4) photo de l'entrée (appareil photo, pas la galerie) + repère ; 5) récapitulatif et envoi (file d'attente hors ligne, photo ≈ 150 Ko). Garde-fous : livreur à moins de 60 m, relevé dans les 20 min après la remise, un relevé par adresse, prime versée seulement si HailandMap accepte. Avis au client à la commande (« le livreur relèvera votre adresse pour la certifier gratuitement », refus possible) ; « +3 000 GNF relevé » affiché sur la mission ; taux d'acceptation par livreur dans la Console.
 
