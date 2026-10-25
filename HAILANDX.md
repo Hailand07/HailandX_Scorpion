@@ -1138,3 +1138,19 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 - Tests : `supabase/tests/annulation_tardive.test.ts` (6) ; suite complète 366.
 💡 **Suite** : refus du colis à la porte / client injoignable signalé par le livreur (mêmes frais, avec preuve photo et position) — non codé.
 **En service (2026-10-25)** ✅ migration appliquée par Claude avec l'accord du fondateur (« oui applique la migration ») ; vérifié : 4 colonnes, 5 fonctions, réglages `cancel_fee_accepte_bps` 5000 / `cancel_fee_retire_bps` 10000. Les fonctions remplacées étaient identiques au dépôt (empreintes comparées).
+
+## 46. Relevé d'adresse par la Flotte → certification niveau 3 dans HailandMap (2026-10-25) — 📄 décidé, 💡 plan proposé, rien n'est codé
+
+**Décisions du fondateur (2026-10-25)** ✅ :
+- La Flotte relève l'emplacement du client **à chaque passage chez un client de niveau 1 ou 2** (première commande ou suivante) : « dès qu'il y a passage de la flotte, il y a passage au niveau 3 ».
+- **Prime de 3 000 GNF par relevé, payée par Hailand** ; certification **offerte** au client, **aucun frais** ajouté à la commande. **Le niveau 3 payant est abandonné** (« pour éviter de faire fuir ») — remplace ECOSYSTEME §17.3.
+- Le livreur **ne trace rien** : il touche les bâtiments sur la vue satellite (numérotés 1, 2, 3… dans l'ordre des touches), remplit une fiche courte par bouton ; **HailandMap trace** ensuite la cour et les bâtiments avec les fiches déjà prêtes.
+- La **nature de l'occupation** se demande d'abord au client : **maison familiale** (toute la cour = une famille, pas d'appartements à détailler) ou **logements séparés** (étages, portes, bâtiments de la cour à détailler). Le formulaire d'enregistrement (HailandMap, NavigationX) est à revoir dans ce sens.
+
+**Plan proposé (à valider)** :
+- Étape 0 — maquettes : écrans Flotte (questions au client, carte satellite à touches numérotées, fiche par bouton, photo, envoi) et panneau « Relevés Flotte » de HailandMap.
+- Étape 1 — base : tables `field_surveys` (un relevé par colis : nature, structure, entrée, photo, repère, logement du client, position et précision du livreur, état `a_verifier` / `accepte` / `refuse`) et `field_survey_points` (bâtiments touchés : numéro, coordonnées, fiche) ; occupation (`familial`, `logements`, `commerce`, `mixte`) dans `buildings` et `declarations` ; réglage `survey_bonus_gnf` 3000 ; prime `courier:prime_releve` / `platform:prime_releve` à l'acceptation ; contrôles d'authenticité (position du livreur, délai après la remise, photo prise sur place).
+- Étape 2 — Flotte : relevé guidé juste après la remise, hors ligne possible, envoi en un geste.
+- Étape 3 — HailandMap : onglet « Relevés Flotte » (prioritaire), carte centrée sur les points numérotés, fiches pré-remplies dans l'assistant de tracé, « Certifier » (rattache l'adresse du client, niveau 3, prime payée) ou « Refuser » avec motif ; question d'occupation ajoutée au formulaire.
+- Étape 4 — HailandX (avis au client, notification « adresse certifiée grâce à votre livraison »), Console (prime réglable, taux d'acceptation par livreur), NavigationX (même question d'occupation), essai réel.
+
