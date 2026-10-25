@@ -157,13 +157,13 @@ function Order({ id }: { id: string }) {
             : <button type="button" onClick={showQr} className="h-[54px] w-full rounded-2xl bg-lime text-[15px] font-extrabold">{qr ? 'QR affiché ci-dessus' : 'Afficher le QR du colis'}</button>}
         </div>
       )}
-      {cancelling && <CancelSheet parcel={d.id} onClose={() => setCancelling(false)} onDone={async (text) => { setCancelling(false); setMsg({ tone: 'ok', text }); setQr(null); await load(); }} />}
+      {cancelling && <CancelSheet parcel={d.id} courierFee={d.status === 'accepte' ? d.delivery_fee_gnf : 0} onClose={() => setCancelling(false)} onDone={async (text) => { setCancelling(false); setMsg({ tone: 'ok', text }); setQr(null); await load(); }} />}
     </Screen>
   );
 }
 
 /** Annuler : motif obligatoire (le client le lit), choisi dans la liste ou écrit. */
-function CancelSheet({ parcel, onClose, onDone }: { parcel: string; onClose: () => void; onDone: (text: string) => void }) {
+function CancelSheet({ parcel, courierFee, onClose, onDone }: { parcel: string; courierFee: number; onClose: () => void; onDone: (text: string) => void }) {
   const [choice, setChoice] = useState<string>('');
   const [other, setOther] = useState('');
   const [err, setErr] = useState<string | null>(null);
@@ -201,6 +201,7 @@ function CancelSheet({ parcel, onClose, onDone }: { parcel: string; onClose: () 
             <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} className="h-5 w-5" />
           </label>
         )}
+        {courierFee > 0 && <p className="rounded-2xl bg-amber-soft px-4 py-3 text-[12.5px] font-bold text-[#7a5500]">Un livreur est déjà en route vers vous : son déplacement (la moitié des frais de livraison, environ {formatGnf(Math.round(courierFee / 2))}) sera repris sur le solde de la boutique.</p>}
         {err && <p role="alert" className="text-[13px] font-bold text-[#a3321f]">{err}</p>}
         <button type="button" disabled={busy} onClick={confirm} className="h-[52px] rounded-2xl bg-[#a3321f] text-[15px] font-extrabold text-white disabled:opacity-50">{busy ? 'Annulation…' : 'Annuler la commande'}</button>
       </div>

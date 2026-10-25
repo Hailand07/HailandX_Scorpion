@@ -20,6 +20,8 @@ export const SETTING_LABEL: Record<string, string> = {
   delivery_base_gnf: 'Livraison : prise en charge',
   delivery_per_km_gnf: 'Livraison : prix par km',
   delivery_min_gnf: 'Livraison : minimum',
+  cancel_fee_accepte_bps: 'Annulation : livreur parti',
+  cancel_fee_retire_bps: 'Annulation : colis en route',
 };
 
 const SHOP_STATUS: Record<string, string> = { preparation: 'en préparation', bientot: 'bientôt', ouverte: 'ouverte', suspendue: 'suspendue' };
