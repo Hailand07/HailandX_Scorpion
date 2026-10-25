@@ -21,6 +21,7 @@ interface Mission {
   from_name: string; from_quartier: string | null; from_commune: string | null; from_lat: number; from_lng: number; from_level?: number; from_outline?: GeoJSON.Geometry | null;
   to_quartier: string | null; to_commune: string | null; to_level: number; to_lat: number; to_lng: number; to_outline?: GeoJSON.Geometry | null;
 }
+interface Return { parcel_id: string; shop_name: string; shop_lat: number | null; shop_lng: number | null; courier_gnf: number }
 interface Mine { id: string; status: string; delivery_fee_gnf: number; shops: { name: string } | null }
 
 const cta = CTA;
@@ -42,6 +43,8 @@ export default function Home() {
   const [courier, setCourier] = useState<Courier | null | undefined>(undefined);
   const [missions, setMissions] = useState<Mission[]>([]);
   const [mine, setMine] = useState<Mine[]>([]);
+  // Colis annulés par le client pendant la course : à rapporter à la boutique (§45).
+  const [returns, setReturns] = useState<Return[]>([]);
   const [today, setToday] = useState({ count: 0, fees: 0, km: 0 });
   const [detail, setDetail] = useState(false);
   const [menu, setMenu] = useState(false);
@@ -76,6 +79,8 @@ export default function Home() {
     if (!sb || courier?.status !== 'valide') return;
     const m = await sb.from('parcels').select('id,status,delivery_fee_gnf,shops(name)').eq('courier_id', uid!).in('status', ['accepte', 'retire']);
     setMine((m.data as unknown as Mine[]) ?? []);
+    const rt = await sb.rpc('fn_my_returns');
+    setReturns((rt.data as Return[] | null) ?? []);
     const since = new Date(); since.setHours(0, 0, 0, 0);
     const d = await sb.from('parcels').select('delivery_fee_gnf,distance_km').eq('courier_id', uid!).eq('status', 'remis').gte('delivered_at', since.toISOString());
     const rows = (d.data as { delivery_fee_gnf: number; distance_km: number | null }[]) ?? [];
@@ -225,6 +230,16 @@ export default function Home() {
             <div className={capsule}><span className="h-2.5 w-2.5 shrink-0 rounded-full bg-[#6e7694]" aria-hidden="true" /><span className="text-[14px] font-extrabold">Hors service</span></div>
           ))}
         </div>
+        {!open && returns.map((r) => (
+          <div key={r.parcel_id} role="alert" className="flex flex-col gap-2 rounded-2xl bg-[#3a1a1a] px-4 py-3.5 text-[#ffd9d2] shadow-[0_8px_22px_rgba(0,0,0,.35)]">
+            <span className="text-[11.5px] font-extrabold tracking-[0.04em]">COLIS ANNULÉ PAR LE CLIENT</span>
+            <span className="text-[14px] font-extrabold">Rapportez-le à {r.shop_name}{r.courier_gnf > 0 ? ` · ${formatGnf(r.courier_gnf)} vous sont dus` : ''}</span>
+            <span className="flex gap-2">
+              {r.shop_lat !== null && r.shop_lng !== null && <a href={`https://www.google.com/maps/dir/?api=1&destination=${r.shop_lat},${r.shop_lng}`} target="_blank" rel="noreferrer" className="flex h-10 flex-1 items-center justify-center rounded-xl border border-[#ffd9d2]/40 text-[13px] font-extrabold">Itinéraire</a>}
+              <button type="button" onClick={async () => { const { error } = await sb!.rpc('fn_parcel_returned', { p_parcel: r.parcel_id }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : 'Merci : la boutique est prévenue.'); await loadMissions(); }} className="h-10 flex-1 rounded-xl bg-[#ffd9d2] text-[13px] font-extrabold text-[#3a1a1a]">Rendu à la boutique</button>
+            </span>
+          </div>
+        ))}
         {!open && Current}
         {enService && geoError && <p role="alert" className={WARN}>{geoError}</p>}
       </div>

@@ -11,9 +11,11 @@ const HELP: Record<string, string> = {
   delivery_base_gnf: 'Montant fixe de chaque livraison, avant les kilomètres',
   delivery_per_km_gnf: 'Par kilomètre à vol d’oiseau entre la boutique et l’adresse (la route fait environ 1,3 fois plus)',
   delivery_min_gnf: 'Aucune livraison ne coûte moins que ce montant',
+  cancel_fee_accepte_bps: 'Part des frais de livraison retenue pour le livreur si le client annule après son acceptation (il est en route vers la boutique)',
+  cancel_fee_retire_bps: 'Part des frais de livraison retenue pour le livreur si le client annule quand le colis est en route (course et retour à la boutique)',
   payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay test : vraie page de paiement, clés de test, équipe seulement. Ouvert à tous : clés de production et KYC validé',
 };
-const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'payment_mode'];
+const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'cancel_fee_accepte_bps', 'cancel_fee_retire_bps', 'payment_mode'];
 const isGnf = (k: string) => k.startsWith('delivery_');
 /** Distances d'exemple : le repère du fondateur (rond-point T8 → Samatran Plateau, moto-taxi 7 000 GNF), puis 1, 5 et 10 km. */
 const EXAMPLES: [string, number][] = [['T8 → Samatran (2,9 km)', 2.88], ['1 km', 1], ['5 km', 5], ['10 km', 10]];

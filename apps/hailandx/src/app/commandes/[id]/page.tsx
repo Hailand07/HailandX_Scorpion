@@ -7,7 +7,7 @@ import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
-interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; discount_gnf: number; promo_code: string | null; cancel_reason: string | null; cancelled_by: string | null; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
+interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; discount_gnf: number; promo_code: string | null; cancel_reason: string | null; cancelled_by: string | null; cancel_courier_gnf: number; cancel_provider_gnf: number; shops: { name: string; slug: string } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
 
 const STEPS = [
   { key: 'confirmee', label: 'Confirmée', help: 'Le vendeur prépare votre colis.' },
@@ -33,7 +33,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,payment_status,created_at').eq('id', id).maybeSingle();
     if (!o.data) { setMissing(true); return; }
     setOrder(o.data as Order);
-    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,discount_gnf,promo_code,cancel_reason,cancelled_by,shops(name,slug),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
+    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,discount_gnf,promo_code,cancel_reason,cancelled_by,cancel_courier_gnf,cancel_provider_gnf,shops(name,slug),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
     const list = (p.data as unknown as Parcel[]) ?? [];
     setParcels(list);
     const c: Record<string, string> = {};
@@ -47,13 +47,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
   }, [session, load]);
-
-  async function act(fn: () => PromiseLike<{ error: { message: string } | null }>, ok: string) {
-    setMsg(null);
-    const { error } = await fn();
-    setMsg(error ? error.message.replace(/^.*?:\s*/, '') : ok);
-    await load();
-  }
 
   if (session === null) return <main className="mx-auto max-w-md px-5 pt-6"><Link href={`/connexion?next=/commandes/${id}`} className="font-bold text-blue-ink">Se connecter pour suivre la commande</Link></main>;
   if (missing) return <main className="mx-auto max-w-md px-5 pt-6"><p className="text-[14px] font-medium text-muted">Commande introuvable.</p><Link href="/commandes" className="font-bold text-blue-ink">Mes commandes</Link></main>;
@@ -90,7 +83,10 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   </div>
                 )}
                 {p.status === 'retire' && <button type="button" onClick={() => setScanFor(p.id)} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Livreur arrivé : scanner le colis</button>}
-                {p.status === 'attente_vendeur' && <button type="button" onClick={() => act(() => sb!.rpc('fn_parcel_cancel', { p_parcel: p.id }), 'Colis annulé.')} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Annuler ce colis</button>}
+                {['attente_vendeur', 'prepare', 'mission_proposee', 'accepte', 'retire'].includes(p.status) && <CancelParcel parcel={p.id} status={p.status} onDone={async (text) => { setMsg(text); await load(); }} />}
+                {p.status === 'annule' && p.cancelled_by === 'acheteur' && p.cancel_courier_gnf + p.cancel_provider_gnf > 0 && order.payment_method !== 'livraison' && (
+                  <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé après le départ du livreur : {formatGnf(p.cancel_courier_gnf)} pour son déplacement{p.cancel_provider_gnf > 0 ? ` et ${formatGnf(p.cancel_provider_gnf)} de frais de paiement` : ''} ont été retenus ; le reste vous est rendu.</p>
+                )}
                 {p.status === 'remis' && <Review parcel={p.id} onDone={() => load()} />}
                 {(p.status === 'retire' || p.status === 'remis' || p.status === 'litige' || p.status === 'annule') && <Problem parcel={p.id} status={p.status} onDone={() => load()} />}
               </section>
@@ -105,6 +101,46 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
         </>
       )}
     </main>
+  );
+}
+
+interface CancelQuote { status: string; courier_gnf: number; provider_gnf: number; refund_gnf: number; prepaid: boolean; cash_suspended_until: string | null }
+
+/** Annuler un colis. Avant le départ du livreur : gratuit. Après : on montre ce qui sera retenu avant de confirmer (§45). */
+function CancelParcel({ parcel, status, onDone }: { parcel: string; status: ParcelStatus; onDone: (msg: string) => void }) {
+  const sb = browserClient();
+  const [quote, setQuote] = useState<CancelQuote | null>(null);
+  const [busy, setBusy] = useState(false);
+  const late = status === 'accepte' || status === 'retire';
+  async function ask() {
+    if (!late) return go();
+    const { data, error } = await sb!.rpc('fn_parcel_cancel_quote', { p_parcel: parcel });
+    if (error) return onDone(error.message.replace(/^.*?:\s*/, ''));
+    setQuote(((data as CancelQuote[] | null) ?? [])[0] ?? null);
+  }
+  async function go() {
+    setBusy(true);
+    const { error } = await sb!.rpc('fn_parcel_cancel', { p_parcel: parcel });
+    setBusy(false); setQuote(null);
+    onDone(error ? error.message.replace(/^.*?:\s*/, '') : late && quote?.prepaid ? `Colis annulé. ${formatGnf(quote.refund_gnf)} vous sont rendus.` : 'Colis annulé.');
+  }
+  if (!quote) return <button type="button" onClick={ask} className="h-11 rounded-2xl border border-line text-[13.5px] font-bold">Annuler ce colis</button>;
+  const kept = quote.courier_gnf + quote.provider_gnf;
+  const until = quote.cash_suspended_until ? new Date(quote.cash_suspended_until).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : null;
+  return (
+    <div className="flex flex-col gap-2.5 rounded-2xl border-2 border-ink p-3.5">
+      <p className="text-[13.5px] font-extrabold">{quote.status === 'retire' ? 'Le livreur a déjà votre colis.' : 'Un livreur est déjà parti chercher votre colis.'}</p>
+      <ul className="flex flex-col gap-1 text-[13px] font-semibold">
+        <li className="flex justify-between gap-3"><span>Déplacement du livreur{quote.status === 'retire' ? ' (course et retour à la boutique)' : ''}</span><span>{formatGnf(quote.courier_gnf)}</span></li>
+        {quote.provider_gnf > 0 && <li className="flex justify-between gap-3"><span>Frais du paiement en ligne (non récupérables)</span><span>{formatGnf(quote.provider_gnf)}</span></li>}
+        {quote.prepaid && <li className="flex justify-between gap-3 text-[14px] font-extrabold"><span>Vous seriez remboursé de</span><span>{formatGnf(quote.refund_gnf)}</span></li>}
+      </ul>
+      <p className="text-[12.5px] font-medium text-muted">{quote.prepaid ? `${formatGnf(kept)} seraient retenus : c’est ce que l’annulation coûte au livreur et à Hailand, rien de plus.` : `Vous n’avez rien payé, mais le déplacement du livreur est payé par Hailand : le paiement à la livraison ne vous sera plus proposé jusqu’au ${until}.`}</p>
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={go} className="h-11 flex-1 rounded-2xl bg-ink text-[13.5px] font-extrabold text-white">Confirmer l’annulation</button>
+        <button type="button" onClick={() => setQuote(null)} className="h-11 flex-1 rounded-2xl border border-line text-[13.5px] font-bold">Garder le colis</button>
+      </div>
+    </div>
   );
 }
 
