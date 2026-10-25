@@ -17,6 +17,9 @@ export const SETTING_LABEL: Record<string, string> = {
   commission_bps: 'Commission Hailand',
   courier_share_bps: 'Part du livreur',
   payment_mode: 'Paiement en ligne',
+  delivery_base_gnf: 'Livraison : prise en charge',
+  delivery_per_km_gnf: 'Livraison : prix par km',
+  delivery_min_gnf: 'Livraison : minimum',
 };
 
 const SHOP_STATUS: Record<string, string> = { preparation: 'en préparation', bientot: 'bientôt', ouverte: 'ouverte', suspendue: 'suspendue' };
@@ -43,6 +46,8 @@ export const settingText = (key: string, value: unknown): string => {
   const v = value === null || value === undefined ? '' : String(value);
   if (key === 'payment_mode') return PAYMENT_MODE[v] ?? v;
   if (key.endsWith('_bps')) return bpsToPct(v);
+  if (key === 'delivery_per_km_gnf') return `${Number(v).toLocaleString('fr-FR')} GNF/km`;
+  if (key.endsWith('_gnf')) return `${Number(v).toLocaleString('fr-FR')} GNF`;
   return v;
 };
 
@@ -107,3 +112,14 @@ export const phoneText = (p: string | null | undefined) => {
   const n = d.slice(-9);
   return `+224 ${n.slice(0, 3)} ${n.slice(3, 5)} ${n.slice(5, 7)} ${n.slice(7)}`;
 };
+
+/** Saisie d'un montant en GNF (« 4 000 », « 4000 ») → « 4000 » ; null si illisible ou hors de 0 à 1 000 000. */
+export const gnfInput = (input: string): string | null => {
+  const t = input.replace(/[\s\u202f.]/g, '').replace(/GNF$/i, '');
+  if (!/^\d{1,7}$/.test(t)) return null;
+  const n = Number(t);
+  return n <= 1_000_000 ? String(n) : null;
+};
+
+/** Frais de livraison avec des réglages donnés (même calcul que la base : arrondi à 500, jamais sous le minimum). */
+export const deliveryFee = (km: number, base: number, perKm: number, min: number): number => Math.max(min, Math.round((base + perKm * km) / 500) * 500);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bpsToPct, journalTag, journalText, pctToBps, phoneText, settingText } from './format';
+import { bpsToPct, deliveryFee, gnfInput, journalTag, journalText, pctToBps, phoneText, settingText } from './format';
 
 describe('console : formats', () => {
   it('pourcentages ↔ points de base', () => {
@@ -15,6 +15,16 @@ describe('console : formats', () => {
   it('valeurs de paramètres lisibles', () => {
     expect(settingText('payment_mode', 'chapchappay')).toBe('Chap Chap Pay — ouvert à tous');
     expect(settingText('commission_bps', '700')).toBe('7 %');
+    expect(settingText('delivery_per_km_gnf', '1100').replace(/\s/g, ' ')).toBe('1 100 GNF/km');
+    expect(settingText('delivery_min_gnf', '6000').replace(/\s/g, ' ')).toBe('6 000 GNF');
+  });
+  it('tarifs de livraison : saisie et calcul identiques à la base', () => {
+    expect(gnfInput('4 000')).toBe('4000');
+    expect(gnfInput('1100 GNF')).toBe('1100');
+    expect(gnfInput('-5')).toBeNull();
+    expect(gnfInput('2000000')).toBeNull();
+    expect(deliveryFee(2.88, 6000, 2100, 8000)).toBe(12000); // T8 → Samatran, réglages de départ
+    expect(deliveryFee(2.88, 4000, 1100, 6000)).toBe(7000); // = moto-taxi constaté par le fondateur
   });
   it('phrases du journal', () => {
     expect(journalText({ action: 'parametre_modifie', target_id: 'commission_bps', detail: { avant: '800', apres: '700' } })).toBe('Commission Hailand : 8 % → 7 %');

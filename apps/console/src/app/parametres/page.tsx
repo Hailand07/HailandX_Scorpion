@@ -2,15 +2,21 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@hailandx/kit';
 import { btn, Flash, PageHead, Panel, useAction, useConsole } from '@/components/ConsoleShell';
-import { pctToBps, SETTING_LABEL, settingText, when } from '@/lib/format';
+import { deliveryFee, gnfInput, pctToBps, SETTING_LABEL, settingText, when } from '@/lib/format';
 
 interface Setting { key: string; value: string; updated_at: string | null }
 const HELP: Record<string, string> = {
   commission_bps: 'Prélevée sur le prix des articles, à la remise du colis',
   courier_share_bps: 'Des frais de livraison payés par l’acheteur',
+  delivery_base_gnf: 'Montant fixe de chaque livraison, avant les kilomètres',
+  delivery_per_km_gnf: 'Par kilomètre à vol d’oiseau entre la boutique et l’adresse (la route fait environ 1,3 fois plus)',
+  delivery_min_gnf: 'Aucune livraison ne coûte moins que ce montant',
   payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay test : vraie page de paiement, clés de test, équipe seulement. Ouvert à tous : clés de production et KYC validé',
 };
-const ORDER = ['commission_bps', 'courier_share_bps', 'payment_mode'];
+const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'payment_mode'];
+const isGnf = (k: string) => k.startsWith('delivery_');
+/** Distances d'exemple : le repère du fondateur (rond-point T8 → Samatran Plateau, moto-taxi 7 000 GNF), puis 1, 5 et 10 km. */
+const EXAMPLES: [string, number][] = [['T8 → Samatran (2,9 km)', 2.88], ['1 km', 1], ['5 km', 5], ['10 km', 10]];
 
 /**
  * Paramètres sensibles de l'écosystème. Modification réservée au fondateur, avec un motif obligatoire et une confirmation ;
@@ -32,8 +38,9 @@ export default function SettingsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const cur = rows?.find((r) => r.key === edit) ?? null;
-  const next = cur ? (cur.key === 'payment_mode' ? value : pctToBps(value)) : null;
-  const open = (r: Setting) => { setEdit(r.key); setMotif(''); setMsg(null); setValue(r.key === 'payment_mode' ? r.value : String(Number(r.value) / 100).replace('.', ',')); };
+  const next = cur ? (cur.key === 'payment_mode' ? value : isGnf(cur.key) ? gnfInput(value) : pctToBps(value)) : null;
+  const val = (k: string) => Number(k === cur?.key && next ? next : rows?.find((r) => r.key === k)?.value ?? 0);
+  const open = (r: Setting) => { setEdit(r.key); setMotif(''); setMsg(null); setValue(r.key === 'payment_mode' || isGnf(r.key) ? r.value : String(Number(r.value) / 100).replace('.', ',')); };
   const save = () => cur && next && run(
     sb.rpc('fn_console_setting_update', { p_key: cur.key, p_value: next, p_motif: motif.trim() }),
     `${SETTING_LABEL[cur.key]} : ${settingText(cur.key, cur.value)} → ${settingText(cur.key, next)}. Inscrit au journal.`,
@@ -71,7 +78,7 @@ export default function SettingsPage() {
               </div>
             ) : (
               <label className="flex items-center gap-3 text-[13.5px] font-extrabold">Nouvelle valeur
-                <span className="flex items-center gap-1.5"><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" className="h-11 w-24 rounded-[12px] border-2 border-blue px-3 text-[16px] font-extrabold outline-none" />%</span>
+                <span className="flex items-center gap-1.5"><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" className={`h-11 ${isGnf(cur.key) ? 'w-32' : 'w-24'} rounded-[12px] border-2 border-blue px-3 text-[16px] font-extrabold outline-none`} />{isGnf(cur.key) ? (cur.key === 'delivery_per_km_gnf' ? 'GNF/km' : 'GNF') : '%'}</span>
               </label>
             )}
             <div className="flex flex-wrap items-center gap-2.5 text-[14px] font-extrabold">
@@ -79,6 +86,16 @@ export default function SettingsPage() {
               <span className={`rounded-[10px] border-2 px-3 py-2 ${next ? 'border-blue' : 'border-[#a3321f] text-[#a3321f]'}`}>{next ? settingText(cur.key, next) : 'valeur invalide'}</span>
               <span className="text-[12.5px] font-semibold text-muted">s’applique aux nouvelles commandes seulement</span>
             </div>
+            {isGnf(cur.key) && (
+              <div className="flex flex-col gap-1.5 rounded-[12px] bg-sand px-3 py-2.5 text-[13px] font-bold">
+                <span className="text-[12px] font-extrabold text-muted">Frais d’une livraison avec ces réglages (livreur : {settingText('courier_share_bps', rows?.find((r) => r.key === 'courier_share_bps')?.value ?? '8000')})</span>
+                {EXAMPLES.map(([label, km]) => {
+                  const now = deliveryFee(km, Number(rows?.find((r) => r.key === 'delivery_base_gnf')?.value ?? 0), Number(rows?.find((r) => r.key === 'delivery_per_km_gnf')?.value ?? 0), Number(rows?.find((r) => r.key === 'delivery_min_gnf')?.value ?? 0));
+                  const then = deliveryFee(km, val('delivery_base_gnf'), val('delivery_per_km_gnf'), val('delivery_min_gnf'));
+                  return <span key={label} className="flex justify-between gap-3"><span>{label}</span><span>{now.toLocaleString('fr-FR')} → <b>{then.toLocaleString('fr-FR')} GNF</b></span></span>;
+                })}
+              </div>
+            )}
             <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Motif (obligatoire, gardé au journal)
               <input value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={200} placeholder="Ex. : promotion de lancement à Matam" className="h-11 rounded-[12px] border border-line px-3 text-[14px] font-semibold outline-none focus:border-blue" />
             </label>
@@ -100,5 +117,5 @@ export default function SettingsPage() {
 /** Rappel affiché sous les paramètres : ce qui n'est pas (encore) réglable ici. */
 function SettingsFooter({ empty }: { empty: boolean }) {
   if (empty) return <p className="border-t border-[#f0ede6] px-[18px] py-4 text-[13.5px] font-semibold text-muted">Aucun paramètre lisible.</p>;
-  return <p className="border-t border-[#f0ede6] px-[18px] py-3.5 text-[12.5px] font-semibold text-muted">Les frais de livraison et le plafond d’espèces des livreurs se règlent encore dans la base ; ils rejoindront cette page.</p>;
+  return <p className="border-t border-[#f0ede6] px-[18px] py-3.5 text-[12.5px] font-semibold text-muted">Le plafond d’espèces des livreurs se règle par livreur (page Livreurs). Les frais déjà calculés d’une commande ne changent pas.</p>;
 }
