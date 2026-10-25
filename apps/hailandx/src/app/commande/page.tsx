@@ -51,10 +51,10 @@ function Checkout() {
     const uid = session.user.id;
     if (session.user.phone) setPhone(formatGnPhone(session.user.phone.startsWith('+') ? session.user.phone : `+${session.user.phone}`));
     (async () => {
-      // Orange Money : ouvert à tous en mode « orange_money » ; en mode « simulation », réservé à l'équipe (essais).
+      // Paiement en ligne (Chap Chap Pay) : ouvert à tous en mode « chapchappay » ; en essai (« simulation », « chapchappay_test »), réservé à l'équipe.
       const [m, a] = await Promise.all([sb.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(), sb.rpc('is_admin')]);
       const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
-      setOmAvailable({ ok: mode === 'orange_money' || a.data === true, trial: mode !== 'orange_money' });
+      setOmAvailable({ ok: mode === 'chapchappay' || a.data === true, trial: mode !== 'chapchappay' });
       const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false });
       const list = (data as Decl[]) ?? [];
       const lv: Record<string, number> = {};
@@ -78,7 +78,7 @@ function Checkout() {
     setBusy(false);
     if (err) return setError(err.message.replace(/^.*?:\s*/, '').slice(0, 200) || 'La commande n’a pas pu être passée.');
     clearCart();
-    router.replace(`/commandes/${data as string}`);
+    router.replace(`/commandes/${data as string}${pay === 'orange_money' ? '?paiement=payer' : ''}`);
   }
 
   /** Vérifie le code auprès de la base (réduction par boutique du panier) ; la commande le revérifie. */
@@ -133,7 +133,7 @@ function Checkout() {
           <h2 className="text-[13px] font-extrabold text-muted">Paiement</h2>
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'livraison' ? 'border-2 border-ink' : 'border border-line'}`}><input type="radio" name="pay" checked={pay === 'livraison'} onChange={() => setPay('livraison')} /> Espèces à la livraison</label>
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${omAvailable.ok ? (pay === 'orange_money' ? 'border-2 border-ink' : 'border border-line') : 'border border-line text-muted'}`}>
-            <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> Orange Money
+            <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> <span className="flex flex-col">Mobile Money ou carte<span className="text-[11.5px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Visa…</span></span>
             <span className="ml-auto text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
           </label>
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'hailandpay' ? 'border-2 border-ink' : 'border border-line'}`}>
@@ -143,7 +143,7 @@ function Checkout() {
           {pay === 'hailandpay' && wallet && (wallet.balance >= toPay
             ? <p className="text-[12.5px] font-medium text-muted">Payé tout de suite en Syli (argent de test, 1 Syli = 1 GNF). L’argent reste bloqué par Hailand jusqu’à la remise du colis, et vous est rendu si la commande est annulée. Solde après paiement : <b className="text-ink">{formatSyli(wallet.balance - toPay)}</b>.</p>
             : <p className="text-[12.5px] font-bold text-[#a3321f]">Solde insuffisant ({formatSyli(wallet.balance)} pour {formatSyli(toPay)}). <Link href="/compte/hailandpay/recharger" className="text-blue-ink underline">Recharger</Link></p>)}
-          {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez à l’étape suivante. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
+          {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez juste après, sur la page sécurisée de Chap Chap Pay. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Code promo</h2>

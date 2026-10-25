@@ -8,7 +8,7 @@ interface Setting { key: string; value: string; updated_at: string | null }
 const HELP: Record<string, string> = {
   commission_bps: 'Prélevée sur le prix des articles, à la remise du colis',
   courier_share_bps: 'Des frais de livraison payés par l’acheteur',
-  payment_mode: 'Essai : réservé à l’équipe. Orange Money : seulement une fois le compte marchand ouvert',
+  payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay test : vraie page de paiement, clés de test, équipe seulement. Ouvert à tous : clés de production et KYC validé',
 };
 const ORDER = ['commission_bps', 'courier_share_bps', 'payment_mode'];
 
@@ -65,7 +65,7 @@ export default function SettingsPage() {
             <h2 className="text-[15px] font-extrabold">Modifier : {SETTING_LABEL[cur.key]}</h2>
             {cur.key === 'payment_mode' ? (
               <div className="flex gap-2">
-                {(['simulation', 'orange_money'] as const).map((m) => (
+                {(['simulation', 'chapchappay_test', 'chapchappay'] as const).map((m) => (
                   <button key={m} type="button" aria-pressed={value === m} onClick={() => setValue(m)} className={`h-11 flex-1 rounded-[12px] text-[13.5px] font-extrabold ${value === m ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{settingText('payment_mode', m)}</button>
                 ))}
               </div>
@@ -82,8 +82,8 @@ export default function SettingsPage() {
             <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Motif (obligatoire, gardé au journal)
               <input value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={200} placeholder="Ex. : promotion de lancement à Matam" className="h-11 rounded-[12px] border border-line px-3 text-[14px] font-semibold outline-none focus:border-blue" />
             </label>
-            {cur.key === 'payment_mode' && value === 'orange_money' && cur.value !== 'orange_money' && (
-              <p className="rounded-[12px] bg-amber-soft px-3 py-2.5 text-[12.5px] font-bold text-[#7a5500]">Vérifiez d’abord que le compte marchand Orange Money est ouvert et que la notification de paiement est configurée : sinon les acheteurs ne pourront pas payer.</p>
+            {cur.key === 'payment_mode' && value === 'chapchappay' && cur.value !== 'chapchappay' && (
+              <p className="rounded-[12px] bg-amber-soft px-3 py-2.5 text-[12.5px] font-bold text-[#7a5500]">Vérifiez d’abord que le compte Chap Chap Pay est validé (KYC) et que les clés de PRODUCTION sont posées dans HailandX (Vercel) : sinon les acheteurs ne pourront pas payer, ou paieraient en mode test.</p>
             )}
             <div className="flex gap-2.5">
               <button type="button" disabled={busy || !next || next === cur.value || motif.trim().length < 3} onClick={save} className={`${btn.dark} h-12 flex-1`}>Confirmer la modification</button>
