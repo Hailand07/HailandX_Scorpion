@@ -62,7 +62,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-4">
       <BackHeader href="/commandes" title="Suivi de commande" label="Retour à mes commandes" />
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
-      {order && order.payment_method === 'orange_money' && <PaymentBox order={order} onDone={() => load()} />}
+      {/* Commande entièrement annulée (ex. impayée après 72 h) : plus rien à payer */}
+      {order && order.payment_method === 'orange_money' && (order.payment_status !== 'en_attente' || parcels.some((x) => x.status !== 'annule')) && <PaymentBox order={order} onDone={() => load()} />}
       {scanFor && <QrScanner title="Scannez le QR du colis" onClose={() => setScanFor(null)} onResult={async (text) => { const id2 = scanFor; setScanFor(null); const { data, error } = await sb!.rpc('fn_parcel_handover_proof', { p_parcel: id2, p_method: 'scan', p_value: text }); setMsg(error ? error.message.replace(/^.*?:\s*/, '') : data === 'remis' ? 'Remise confirmée. Merci !' : 'QR non reconnu pour ce colis.'); await load(); }} />}
       {!order ? <Chargement /> : (
         <>

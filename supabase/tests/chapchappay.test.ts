@@ -83,3 +83,49 @@ describe('lien de paiement, statuts et confirmation', () => {
     expect(await q(`select 1 from ledger_entries where order_id = $1 and kind = 'paiement'`, [o])).toHaveLength(1);
   });
 });
+
+describe('annulation automatique des commandes en ligne impayées (72 h)', () => {
+  const run = async () => Number((await one<{ n: number }>('select private.expire_unpaid_online_orders(72) n')).n);
+  const stock = async () => Number((await one<{ stock: number }>('select stock from offer_variants where id = $1', [variantId])).stock);
+  const age = (o: string, h: number) => db.exec(`update orders set created_at = now() - interval '${h} hours' where id = '${o}'`);
+  const status = async (o: string) => (await q<{ status: string }>('select status from parcels where order_id = $1', [o])).map((r) => r.status);
+
+  it('après 72 h sans paiement : colis annulés, stock rendu, acheteur prévenu ; avant 72 h : rien', async () => {
+    await setMode('chapchappay');
+    const young = await order(); const old = await order();
+    await age(young, 10); await age(old, 80);
+    const s0 = await stock();
+    expect(await run()).toBe(1);
+    expect(await status(old)).toEqual(['annule']);
+    expect(await status(young)).toEqual(['attente_vendeur']);
+    expect(await stock()).toBe(s0 + 1);
+    const p = await one<{ cancelled_by: string; cancel_reason: string }>('select cancelled_by, cancel_reason from parcels where order_id = $1', [old]);
+    expect(p.cancelled_by).toBe('equipe');
+    expect(p.cancel_reason).toMatch(/Paiement non reçu dans les 72 h/);
+    expect(await q(`select 1 from notifications where title = 'Colis annulé' and link = $1`, [`/commandes/${old}`])).toHaveLength(1);
+    expect(await run()).toBe(0); // une seule fois
+    expect(await as(db, U.acheteur, () => refused(db.query('select * from fn_pay_start($1)', [old])))).toMatch(/annulée : rien à payer/);
+  });
+
+  it('un lien de paiement de moins de 73 h, ou une commande déjà payée, ne sont pas annulés', async () => {
+    const o = await order();
+    await as(db, U.acheteur, () => db.query('select * from fn_pay_start($1)', [o]));
+    await server(() => db.query(`select fn_pay_attach($1, 'op-recent', 'https://chapchappay.com/pay/op-recent', false)`, [o]));
+    await age(o, 80);
+    expect(await run()).toBe(0);
+    expect(await status(o)).toEqual(['attente_vendeur']);
+    await db.exec(`update payments set updated_at = now() - interval '74 hours' where order_id = '${o}'`);
+    expect(await run()).toBe(1);
+    expect(await one('select operation_id, checkout_url from payments where order_id = $1', [o])).toEqual({ operation_id: null, checkout_url: null });
+  });
+
+  it('paiement arrivé après l’annulation : encaissé puis compté à rembourser, séquestre à zéro', async () => {
+    const o = await order(); await age(o, 80); await run();
+    const t = await total(o);
+    await server(() => db.query(`select fn_payment_confirm($1, 'TXN-TARD', $2)`, [o, t]));
+    expect((await one<{ payment_status: string }>('select payment_status from orders where id = $1', [o])).payment_status).toBe('rembourse');
+    expect(Number((await one<{ s: string }>(`select coalesce(sum(amount_gnf), 0) s from ledger_entries where order_id = $1 and account = 'escrow'`, [o])).s)).toBe(0);
+    expect(Number((await one<{ s: string }>(`select coalesce(sum(amount_gnf), 0) s from ledger_entries where order_id = $1 and account = 'buyer'`, [o])).s)).toBe(t);
+    expect((await one<{ status: string }>('select status from payments where order_id = $1', [o])).status).toBe('rembourse');
+  });
+});
