@@ -561,6 +561,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-10-25 | §43 : paiement en ligne par **Chap Chap Pay** (Orange Money, MTN MoMo, PayCard, carte…) — migration `2026-11-02_chapchappay.sql` (⏳ à appliquer), routes démarrer / notification signée / vérifier, écrans HailandX, Console (3 modes), Vendeur ; 13 tests ; libellé Vendeur des commandes HailandPay corrigé. |
 | 2026-10-25 | §43 : mise en service en mode test ; **premier paiement Chap Chap Pay réussi** (Orange Money de test, argent bloqué au séquestre) ; message « stock insuffisant » rendu lisible (nom du produit au lieu de l'identifiant). |
 | 2026-10-25 | §43 : annulation automatique (toutes les heures, `pg_cron`) des commandes en ligne impayées après 72 h, stock rendu ; paiement tardif compté à rembourser ; migration `2026-11-03_annulation_impayes.sql` (⏳ à appliquer) ; 357 tests. |
+| 2026-10-25 | §43 : tarifs Chap Chap Pay notés (2 % + 200 GNF, carte 2,5 % + 200 GNF, à la charge de Hailand) ; annulation automatique appliquée en production (tâche horaire planifiée). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1097,3 +1098,6 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 - `fn_pay_start` refuse une commande entièrement annulée ; le suivi de commande n'affiche plus « Payer » pour elle.
 - Tests : 3 scénarios de plus dans `supabase/tests/chapchappay.test.ts` (8) ; suite complète 357.
 - ⚠️ Au premier passage, la commande en ligne impayée du 2026-10-21 (`0a3a2c16…`, essai) sera annulée et son stock rendu.
+
+**Tarifs Chap Chap Pay (tableau de bord du fondateur, 2026-10-25)** ✅ E-Commerce : PayCard, Orange Money, MTN MoMo, Kulu, Soutra Money, Akiba **2 % + 200 GNF** par paiement ; carte bancaire **2,5 % + 200 GNF**. Avec `fee_handling = deduct` (choisi), ces frais sont **pris sur la part de Hailand** : le client paie le prix affiché. Exemples (commission 8 % des articles + 20 % des frais de livraison) : commande de 210 000 + 29 000 GNF → frais Chap Chap Pay 4 980, revenu Hailand 22 600, reste 17 620 ; 55 000 + 29 000 → frais 1 880, revenu 10 200 ; 6 500 000 + 35 000 → frais 130 900, revenu 527 000. La commission couvre toujours les frais. ⚠️ Coûts non couverts : une commande payée puis annulée est remboursée en entier, les frais (≈ 2 %) restent perdus pour Hailand ; les envois d'argent aux vendeurs et aux clients (Orange Money, virement) ont leurs propres frais, non comptés au grand livre.
+**Annulation automatique en service (2026-10-25)** ✅ `pg_cron` 1.6.4 activé, tâche `hailandx-commandes-impayees` planifiée (minute 17 de chaque heure), déclencheur du paiement tardif en place.
