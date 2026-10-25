@@ -1117,7 +1117,7 @@ Migration `supabase/migrations/2026-10-30_hailandx_corrections_simulation.sql` (
 **Part du livreur portée à 90 % (2026-10-25, demande du fondateur)** ✅ `courier_share_bps` 8000 → 9000 (journal `parametre_modifie`). Nouvelle répartition, article 55 000 + livraison T8 → Samatran 7 000 = 62 000 payés : vendeur 50 600 ; livreur **6 300** ; Hailand 5 100 brut (4 400 + 700), **3 660 net** en ligne après Chap Chap Pay (1 440), 5 100 en espèces. Article 210 000 à 5 km (9 500) : livreur 8 550, Hailand 17 750 brut / 13 160 net. Article 15 000 à 1 km (6 000) : livreur 5 400, Hailand 1 800 brut / 1 180 net. Les colis déjà remis gardent leur répartition.
 **Prix stratégique (2026-10-25, délégué par le fondateur : « le livreur doit gagner un peu plus qu'un taxi motard »)** ✅ en service : **4 500 + 1 500 GNF/km, minimum 6 000**, livreur 90 %. T8 → Samatran (2,88 km) : l'acheteur paie **9 000**, le livreur reçoit **8 100** (moto-taxi : 7 000, soit +16 %), Hailand 900. Autres distances : 1 km 6 000 (livreur 5 400) · 5 km 12 000 (10 800) · 10 km 19 500 (17 550) · 15 km 27 000 (24 300). ⚠️ Calé sur **un seul** prix de moto-taxi connu : à vérifier avec un trajet court et un long. Article 55 000 livré T8 → Samatran : acheteur 64 000 ; vendeur 50 600 ; livreur 8 100 ; Hailand 5 300 brut (4 400 + 900), 3 820 net en ligne (Chap Chap Pay 1 480).
 
-## 45. Annulation tardive : frais retenus après le départ du livreur (2026-10-25) — ✅ code et tests ; ⏳ migration à appliquer
+## 45. Annulation tardive : frais retenus après le départ du livreur (2026-10-25) — ✅ code, tests, migration appliquée en production
 
 **Demande du fondateur** : « lorsqu'un client passe une commande et n'a pas annulé tout de suite, il attend que le livreur ait commencé sa mission pour annuler, alors à partir de là déjà des frais pourront s'appliquer, on lui restituera son argent bien sûr mais après avoir pris ce que ça a exactement coûté au livreur et à Hailand ».
 **Avant** : l'acheteur ne pouvait annuler qu'avant la préparation (`attente_vendeur`) ; le livreur n'était jamais payé pour une course annulée.
@@ -1137,4 +1137,4 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 - Vendeur : avertissement dans « Annuler » quand un livreur est déjà en route. Console → Paramètres : les deux taux.
 - Tests : `supabase/tests/annulation_tardive.test.ts` (6) ; suite complète 366.
 💡 **Suite** : refus du colis à la porte / client injoignable signalé par le livreur (mêmes frais, avec preuve photo et position) — non codé.
-
+**En service (2026-10-25)** ✅ migration appliquée par Claude avec l'accord du fondateur (« oui applique la migration ») ; vérifié : 4 colonnes, 5 fonctions, réglages `cancel_fee_accepte_bps` 5000 / `cancel_fee_retire_bps` 10000. Les fonctions remplacées étaient identiques au dépôt (empreintes comparées).
