@@ -17,6 +17,7 @@ export function statusPill(s: ParcelStatus, createdAt: string): [string, string]
 
 /** Libellé du paiement d'une commande. */
 export function payLabel(method: string | undefined, status: string | undefined): { text: string; paid: boolean } {
+  if (method === 'hailandpay') return { text: 'HailandPay · payé (Syli, test)', paid: true };
   if (method !== 'orange_money') return { text: 'Espèces à la remise', paid: false };
-  return status === 'en_attente' ? { text: 'Orange Money · en attente', paid: false } : { text: 'Orange Money · payé', paid: true };
+  return status === 'en_attente' ? { text: 'Paiement en ligne · en attente', paid: false } : { text: 'Payé en ligne', paid: true };
 }

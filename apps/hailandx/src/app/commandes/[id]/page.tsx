@@ -164,27 +164,64 @@ function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelSta
 
 const PAY_LABEL: Record<string, string> = { bloque: 'Payée : l’argent est bloqué jusqu’à la remise.', libere: 'Payée et versée au vendeur.', rembourse: 'Remboursée.' };
 
-/** Paiement Orange Money : à payer, bloqué (séquestre), versé ou remboursé. */
+/** Paiement en ligne (Chap Chap Pay : Orange Money, MTN MoMo, PayCard, carte…) : à payer, en cours, bloqué (séquestre), versé ou remboursé. */
 function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
   const sb = browserClient();
-  const [state, setState] = useState<{ provider: string; admin: boolean } | null>(null);
+  const [state, setState] = useState<{ mode: string; admin: boolean; status: string | null; method: string | null } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [autoPay, setAutoPay] = useState(false);
+  const token = async () => (await sb!.auth.getSession()).data.session?.access_token ?? '';
+  const call = async (path: string) => {
+    const r = await fetch(`/api/paiement/chapchappay/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await token()}` }, body: JSON.stringify({ order: order.id }) });
+    return { status: r.status, body: (await r.json().catch(() => ({}))) as { url?: string; state?: string; error?: string } };
+  };
+  const load = useCallback(async () => {
+    const [a, m, p] = await Promise.all([sb!.rpc('is_admin'), sb!.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(), sb!.from('payments').select('provider_status,provider_method').eq('order_id', order.id).maybeSingle()]);
+    const pay = p.data as { provider_status: string | null; provider_method: string | null } | null;
+    setState({ mode: (m.data as { value: string } | null)?.value ?? 'simulation', admin: a.data === true, status: pay?.provider_status ?? null, method: pay?.provider_method ?? null });
+  }, [sb, order.id]);
+  useEffect(() => { if (order.payment_status === 'en_attente') void load(); }, [load, order.payment_status]);
+  // Retour de la page de paiement : on demande tout de suite le statut (la notification peut tarder quelques minutes).
   useEffect(() => {
-    if (order.payment_status !== 'en_attente') return;
-    (async () => { const a = await sb!.rpc('is_admin'); const m = await sb!.from('settings').select('value').eq('key', 'payment_mode').maybeSingle(); setState({ provider: (m.data as { value: string } | null)?.value ?? 'simulation', admin: a.data === true }); })();
-  }, [sb, order.payment_status]);
+    if (order.payment_status !== 'en_attente' || typeof window === 'undefined') return;
+    const back = new URLSearchParams(window.location.search).get('paiement');
+    if (!back) return;
+    window.history.replaceState(null, '', window.location.pathname);
+    if (back === 'payer') { setAutoPay(true); return; } // juste après la commande : on ouvre le paiement
+    (async () => { setMsg('Vérification du paiement…'); const r = await call('verifier'); if (r.body.state === 'bloque' || r.body.state === 'deja_paye') onDone(); else { setMsg(back === 'annule' ? 'Paiement annulé : vous pouvez réessayer.' : null); await load(); } })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [order.payment_status]);
+
+  const online = state && (state.mode === 'chapchappay' || (state.mode === 'chapchappay_test' && state.admin));
+  const pending = state?.status === 'pending' || state?.status === 'new';
+  async function pay() {
+    setBusy(true); setMsg(null);
+    const r = await call('demarrer');
+    if (r.body.url) { window.location.assign(r.body.url); return; }
+    setBusy(false); setMsg(r.body.error ?? 'Le paiement n’a pas pu démarrer.');
+  }
+  useEffect(() => { if (autoPay && online && !pending) { setAutoPay(false); void pay(); } }, [autoPay, online]); // eslint-disable-line react-hooks/exhaustive-deps
   if (order.payment_status !== 'en_attente') return <p className="rounded-2xl bg-ok-soft px-4 py-3 text-[13px] font-bold text-ok">{PAY_LABEL[order.payment_status] ?? ''}</p>;
+  async function check() { setBusy(true); const r = await call('verifier'); setBusy(false); if (r.body.state === 'bloque' || r.body.state === 'deja_paye') onDone(); else { await load(); setMsg('Pas encore confirmé par l’opérateur : réessayez dans une minute.'); } }
   return (
     <div className="flex flex-col gap-2 rounded-2xl bg-amber-soft px-4 py-3">
       <span className="text-[13.5px] font-extrabold">Paiement en attente : {formatGnf(order.total_gnf)}</span>
-      <span className="text-[12.5px] font-medium">Le vendeur prépare votre colis dès que vous avez payé. L’argent est bloqué par Hailand jusqu’à la remise.</span>
-      {state?.provider === 'orange_money' ? (
-        <button type="button" onClick={async () => { setMsg(null); const r = await sb!.rpc('fn_pay_start', { p_order: order.id }); setMsg(r.error ? r.error.message.replace(/^.*?:\s*/, '') : 'Le paiement Orange Money s’ouvre bientôt : le compte marchand est en cours d’ouverture.'); }} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Payer avec Orange Money</button>
-      ) : state?.admin ? (
+      <span className="text-[12.5px] font-medium">Le vendeur prépare votre colis dès que vous avez payé. L’argent est bloqué par Hailand jusqu’à la remise, et vous est rendu si la commande est annulée.</span>
+      {state?.status === 'failed' || state?.status === 'error' ? <span className="text-[12.5px] font-bold text-[#a3321f]">Le dernier essai de paiement n’a pas abouti : vous pouvez réessayer.</span> : null}
+      {online ? (
+        <>
+          <button type="button" disabled={busy} onClick={pay} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-50">
+            {busy ? 'Ouverture du paiement…' : pending ? 'Reprendre le paiement' : 'Payer maintenant'}
+          </button>
+          <span className="text-[12px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Soutra Money ou carte bancaire, sur la page sécurisée de Chap Chap Pay{state?.mode === 'chapchappay_test' ? ' — mode essai : aucun argent réel' : ''}.</span>
+          {pending && <span className="text-[12.5px] font-bold">Un paiement est en cours de confirmation par l’opérateur (parfois quelques minutes) : ne payez pas une seconde fois. <button type="button" disabled={busy} onClick={check} className="underline">Vérifier maintenant</button></span>}
+        </>
+      ) : state?.admin && state.mode === 'simulation' ? (
         <button type="button" onClick={async () => { setMsg(null); const r = await sb!.rpc('fn_payment_confirm', { p_order: order.id, p_ref: 'SIMULATION', p_amount: order.total_gnf }); if (r.error) setMsg(r.error.message.replace(/^.*?:\s*/, '')); else onDone(); }} className="h-12 rounded-2xl bg-lime text-[14px] font-extrabold">Simuler le paiement (essai équipe)</button>
-      ) : (
+      ) : state ? (
         <span className="text-[12.5px] font-bold text-muted">Le paiement en ligne n’est pas encore ouvert. Vous pouvez annuler ce colis et payer en espèces à la livraison.</span>
-      )}
+      ) : null}
       {msg && <span role="status" className="text-[12.5px] font-semibold">{msg}</span>}
     </div>
   );

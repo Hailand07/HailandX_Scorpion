@@ -13,7 +13,7 @@ describe('console : formats', () => {
     expect(pctToBps('')).toBeNull();
   });
   it('valeurs de paramètres lisibles', () => {
-    expect(settingText('payment_mode', 'orange_money')).toBe('Orange Money');
+    expect(settingText('payment_mode', 'chapchappay')).toBe('Chap Chap Pay — ouvert à tous');
     expect(settingText('commission_bps', '700')).toBe('7 %');
   });
   it('phrases du journal', () => {
