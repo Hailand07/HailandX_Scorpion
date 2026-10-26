@@ -1167,3 +1167,16 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 - Console → Paramètres : deux modes de plus (« Djomy — test, équipe », « Djomy — ouvert à tous »). HailandX : nom du fournisseur affiché selon le mode.
 **À faire par le fondateur** : (1) coller la migration ; (2) Vercel (HailandX) : `DJOMY_CLIENT_ID`, `DJOMY_CLIENT_SECRET` (sandbox d'abord ; régénérer le secret montré en capture) ; (3) espace développeur Djomy → Webhooks : `https://hailandx-hdxk.vercel.app/api/paiement/djomy/notification` ; (4) Console → Paramètres → « Djomy — test, équipe » ; essai ; puis clés du compte live et « Djomy — ouvert à tous » après un vrai petit paiement.
 **En service (2026-10-26)** ✅ PR fusionnée ; migration collée par le fondateur (vérifié : fournisseur `djomy`, `payments.provider_fee_gnf`, `fn_pay_provider_fee`, `private.payment_provider` à jour) ; clés `DJOMY_CLIENT_ID` / `DJOMY_CLIENT_SECRET` posées (la route du webhook en ligne répond « signature invalide » à un appel non signé, donc les clés sont lues). Mode en production encore `chapchappay_test`.
+
+## 48. Versements aux vendeurs et aux livreurs (2026-10-26) — ✅ code et tests ; ⏳ migration à appliquer
+
+**Question du fondateur** : « on parle de versement au vendeur, au livreur et à Hailand, mais où ? » — **Constat** : l'argent payé en ligne arrive sur le compte marchand de Hailand (Chap Chap Pay / Djomy, au nom de Loura Voyage SARL) ; le grand livre dit ce qui est dû à chacun ; l'équipe versait à la main sans savoir sur quel numéro.
+**Décisions du fondateur (2026-10-26)** ✅ : Hailand **paie les frais** de versement ; versement **chaque semaine** ; argent disponible **48 h après la remise** ; sur une commande **en espèces, le livreur garde son gain** et ne reverse que le reste.
+**Code** :
+- Base : `supabase/migrations/2026-11-07_versements.sql` — tables `payout_methods` et `payouts` ; `fn_payout_method_set` (changement utilisable après 48 h, titulaire et équipe prévenus), `fn_my_payout_summary` (solde, disponible, en attente), `fn_payouts_due` et `fn_payout_record` (équipe), `private.payable_gnf` ; `parcel_money_after` (espèces : écritures `gain_garde_especes`) et `fn_parcel_handover` (espèces à reverser = encaissé − gain gardé) ; rappel `pg_cron` chaque lundi 8 h 07 (`hailandx-versements-hebdo`). Ajouts et `create or replace` seulement. Scripts de remise à zéro mis à jour (nouvelles tables).
+- HailandX Vendeur → Argent : carte « Versements » (disponible, en attente 48 h, moyen de versement à choisir ou changer, versements reçus).
+- Flotte → Mes livraisons : « Gains à recevoir » (livraisons payées en ligne) et moyen de versement ; texte des espèces à reverser corrigé.
+- Console → Argent : « Versements de la semaine » (boutiques et livreurs, disponible, moyen et numéro complet, référence de l'envoi), blocages affichés (pas de moyen, moyen modifié < 48 h, rien de disponible).
+- Tests : `supabase/tests/versements.test.ts` (3) ; tests d'espèces ajustés (commerce, corrections) ; suite complète 380.
+**Suite** 💡 : envoi automatique par l'API Djomy (`POST /v1/payout-orders`, 5 bénéficiaires par envoi, webhook `payout.success` / `payout.failed`) — en attente des moyens et frais de versement de Djomy et du format exact d'un bénéficiaire (absent de la documentation copiée).
+

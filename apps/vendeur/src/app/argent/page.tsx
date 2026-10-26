@@ -1,12 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { formatGnf, maskPhone } from '@hailandx/commerce';
-import { BackHeader, browserClient, Icon, Screen, useSession } from '@hailandx/kit';
+import { formatGnf } from '@hailandx/commerce';
+import { BackHeader, browserClient, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShopWallet } from '@/components/ShopWallet';
+import { PayoutCard } from '@/components/PayoutCard';
 
 interface Entry { id: number; kind: string; amount_gnf: number; created_at: string; parcel_id: string | null }
-const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Versement reçu de Hailand' };
+const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Versement reçu de Hailand', reversement_portefeuille: 'Versé dans le portefeuille HailandPay', reprise_portefeuille: 'Repris au portefeuille HailandPay' };
 
 /** Argent (v2) : ce que Hailand doit à la boutique, l'argent bloqué en attente de remise, et les mouvements. */
 export default function MoneyPage() {
@@ -14,7 +15,6 @@ export default function MoneyPage() {
 }
 
 function Money({ shopId }: { shopId: string }) {
-  const session = useSession();
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [pending, setPending] = useState<{ n: number; sum: number } | null>(null);
   const [commission, setCommission] = useState<number | null>(null);
@@ -34,10 +34,8 @@ function Money({ shopId }: { shopId: string }) {
       <section className="flex flex-col gap-3 rounded-[24px] bg-ink p-[18px] text-white">
         <span className="text-[12.5px] font-bold text-white/70">Hailand vous doit</span>
         <span className="font-display text-[32px] font-semibold tracking-tight">{entries ? formatGnf(balance, false) : '…'} <span className="text-[15px] text-white/65">GNF</span></span>
-        <div className="flex items-center gap-2.5 rounded-[14px] bg-white/[0.08] px-3 py-2.5 text-[12.5px] font-bold leading-snug text-white/85">
-          <Icon name="phone" size={18} stroke={2} className="text-lime" />Versé par Hailand sur votre Orange Money · {maskPhone(session?.user.phone)}
-        </div>
       </section>
+      <PayoutCard shopId={shopId} />
 
       {pending && pending.n > 0 && (
         <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">

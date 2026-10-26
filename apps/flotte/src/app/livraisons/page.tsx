@@ -8,6 +8,7 @@ import { useSession } from '@/lib/useSession';
 import { Stat, WARN } from '@/components/Frame';
 import { Ico } from '@/components/Icons';
 import { CourierWallet } from '@/components/CourierWallet';
+import { CourierPayout } from '@/components/CourierPayout';
 import { Chargement } from '@hailandx/ui';
 
 interface Row { id: string; delivered_at: string; delivery_fee_gnf: number; cod_amount_gnf: number; distance_km: number | null; shops: { name: string } | null }
@@ -65,9 +66,11 @@ export default function Livraisons() {
       <section id="especes" aria-label="Espèces à reverser" className="flex flex-col gap-2 rounded-[20px] border border-night-line bg-night-card p-4">
         <span className="text-[12.5px] font-bold text-night-muted">Espèces à reverser à Hailand</span>
         <span className="font-display text-[26px] font-semibold">{cash ? formatGnf(cash.cash_balance_gnf) : '…'}</span>
-        {cash && <span className="text-[12.5px] font-semibold text-night-muted">Plafond : {formatGnf(cash.cash_limit_gnf)}. Au-delà, plus de mission payable à la livraison avant le reversement.</span>}
+        {cash && <span className="text-[12.5px] font-semibold text-night-muted">Votre part de chaque livraison en espèces est déjà déduite : vous la gardez. Plafond : {formatGnf(cash.cash_limit_gnf)} ; au-delà, plus de mission payable à la livraison avant le reversement.</span>}
         {cash && cash.cash_balance_gnf >= cash.cash_limit_gnf && <p className={WARN}>Plafond atteint : reversez vos espèces à l’équipe Hailand.</p>}
       </section>
+
+      <CourierPayout />
 
       <CourierWallet />
 

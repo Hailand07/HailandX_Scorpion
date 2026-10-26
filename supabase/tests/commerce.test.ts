@@ -288,7 +288,10 @@ describe('remise : contrôle de proximité, scan de l’acheteur ou code, verrou
     const cod = (await one<{ cod_amount_gnf: number }>('select cod_amount_gnf from parcels where id = $1', [parcelId])).cod_amount_gnf;
     const before = (await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf;
     expect((await as(db, U.acheteur, () => one<{ fn_parcel_handover_proof: string }>('select fn_parcel_handover_proof($1, $2, $3)', [parcelId, 'scan', qr]))).fn_parcel_handover_proof).toBe('remis');
-    expect((await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf).toBe(before + cod);
+    // §48 : le livreur garde son gain sur les espèces ; il ne reste à reverser que l'encaissé moins ce gain.
+    const kept = (await one<{ k: number }>(`select coalesce(sum(amount_gnf), 0)::int k from ledger_entries where parcel_id = $1 and account = 'courier_cash' and kind = 'gain_garde_especes'`, [parcelId])).k;
+    expect(kept).toBeLessThan(0);
+    expect((await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf).toBe(before + cod + kept);
     expect((await one<{ status: string; delivered_at: string | null }>('select status, delivered_at from parcels where id = $1', [parcelId])).status).toBe('remis');
     expect((await one<{ kind: string }>('select kind from delivery_events where parcel_id = $1 order by id desc limit 1', [parcelId])).kind).toBe('remis');
     // Une remise confirmée ne se rejoue pas.
