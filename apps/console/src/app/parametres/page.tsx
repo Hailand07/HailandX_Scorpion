@@ -13,7 +13,7 @@ const HELP: Record<string, string> = {
   delivery_min_gnf: 'Aucune livraison ne coûte moins que ce montant',
   cancel_fee_accepte_bps: 'Part des frais de livraison retenue pour le livreur si le client annule après son acceptation (il est en route vers la boutique)',
   cancel_fee_retire_bps: 'Part des frais de livraison retenue pour le livreur si le client annule quand le colis est en route (course et retour à la boutique)',
-  payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay test : vraie page de paiement, clés de test, équipe seulement. Ouvert à tous : clés de production et KYC validé',
+  payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay ou Djomy « test » : vraie page de paiement, clés de test (sandbox), équipe seulement. « Ouvert à tous » : clés de production, compte validé',
 };
 const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'cancel_fee_accepte_bps', 'cancel_fee_retire_bps', 'payment_mode'];
 const isGnf = (k: string) => k.startsWith('delivery_');
@@ -73,9 +73,9 @@ export default function SettingsPage() {
           <Panel label={`Modifier ${SETTING_LABEL[cur.key]}`} className="flex flex-col gap-3 border-2 border-ink p-[18px]">
             <h2 className="text-[15px] font-extrabold">Modifier : {SETTING_LABEL[cur.key]}</h2>
             {cur.key === 'payment_mode' ? (
-              <div className="flex gap-2">
-                {(['simulation', 'chapchappay_test', 'chapchappay'] as const).map((m) => (
-                  <button key={m} type="button" aria-pressed={value === m} onClick={() => setValue(m)} className={`h-11 flex-1 rounded-[12px] text-[13.5px] font-extrabold ${value === m ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{settingText('payment_mode', m)}</button>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {(['simulation', 'chapchappay_test', 'chapchappay', 'djomy_test', 'djomy'] as const).map((m) => (
+                  <button key={m} type="button" aria-pressed={value === m} onClick={() => setValue(m)} className={`min-h-11 rounded-[12px] px-2 text-[13.5px] font-extrabold ${value === m ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{settingText('payment_mode', m)}</button>
                 ))}
               </div>
             ) : (
@@ -101,8 +101,8 @@ export default function SettingsPage() {
             <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Motif (obligatoire, gardé au journal)
               <input value={motif} onChange={(e) => setMotif(e.target.value)} maxLength={200} placeholder="Ex. : promotion de lancement à Matam" className="h-11 rounded-[12px] border border-line px-3 text-[14px] font-semibold outline-none focus:border-blue" />
             </label>
-            {cur.key === 'payment_mode' && value === 'chapchappay' && cur.value !== 'chapchappay' && (
-              <p className="rounded-[12px] bg-amber-soft px-3 py-2.5 text-[12.5px] font-bold text-[#7a5500]">Vérifiez d’abord que le compte Chap Chap Pay est validé (KYC) et que les clés de PRODUCTION sont posées dans HailandX (Vercel) : sinon les acheteurs ne pourront pas payer, ou paieraient en mode test.</p>
+            {cur.key === 'payment_mode' && (value === 'chapchappay' || value === 'djomy') && cur.value !== value && (
+              <p className="rounded-[12px] bg-amber-soft px-3 py-2.5 text-[12.5px] font-bold text-[#7a5500]">Vérifiez d’abord que le compte {value === 'djomy' ? 'Djomy (live)' : 'Chap Chap Pay'} est validé et que les clés de PRODUCTION sont posées dans HailandX (Vercel{value === 'djomy' ? ' : DJOMY_CLIENT_ID et DJOMY_CLIENT_SECRET du compte live' : ''}) : sinon les acheteurs ne pourront pas payer, ou paieraient en mode test.</p>
             )}
             <div className="flex gap-2.5">
               <button type="button" disabled={busy || !next || next === cur.value || motif.trim().length < 3} onClick={save} className={`${btn.dark} h-12 flex-1`}>Confirmer la modification</button>

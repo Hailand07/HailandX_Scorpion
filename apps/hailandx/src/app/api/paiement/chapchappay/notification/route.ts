@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ccpVerify, orderIdFromRef, parseResult, sameSecret } from '@/lib/chapchappay';
-import { payEnv, serviceClient } from '@/lib/payServer';
+import { hasCcp, payEnv, serviceClient } from '@/lib/payServer';
 import { orderOfOperation, settle } from '@/lib/settlePayment';
 
 /**
@@ -9,7 +9,7 @@ import { orderOfOperation, settle } from '@/lib/settlePayment';
  */
 export async function POST(req: Request) {
   const env = payEnv();
-  if (!env) return NextResponse.json({ error: 'paiement non configuré' }, { status: 503 });
+  if (!env || !hasCcp(env)) return NextResponse.json({ error: 'paiement non configuré' }, { status: 503 });
   const raw = await req.text(); // signature calculée sur les octets exacts : on lit le corps brut avant tout JSON
   if (!ccpVerify(env.ccpEnc, raw, req.headers.get('ccp-hmac-signature'))) return NextResponse.json({ error: 'signature invalide' }, { status: 401 });
   if (!sameSecret(env.ccpKey, req.headers.get('ccp-api-key'))) return NextResponse.json({ error: 'clé invalide' }, { status: 401 });

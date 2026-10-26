@@ -14,6 +14,7 @@ describe('console : formats', () => {
   });
   it('valeurs de paramètres lisibles', () => {
     expect(settingText('payment_mode', 'chapchappay')).toBe('Chap Chap Pay — ouvert à tous');
+    expect(settingText('payment_mode', 'djomy_test')).toBe('Djomy — test, équipe');
     expect(settingText('commission_bps', '700')).toBe('7 %');
     expect(settingText('delivery_per_km_gnf', '1100').replace(/\s/g, ' ')).toBe('1 100 GNF/km');
     expect(settingText('delivery_min_gnf', '6000').replace(/\s/g, ' ')).toBe('6 000 GNF');

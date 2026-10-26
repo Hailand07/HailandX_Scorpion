@@ -210,7 +210,7 @@ function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
   const [autoPay, setAutoPay] = useState(false);
   const token = async () => (await sb!.auth.getSession()).data.session?.access_token ?? '';
   const call = async (path: string) => {
-    const r = await fetch(`/api/paiement/chapchappay/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await token()}` }, body: JSON.stringify({ order: order.id }) });
+    const r = await fetch(`/api/paiement/${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await token()}` }, body: JSON.stringify({ order: order.id }) });
     return { status: r.status, body: (await r.json().catch(() => ({}))) as { url?: string; state?: string; error?: string } };
   };
   const load = useCallback(async () => {
@@ -230,7 +230,10 @@ function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.payment_status]);
 
-  const online = state && (state.mode === 'chapchappay' || (state.mode === 'chapchappay_test' && state.admin));
+  // Fournisseur choisi dans la Console : Chap Chap Pay ou Djomy ; « …_test » = essai réservé à l'équipe.
+  const testMode = state?.mode === 'chapchappay_test' || state?.mode === 'djomy_test';
+  const online = state && (state.mode === 'chapchappay' || state.mode === 'djomy' || (testMode && state.admin));
+  const gateway = state?.mode.startsWith('djomy') ? 'Djomy' : 'Chap Chap Pay';
   const pending = state?.status === 'pending' || state?.status === 'new';
   async function pay() {
     setBusy(true); setMsg(null);
@@ -251,7 +254,7 @@ function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
           <button type="button" disabled={busy} onClick={pay} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-50">
             {busy ? 'Ouverture du paiement…' : pending ? 'Reprendre le paiement' : 'Payer maintenant'}
           </button>
-          <span className="text-[12px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Soutra Money ou carte bancaire, sur la page sécurisée de Chap Chap Pay{state?.mode === 'chapchappay_test' ? ' — mode essai : aucun argent réel' : ''}.</span>
+          <span className="text-[12px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Soutra Money ou carte bancaire, sur la page sécurisée de {gateway}{testMode ? ' — mode essai : aucun argent réel' : ''}.</span>
           {pending && <span className="text-[12.5px] font-bold">Un paiement est en cours de confirmation par l’opérateur (parfois quelques minutes) : ne payez pas une seconde fois. <button type="button" disabled={busy} onClick={check} className="underline">Vérifier maintenant</button></span>}
         </>
       ) : state?.admin && state.mode === 'simulation' ? (
