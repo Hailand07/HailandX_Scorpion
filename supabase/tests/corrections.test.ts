@@ -17,7 +17,7 @@ async function decl(user: string, p: { lng: number; lat: number }, accuracy = 5)
 }
 const order = async (who: string = U.acheteur, qty = 1) => {
   const o = (await as(db, who, () => one<{ id: string }>('select fn_place_order($1::jsonb, $2, $3, $4) id', [JSON.stringify([{ offer_id: offer, variant_id: variant, qty }]), buyerDecl, '+224 620 00 00 00', 'livraison']))).id;
-  return (await one<{ id: string; subtotal_gnf: number; cod_amount_gnf: number }>('select id, subtotal_gnf, cod_amount_gnf from parcels where order_id = $1', [o]));
+  return (await one<{ id: string; subtotal_gnf: number; cod_amount_gnf: number; delivery_fee_gnf: number }>('select id, subtotal_gnf, cod_amount_gnf, delivery_fee_gnf from parcels where order_id = $1', [o]));
 };
 const stock = async () => (await one<{ stock: number }>('select stock from offer_variants where id = $1', [variant])).stock;
 const notes = async (user: string) => q<{ kind: string; title: string; body: string | null; link: string | null }>('select kind, title, body, link from notifications where user_id = $1 order by id', [user]);
@@ -96,7 +96,7 @@ describe('A4 : le plafond compte les missions en cours', () => {
   });
 });
 
-let delivered: { id: string; subtotal_gnf: number; cod_amount_gnf: number };
+let delivered: { id: string; subtotal_gnf: number; cod_amount_gnf: number; delivery_fee_gnf: number };
 describe('A5 + A10 : remise, solde du vendeur, espèces du livreur', () => {
   it('le vendeur est prévenu de la somme ajoutée ; les espèces entrent au compte du livreur puis en sortent au reversement', async () => {
     delivered = await order();
@@ -104,10 +104,12 @@ describe('A5 + A10 : remise, solde du vendeur, espèces du livreur', () => {
     const n = (await notes(U.vendeur)).find((x) => x.title === 'Colis remis au client')!;
     expect(n.body).toBe('368 000 GNF ajoutés à votre solde (commission Hailand déduite).');
     expect(n.link).toBe(`/vendeur/commandes/${delivered.id}`);
-    expect(await sum('courier_cash', U.livreur)).toBe(delivered.cod_amount_gnf);
+    // §48 : le livreur garde son gain (80 % des frais de livraison) sur les espèces encaissées.
+    const due = delivered.cod_amount_gnf - Math.round(delivered.delivery_fee_gnf * 0.8);
+    expect(await sum('courier_cash', U.livreur)).toBe(due);
     await as(db, U.admin, () => db.query('select fn_courier_cash_settle($1, $2)', [U.livreur, 100000]));
-    expect(await sum('courier_cash', U.livreur)).toBe(delivered.cod_amount_gnf - 100000);
-    expect((await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf).toBe(delivered.cod_amount_gnf - 100000);
+    expect(await sum('courier_cash', U.livreur)).toBe(due - 100000);
+    expect((await one<{ cash_balance_gnf: number }>('select cash_balance_gnf from couriers where user_id = $1', [U.livreur])).cash_balance_gnf).toBe(due - 100000);
   });
   it('commandé et encaissé sont distingués dans les ventes du jour', async () => {
     const today = (await as(db, U.vendeur, () => q<{ revenue_gnf: string; delivered_gnf: string }>('select revenue_gnf, delivered_gnf from fn_shop_sales($1, 1)', [shop])))[0]!;
