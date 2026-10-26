@@ -1180,3 +1180,14 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 - Tests : `supabase/tests/versements.test.ts` (3) ; tests d'espèces ajustés (commerce, corrections) ; suite complète 380.
 **Suite** 💡 : envoi automatique par l'API Djomy (`POST /v1/payout-orders`, 5 bénéficiaires par envoi, webhook `payout.success` / `payout.failed`) — en attente des moyens et frais de versement de Djomy et du format exact d'un bénéficiaire (absent de la documentation copiée).
 
+## 49. Phase de lancement : HailandX boutique « à la Shopify », commande sur place (2026-10-26) — 📄 décidé ; ✅ étape 0 maquettes v9 ; rien n'est codé
+
+**Décision du fondateur (2026-10-26)** : phase d'initiation, « la plus fragile » — **déployer le strict nécessaire**, évoluer selon les résultats. Modèle **Shopify** : HailandX sert aux **vendeurs** (boutique, produits, liens partagés) ; le **client n'arrive que par un lien** vers la fiche d'un produit et commande sur place ; Hailand encaisse et livre.
+**Décisions (réponses « oui aux quatre »)** :
+1. **Plus de vitrine globale** : pas d'accueil mélangeant les vendeurs, pas de recherche ni de comparaison entre vendeurs, pas de catégories ni de favoris côté client (données gardées en base, réactivables).
+2. **Fiche produit refaite**, avec « Autres produits de cette boutique » et **page boutique** (ce vendeur seulement), comme Shopify.
+3. **Panier limité à une seule boutique** (une commande = un vendeur = un colis).
+4. **NavigationX mis de côté temporairement** : le parcours d'enregistrement de NavigationX (conseils → mesures GPS → bâtiment sur la vue satellite → informations → adresse prête) est **recopié tel quel** dans HailandX, pour le **client** (à la commande) et pour le **vendeur** (adresse de la boutique, HailandX Vendeur). Il écrit dans `declarations` comme aujourd'hui (compte unique : NavigationX retrouvera ces adresses à sa réouverture).
+5. **Maquettes d'abord** : ✅ maquettes v9 (artefact « HailandX — boutique et commande sur place », 12 écrans : page sans lien pour les vendeurs, fiche, page boutique, panier + connexion SMS, adresse en 5 écrans, paiement, suivi, adresse du vendeur).
+**Plan** : étape 0 maquettes ✅ → 1 fiche + page boutique + page d'accueil vendeurs, retrait de la vitrine → 2 panier une boutique + connexion SMS dans la commande → 3 parcours d'adresse recopié de NavigationX (client) → 4 même parcours dans HailandX Vendeur, retrait des redirections vers NavigationX → 5 essais réels, documentation.
+
