@@ -8,9 +8,9 @@ import { browserClient, Icon, useSession } from '@hailandx/kit';
 const HIDDEN = ['/p/', '/panier', '/commande', '/connexion', '/bienvenue', '/compte/supprimer'];
 
 const TABS = [
-  { href: '/', label: 'Accueil', icon: 'home', match: (p: string) => p === '/' || ['/recherche', '/b/', '/panier'].some((x) => p.startsWith(x)) },
+  { href: '/', label: 'Accueil', icon: 'home', match: (p: string) => p === '/' || ['/b/', '/panier'].some((x) => p.startsWith(x)) },
   { href: '/commandes', label: 'Commandes', icon: 'box', match: (p: string) => p.startsWith('/commandes') },
-  { href: '/compte', label: 'Compte', icon: 'user', match: (p: string) => ['/compte', '/favoris', '/notifications', '/adresse', '/aide'].some((x) => p.startsWith(x)) },
+  { href: '/compte', label: 'Compte', icon: 'user', match: (p: string) => ['/compte', '/notifications', '/adresse', '/aide'].some((x) => p.startsWith(x)) },
 ] as const;
 
 /** Barre du bas de HailandX (acheteurs) : Accueil, Commandes, Compte. Une pastille signale les colis en cours. La vente a son application. */

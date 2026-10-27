@@ -10,16 +10,15 @@ import { Chargement } from '@hailandx/ui';
 export default function AccountPage() {
   const session = useSession();
   const { wallet } = useWallet();
-  const [counts, setCounts] = useState<{ fav: number; addr: number; unread: number } | null>(null);
+  const [counts, setCounts] = useState<{ addr: number; unread: number } | null>(null);
 
   useEffect(() => {
     const sb = browserClient(); const uid = session?.user.id;
     if (!sb || !uid) return;
     Promise.all([
-      sb.from('product_favorites').select('product_id', { count: 'exact', head: true }).eq('user_id', uid),
       sb.from('declarations').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'active'),
       unreadNotifications(sb, 'acheteur'),
-    ]).then(([f, a, n]) => setCounts({ fav: f.count ?? 0, addr: a.count ?? 0, unread: n }));
+    ]).then(([a, n]) => setCounts({ addr: a.count ?? 0, unread: n }));
   }, [session]);
 
   if (session === undefined) return <Screen className="pt-6"><Chargement /></Screen>;
@@ -30,7 +29,7 @@ export default function AccountPage() {
         <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-ink text-lime"><Icon name="phone" size={30} stroke={1.8} /></span>
         <div className="flex flex-col gap-2">
           <h1 className="font-display text-[26px] font-semibold leading-tight tracking-tight">Votre numéro suffit</h1>
-          <p className="text-[15px] font-semibold leading-relaxed text-muted">Un code par SMS, et vous retrouvez vos commandes, vos favoris et vos adresses. Pas de mot de passe.</p>
+          <p className="text-[15px] font-semibold leading-relaxed text-muted">Un code par SMS, et vous retrouvez vos commandes et vos adresses. Pas de mot de passe.</p>
         </div>
         <Link href="/connexion?next=/compte" className="flex h-14 items-center justify-center rounded-[18px] bg-ink text-[16px] font-extrabold text-white">Me connecter</Link>
         <Link href="/aide" className="flex h-11 items-center self-center text-[13.5px] font-bold text-muted">Aide et contact</Link>
@@ -55,7 +54,6 @@ export default function AccountPage() {
         <GroupTitle>Mes achats</GroupTitle>
         <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
           <ListRow href="/compte/hailandpay" icon="wallet" label="HailandPay" value={wallet ? <span className="text-[13px] font-bold text-muted">{formatSyli(wallet.balance)} · TEST</span> : null} />
-          <ListRow href="/favoris" icon="heart" label="Favoris" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.fav}</span> : null} />
           <ListRow href="/adresse" icon="pin" label="Adresses de livraison" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.addr}</span> : null} last />
         </div>
       </section>
