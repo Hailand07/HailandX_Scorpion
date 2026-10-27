@@ -52,6 +52,12 @@ export interface Detection {
 /** Rayon d'examen autour de la position (m). */
 export const SCAN_RADIUS_M = 60;
 
+/**
+ * Au-delà de cette précision GPS (m), le bâtiment deviné n'est pas fiable : l'utilisateur doit le toucher sur la vue satellite.
+ * Le point touché devient `anchor_point` ; c'est lui que le livreur Hailand doit atteindre (tolérance 150 m, HAILANDX.md §41).
+ */
+export const IMPRECISE_ACCURACY_M = 50;
+
 export function snapRadius(accuracy: number): number {
   return Math.min(Math.max(accuracy, 5), 15);
 }

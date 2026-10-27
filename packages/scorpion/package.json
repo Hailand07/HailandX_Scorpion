@@ -4,6 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "main": "src/index.ts",
-  "dependencies": { "@turf/turf": "^7.4.0" },
-  "types": "src/index.ts"
+  "dependencies": {
+    "@turf/turf": "^7.4.0",
+    "mapbox-gl": "^3.32.0"
+  },
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./parcours": "./src/parcours/index.ts"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "@supabase/supabase-js": "^2.117.3"
+  }
 }
