@@ -2,7 +2,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, LienHailand, lienEnregistrement, mediaUrl, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, LienHailand, mediaUrl, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { AdresseBoutique } from '@/components/AdresseBoutique';
 import { declLabel } from '@/lib/useMyShop';
 import { SellerGate, type SellerCtx } from '@/components/SellerGate';
 
@@ -21,6 +22,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+  const [locating, setLocating] = useState(false);
   useEffect(() => { sb?.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? [])); }, [sb]);
 
   const edit = (f: Field, v: string) => { setOpen(open === f ? null : f); setValue(v); setMsg(null); };
@@ -47,6 +49,8 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
     if (shop.status === 'ouverte' && !confirm('Changer d’adresse referme la vente jusqu’à la certification de la nouvelle adresse. Continuer ?')) return;
     void save({ declaration_id: id }, 'Adresse changée. Demandez sa certification depuis l’onglet Vendre.');
   }
+
+  if (locating) return <AdresseBoutique kicker="NOUVELLE ADRESSE DE LA BOUTIQUE" onDone={(id) => { setLocating(false); changeAddress(id); }} onClose={() => setLocating(false)} />;
 
   const logo = mediaUrl(shop.logo_path); const cover = mediaUrl(shop.cover_path);
   const initials = shop.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
@@ -101,7 +105,8 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
             {decls.filter((x) => x.id !== decl?.id).map((x) => <button key={x.id} type="button" disabled={busy} onClick={() => changeAddress(x.id)} className="flex min-h-12 items-center justify-between rounded-[14px] border border-line bg-card px-3.5 text-[14px] font-bold"><span className="truncate">{declLabel(x)}</span><span className="text-[12px] text-muted">niveau {x.level}</span></button>)}
           </div>
         )}
-        <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">Vous déménagez ? Repérez le nouveau bâtiment avec <LienHailand app="navigationx" href={lienEnregistrement('vendeur', '/reglages')} className="font-extrabold text-blue-ink">NavigationX</LienHailand>, puis demandez sa certification. Changer d’adresse referme la vente jusqu’à la nouvelle certification.</p>
+        <button type="button" onClick={() => setLocating(true)} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-line bg-card text-[13.5px] font-extrabold"><Icon name="pin" size={17} />Vous déménagez ? Repérer le nouveau bâtiment</button>
+        <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">Puis demandez sa certification. Changer d’adresse referme la vente jusqu’à la nouvelle certification.</p>
       </section>
 
       <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-line bg-card text-[14.5px] font-extrabold"><Icon name="eye" size={18} />Voir ma boutique sur HailandX</LienHailand>
