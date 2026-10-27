@@ -4,6 +4,7 @@ export * from './useSession';
 export * from './media';
 export * from './Screen';
 export * from './PhoneLogin';
+export * from './PhoneLoginInline';
 export * from './DeleteAccount';
 export * from './Notifications';
 export * from './NotificationBell';

@@ -4,10 +4,9 @@ import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
 import { ago, brandOf, discountPercent, formatGnf, onVacation, keyFacts, rankOffers, readAttributes, specRows, type Offer } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
-import { getCatalog, offerKey, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
+import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
 import { AskQuestion } from '@/components/AskQuestion';
-import { RecordView } from '@/components/RecentlyViewed';
 import { BuyBar } from '@/components/BuyBar';
 import { CartButton } from '@/components/CartButton';
 import { ProductGallery, ReadMore } from '@/components/ProductGallery';
@@ -86,7 +85,6 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
   const pending = questions.filter((x) => !x.answer);
   const rating = shop.stats.reviewCount > 0 ? shop.stats.rating.toFixed(1).replace('.', ',') : null;
   const since = new Date(Date.now() - shop.stats.ageDays * 86_400_000).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-  const viewed = { key: offerKey(p), href: `/p/${p.slug}?b=${shop.slug}`, name: p.name, priceGnf: p.priceGnf, photoUrl: p.photoUrl ?? null, color: p.color, shopName: shop.name, etaMinutes: p.etaMinutes, compareAtGnf: p.compareAtGnf };
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 bg-card pb-32">
@@ -274,7 +272,6 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
-      <RecordView item={viewed} />
       <BuyBar available={p.inStock !== false && !onVacation(shop.vacationUntil)} closedLabel={onVacation(shop.vacationUntil) ? `Boutique en congé jusqu’au ${new Date(shop.vacationUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : undefined} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
     </main>
   );

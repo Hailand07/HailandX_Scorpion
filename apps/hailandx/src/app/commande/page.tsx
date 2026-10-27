@@ -2,10 +2,11 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Wordmark, Chargement } from '@hailandx/ui';
+import { Button, Chargement } from '@hailandx/ui';
 import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
-import { browserClient, Icon, LienHailand, lienEnregistrement, useSession, useWallet } from '@hailandx/kit';
+import { aUnNom, browserClient, Icon, LienHailand, lienEnregistrement, PhoneLoginInline, useSession, useWallet } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
+import { OrderSteps } from '@/components/OrderSteps';
 import { currentSource } from '@/lib/source';
 import { explainOrderError } from '@/lib/orderError';
 
@@ -96,20 +97,25 @@ function Checkout() {
   const toPay = Math.max(0, cartSubtotal(lines) - discount) + feeTotal;
 
   const Head = (
-    <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><h1 className="font-display text-[20px] font-semibold">Commande</h1></div>
+    <header className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2">
+        <Link href="/panier" aria-label="Retour au panier" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
+        <h1 className="flex-1 font-display text-[19px] font-semibold">Adresse et paiement</h1>
+      </div>
+      <OrderSteps current={decl ? 3 : 2} />
+    </header>
   );
 
   if (session === undefined) return <main className="mx-auto max-w-md px-5 pt-6">{Head}</main>;
   if (lines.length === 0) {
-    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier est vide.</p><Link href="/" className="font-bold text-blue-ink">Voir les boutiques</Link></main>;
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier est vide.</p><Link href="/commandes" className="font-bold text-blue-ink">Mes commandes</Link></main>;
   }
-  if (!session) {
-    return (
-      <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}
-        <p className="text-[14px] font-medium text-muted">Connectez-vous avec votre téléphone pour commander.</p>
-        <Link href="/connexion?next=/commande" className="inline-flex h-[54px] items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Se connecter</Link>
-      </main>
-    );
+  // Un panier = une boutique (§49) : un ancien panier mélangé se corrige d'abord au panier.
+  if (new Set(lines.map((l) => l.shopSlug)).size > 1) {
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier contient plusieurs boutiques : une commande = une seule boutique.</p><Link href="/panier" className="font-bold text-blue-ink">Corriger le panier</Link></main>;
+  }
+  if (!aUnNom(session)) {
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<PhoneLoginInline /></main>;
   }
 
   return (
@@ -165,8 +171,7 @@ function Checkout() {
               {quote.map((x) => (
                 <div key={x.shop_id} className="flex justify-between gap-3"><span className="min-w-0 truncate text-muted">Livraison depuis {x.shop_name} · {Number(x.distance_km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</span><span className="shrink-0">{formatGnf(x.fee_gnf)}</span></div>
               ))}
-              {quote.length > 1 && <p className="text-[12px] font-semibold leading-snug text-muted">Vos articles viennent de {quote.length} boutiques : {quote.length} colis, chacun livré depuis sa boutique, avec ses propres frais.</p>}
-              <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(toPay)}</span></div>
+                            <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(toPay)}</span></div>
             </>
           ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>
