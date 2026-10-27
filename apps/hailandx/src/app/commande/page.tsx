@@ -2,10 +2,12 @@
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Button, Wordmark, Chargement } from '@hailandx/ui';
+import { Button, Chargement } from '@hailandx/ui';
 import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
-import { browserClient, Icon, LienHailand, lienEnregistrement, useSession, useWallet } from '@hailandx/kit';
+import { aUnNom, browserClient, Icon, PhoneLoginInline, useSession, useWallet } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
+import { OrderSteps } from '@/components/OrderSteps';
+import { AdresseClient } from '@/components/AdresseClient';
 import { currentSource } from '@/lib/source';
 import { explainOrderError } from '@/lib/orderError';
 
@@ -13,8 +15,9 @@ interface Decl { id: string; declared_label: string | null; hailand_code: string
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
 
 /**
- * Commande : adresse (niveau 1 au minimum), téléphone, paiement à la livraison. Le serveur recalcule prix, stock et frais.
- * Sans adresse : enregistrement dans NavigationX, retour ici avec `?adresse=<id>` (le panier est resté sur l'appareil).
+ * Commande : adresse (niveau 1 au minimum), téléphone, paiement. Le serveur recalcule prix, stock et frais.
+ * Sans adresse (ou « + Nouvelle adresse ») : le parcours d'adresse s'ouvre ICI, recopié de NavigationX (§49 étape 3).
+ * `?adresse=<id>` (retour d'un ancien lien NavigationX) reste accepté.
  */
 function Checkout() {
   const router = useRouter();
@@ -29,6 +32,8 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [added, setAdded] = useState<string | null>(null);
   const [pay, setPay] = useState<'livraison' | 'orange_money' | 'hailandpay'>('livraison');
   const { wallet } = useWallet();
   const [promo, setPromo] = useState('');
@@ -62,9 +67,10 @@ function Checkout() {
       const lv: Record<string, number> = {};
       await Promise.all(list.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); lv[d.id] = typeof r.data === 'number' ? r.data : d.detected_level; }));
       const ok = list.filter((d) => (lv[d.id] ?? 0) >= 1);
-      setDecls(ok); setLevels(lv); setDecl((recue && ok.some((d) => d.id === recue) ? recue : ok[0]?.id) ?? ''); setReady(true);
+      const want = added ?? recue;
+      setDecls(ok); setLevels(lv); setDecl((want && ok.some((d) => d.id === want) ? want : ok[0]?.id) ?? ''); setReady(true);
     })();
-  }, [sb, session, recue]);
+  }, [sb, session, recue, added]);
 
   async function place(e: React.FormEvent) {
     e.preventDefault();
@@ -96,21 +102,28 @@ function Checkout() {
   const toPay = Math.max(0, cartSubtotal(lines) - discount) + feeTotal;
 
   const Head = (
-    <div className="flex items-center justify-between"><Link href="/" aria-label="Accueil"><Wordmark /></Link><h1 className="font-display text-[20px] font-semibold">Commande</h1></div>
+    <header className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-2">
+        <Link href="/panier" aria-label="Retour au panier" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
+        <h1 className="flex-1 font-display text-[19px] font-semibold">Adresse et paiement</h1>
+      </div>
+      <OrderSteps current={decl ? 3 : 2} />
+    </header>
   );
 
   if (session === undefined) return <main className="mx-auto max-w-md px-5 pt-6">{Head}</main>;
   if (lines.length === 0) {
-    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier est vide.</p><Link href="/" className="font-bold text-blue-ink">Voir les boutiques</Link></main>;
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier est vide.</p><Link href="/commandes" className="font-bold text-blue-ink">Mes commandes</Link></main>;
   }
-  if (!session) {
-    return (
-      <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}
-        <p className="text-[14px] font-medium text-muted">Connectez-vous avec votre téléphone pour commander.</p>
-        <Link href="/connexion?next=/commande" className="inline-flex h-[54px] items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Se connecter</Link>
-      </main>
-    );
+  // Un panier = une boutique (§49) : un ancien panier mélangé se corrige d'abord au panier.
+  if (new Set(lines.map((l) => l.shopSlug)).size > 1) {
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier contient plusieurs boutiques : une commande = une seule boutique.</p><Link href="/panier" className="font-bold text-blue-ink">Corriger le panier</Link></main>;
   }
+  if (!aUnNom(session)) {
+    return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<PhoneLoginInline /></main>;
+  }
+
+  if (adding) return <AdresseClient cta="Revenir à ma commande" onDone={(id) => { setAdding(false); setReady(false); setAdded(id); }} onClose={() => setAdding(false)} />;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-6">
@@ -119,13 +132,13 @@ function Checkout() {
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
           {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length === 0 ? (
-            <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Pour être livré jusqu’à votre porte, enregistrez votre adresse une fois dans <b className="font-extrabold text-ink">NavigationX</b>. Elle servira pour toutes vos commandes.</p><LienHailand app="navigationx" href={lienEnregistrement('hailandx', '/commande')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-ink text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Enregistrer mon adresse avec NavigationX</LienHailand><p className="text-[12px] font-semibold text-muted">Votre panier vous attend ici : vous revenez à cette étape à la fin.</p></div>
+            <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Repérons votre bâtiment, ici même : position GPS, vue satellite, vous confirmez. Une fois pour toutes vos commandes.</p><button type="button" onClick={() => setAdding(true)} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Où livrer ? Repérer mon bâtiment</button></div>
           ) : (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
               {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
             </select>
           )}
-          {ready && decls.length > 0 && <LienHailand app="navigationx" href={lienEnregistrement('hailandx', '/commande')} className="text-[13px] font-bold text-blue-ink">+ Ajouter une autre adresse (NavigationX)</LienHailand>}
+          {ready && decls.length > 0 && <button type="button" onClick={() => setAdding(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Nouvelle adresse (repérer un bâtiment)</button>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
@@ -165,8 +178,7 @@ function Checkout() {
               {quote.map((x) => (
                 <div key={x.shop_id} className="flex justify-between gap-3"><span className="min-w-0 truncate text-muted">Livraison depuis {x.shop_name} · {Number(x.distance_km).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km</span><span className="shrink-0">{formatGnf(x.fee_gnf)}</span></div>
               ))}
-              {quote.length > 1 && <p className="text-[12px] font-semibold leading-snug text-muted">Vos articles viennent de {quote.length} boutiques : {quote.length} colis, chacun livré depuis sa boutique, avec ses propres frais.</p>}
-              <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(toPay)}</span></div>
+                            <div className="mt-1 flex justify-between border-t border-line-soft pt-2 text-[15px] font-extrabold"><span>Total à payer</span><span>{formatGnf(toPay)}</span></div>
             </>
           ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>

@@ -1,7 +1,10 @@
 'use client';
 import { useSyncExternalStore } from 'react';
 
-/** Panier : conservé dans le navigateur jusqu'à la commande (aucune table de panier en base, HAILANDX.md §14). */
+/**
+ * Panier : conservé dans le navigateur jusqu'à la commande (aucune table de panier en base, HAILANDX.md §14).
+ * Phase de lancement (§49) : UNE seule boutique par panier, donc un seul colis.
+ */
 export interface CartLine {
   offerId: string;
   variantId: string | null;
@@ -37,12 +40,26 @@ function write(lines: CartLine[]) {
 
 const clampQty = (n: number) => Math.max(1, Math.min(99, Math.floor(n)));
 
-export function addToCart(line: Omit<CartLine, 'qty'>, qty = 1) {
-  const lines = [...read()];
+/** Boutique du panier (une seule), ou `null` s'il est vide. */
+export const cartShop = (lines: CartLine[]): { slug: string; name: string } | null => (lines[0] ? { slug: lines[0].shopSlug, name: lines[0].shopName } : null);
+
+/**
+ * Ajoute un article. Si le panier contient déjà les produits d'une AUTRE boutique : refusé (renvoie `false`),
+ * sauf avec `replace`, qui vide le panier avant d'ajouter (le client a confirmé).
+ */
+export function addToCart(line: Omit<CartLine, 'qty'>, qty = 1, replace = false): boolean {
+  const current = read();
+  if (current.length && current.some((l) => l.shopSlug !== line.shopSlug)) {
+    if (!replace) return false;
+    write([{ ...line, qty: clampQty(qty) }]);
+    return true;
+  }
+  const lines = [...current];
   const i = lines.findIndex((l) => l.offerId === line.offerId && l.variantId === line.variantId);
   if (i >= 0) lines[i] = { ...lines[i]!, qty: clampQty(lines[i]!.qty + qty) };
   else lines.push({ ...line, qty: clampQty(qty) });
   write(lines);
+  return true;
 }
 export function setQty(offerId: string, variantId: string | null, qty: number) {
   write(read().map((l) => (l.offerId === offerId && l.variantId === variantId ? { ...l, qty: clampQty(qty) } : l)));
@@ -56,33 +73,6 @@ export function syncPrices(prices: Map<string, number>) {
   const lines = read();
   if (!lines.some((l) => prices.has(l.offerId) && prices.get(l.offerId) !== l.priceGnf)) return;
   write(lines.map((l) => (prices.has(l.offerId) ? { ...l, priceGnf: prices.get(l.offerId)! } : l)));
-}
-
-/** « Mis de côté » : des articles retirés du panier pour plus tard (comme Amazon), sur ce téléphone seulement. */
-const LATER = 'hx.later';
-function readLater(): CartLine[] { try { const v = JSON.parse(localStorage.getItem(LATER) ?? '[]'); return Array.isArray(v) ? v : []; } catch { return []; } }
-function writeLater(lines: CartLine[]) { try { localStorage.setItem(LATER, JSON.stringify(lines.slice(0, 30))); } catch { /* ignoré */ } window.dispatchEvent(new Event(EVENT)); }
-export function saveForLater(offerId: string, variantId: string | null) {
-  const line = read().find((l) => l.offerId === offerId && l.variantId === variantId);
-  if (!line) return;
-  writeLater([line, ...readLater().filter((l) => !(l.offerId === offerId && l.variantId === variantId))]);
-  removeLine(offerId, variantId);
-}
-export function moveToCart(offerId: string, variantId: string | null) {
-  const line = readLater().find((l) => l.offerId === offerId && l.variantId === variantId);
-  if (!line) return;
-  writeLater(readLater().filter((l) => l !== line));
-  const { qty, ...rest } = line; addToCart(rest, qty);
-}
-export function removeLater(offerId: string, variantId: string | null) { writeLater(readLater().filter((l) => !(l.offerId === offerId && l.variantId === variantId))); }
-let laterCache: { raw: string | null; lines: CartLine[] } = { raw: null, lines: [] };
-function laterSnapshot(): CartLine[] {
-  let raw: string | null = null; try { raw = localStorage.getItem(LATER); } catch { /* ignoré */ }
-  if (raw !== laterCache.raw) laterCache = { raw, lines: readLater() };
-  return laterCache.lines;
-}
-export function useLater(): CartLine[] {
-  return useSyncExternalStore(subscribe, laterSnapshot, () => EMPTY);
 }
 
 const EMPTY: CartLine[] = [];
@@ -99,3 +89,6 @@ export function useCart(): CartLine[] {
 
 export const cartCount = (lines: CartLine[]) => lines.reduce((n, l) => n + l.qty, 0);
 export const cartSubtotal = (lines: CartLine[]) => lines.reduce((n, l) => n + l.qty * l.priceGnf, 0);
+
+/** Panier d'avant la règle « une boutique » : ne garder que les articles de la boutique choisie. */
+export const keepShop = (shopSlug: string) => write(read().filter((l) => l.shopSlug === shopSlug));

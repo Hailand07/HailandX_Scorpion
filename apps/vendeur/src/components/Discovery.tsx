@@ -3,7 +3,7 @@ import { Icon, Screen } from '@hailandx/kit';
 import { Brand } from './Brand';
 
 const STEPS: [string, string][] = [
-  ['Votre adresse', 'Repérez votre bâtiment sur la carte, avec NavigationX.'],
+  ['Votre adresse', 'Repérez votre bâtiment ici même : position GPS, vue satellite, vous confirmez.'],
   ['Votre boutique', 'Un nom, une catégorie, un logo si vous voulez.'],
   ['La certification', 'Un agent Hailand vérifie votre emplacement. Ensuite, vous ajoutez vos produits et vous vendez.'],
 ];

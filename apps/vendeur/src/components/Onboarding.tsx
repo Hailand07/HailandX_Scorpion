@@ -3,7 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, lienEnregistrement, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { AdresseBoutique } from './AdresseBoutique';
 import { declLabel, type MyCert, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { Brand } from './Brand';
 
@@ -19,11 +20,11 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
   const [cats, setCats] = useState<Cat[]>([]);
   const [name, setName] = useState('');
   const [cat, setCat] = useState<string | null>(null);
-  // Adresse reçue de NavigationX (si elle appartient bien à ce compte), sinon la plus récente.
+  // Adresse reçue (ancien lien NavigationX ou parcours sur place), si elle appartient bien à ce compte, sinon la plus récente.
   const initial = (recue && decls.some((d) => d.id === recue) ? recue : decls[0]?.id) ?? null;
   const [addr, setAddr] = useState<string | null>(initial);
-  // Parcours d'enregistrement de NavigationX, avec retour ici à la fin.
-  const versNavigationX = lienEnregistrement('vendeur', '/ouvrir');
+  // Parcours d'adresse sur place (§49 étape 4) : plus de détour par NavigationX.
+  const [locating, setLocating] = useState(false);
   const [logo, setLogo] = useState<File | null>(null);
   const logoUrl = useMemo(() => (logo ? URL.createObjectURL(logo) : null), [logo]);
   useEffect(() => () => { if (logoUrl) URL.revokeObjectURL(logoUrl); }, [logoUrl]);
@@ -68,6 +69,10 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
     router.replace('/');
   });
 
+  // Nouvelle adresse repérée : avant la boutique, elle devient l'adresse choisie ; après, elle est rattachée à la boutique.
+  const located = (id: string) => { setLocating(false); setAddr(id); if (shop) void attach(id); else void reload(); };
+  if (locating) return <AdresseBoutique kicker={shop ? 'NOUVELLE ADRESSE DE LA BOUTIQUE' : 'OUVRIR MA BOUTIQUE · ÉTAPE 1'} onDone={located} onClose={() => setLocating(false)} />;
+
   const bar = (on: boolean) => `h-1.5 rounded-full ${on ? 'bg-ink' : 'bg-[#e2ded3]'}`;
   const doneAll = certified && step === 3;
 
@@ -80,18 +85,17 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
 
       {/* Étape 1 — adresse */}
       {step === 1 ? (
-        <Open n={1} title="Où se trouve votre boutique ?" text="Votre emplacement s’enregistre dans NavigationX, l’application officielle des adresses Hailand. Vous y êtes déjà connecté avec ce compte.">
+        <Open n={1} title="Où se trouve votre boutique ?" text="Les livreurs viennent y chercher les colis. On repère le bâtiment ici même : position GPS, vue satellite, vous confirmez.">
           <MapArt />
-          <LienHailand app="navigationx" href={versNavigationX} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Enregistrer mon emplacement avec NavigationX</LienHailand>
-          <p className="text-[12px] font-semibold text-muted">À la fin, un bouton vous ramène ici pour continuer.</p>
-          <button type="button" onClick={() => void reload()} className="flex h-11 items-center justify-center text-[13px] font-extrabold text-blue-ink">Déjà enregistré dans NavigationX ? Actualiser</button>
+          <button type="button" onClick={() => setLocating(true)} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-blue text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Localiser ma boutique</button>
+          <p className="text-[12px] font-semibold text-muted">Placez-vous dans la boutique, près d’une fenêtre : 15 secondes de mesures GPS, puis vous confirmez le bâtiment.</p>
         </Open>
       ) : (
         <>
           {depuis && !shop && decls.some((d) => d.id === recue) && (
-            <p role="status" className="flex items-center gap-2.5 rounded-[18px] bg-blue-soft px-4 py-3 text-[13.5px] font-extrabold text-blue-ink"><Icon name="pin" size={18} />{depuis === 'vente' ? 'Point de vente choisi dans NavigationX' : 'Adresse reçue de NavigationX : vous continuez ici.'}</p>
+            <p role="status" className="flex items-center gap-2.5 rounded-[18px] bg-blue-soft px-4 py-3 text-[13.5px] font-extrabold text-blue-ink"><Icon name="pin" size={18} />{depuis === 'vente' ? 'Point de vente choisi dans NavigationX' : 'Adresse reçue : vous continuez ici.'}</p>
           )}
-          <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} href={versNavigationX} />
+          <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} onChange={() => setLocating(true)} />
         </>
       )}
 
@@ -135,12 +139,13 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
         <Open n={3} title="Boutique suspendue" text="L’équipe Hailand a suspendu votre boutique. Écrivez-lui depuis Compte, « Aide et contact »." />
       )}
       {step === 3 && shop && shop.status !== 'suspendue' && !decl && (
-        <Open n={3} title="Rattachez une adresse" text="Votre boutique n’a pas d’adresse. Choisissez celle à certifier.">
+        <Open n={3} title="Rattachez une adresse" text="Votre boutique n’a pas d’adresse. Choisissez celle à certifier, ou repérez le bâtiment.">
+          <button type="button" disabled={busy} onClick={() => setLocating(true)} className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-blue text-[14px] font-extrabold text-white"><Icon name="pin" size={17} />Localiser ma boutique</button>
           {decls.map((d) => <button key={d.id} type="button" disabled={busy} onClick={() => attach(d.id)} className="flex min-h-12 items-center justify-between rounded-[14px] border border-line px-3.5 text-[14px] font-bold"><span className="truncate">{declLabel(d)}</span><span className="text-[12px] text-muted">niveau {d.level}</span></button>)}
         </Open>
       )}
       {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && !atHailandMap && !pending && (
-        <Open n={3} title="Faites certifier votre adresse" text={refused ? 'Votre dernière demande a été refusée : corrigez votre adresse dans NavigationX, puis redemandez.' : 'L’équipe Hailand vérifie votre demande, puis un agent passe confirmer que votre boutique est bien dans ce bâtiment. Il vous appelle avant. C’est gratuit.'}>
+        <Open n={3} title="Faites certifier votre adresse" text={refused ? 'Votre dernière demande a été refusée : repérez à nouveau le bâtiment (« Changer » sur votre adresse, plus haut), puis redemandez.' : 'L’équipe Hailand vérifie votre demande, puis un agent passe confirmer que votre boutique est bien dans ce bâtiment. Il vous appelle avant. C’est gratuit.'}>
           {refused && cert?.console_note && <p className="rounded-[14px] bg-[#fbeae5] px-3.5 py-3 text-[13px] font-semibold leading-snug text-[#a3321f]"><span className="font-extrabold">Motif : </span>{cert.console_note}</p>}
           <button type="button" disabled={busy} onClick={ask} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50">Demander la certification</button>
         </Open>
@@ -185,12 +190,13 @@ function Open({ n, title, text, children }: { n: number; title: string; text?: s
   );
 }
 
-function Done({ title, sub, href }: { title: string; sub: string; href: string }) {
+function Done({ title, sub, href, onChange }: { title: string; sub: string; href?: string; onChange?: () => void }) {
   return (
     <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">
       <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#0f7a5c] text-white"><Icon name="check" size={15} stroke={3} /></span>
       <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14.5px] font-extrabold">{title}</span><span className="truncate text-[12.5px] font-semibold text-muted">{sub}</span></span>
-      <LienHailand app="navigationx" href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</LienHailand>
+      {onChange ? <button type="button" onClick={onChange} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</button>
+        : href && <Link href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</Link>}
     </section>
   );
 }

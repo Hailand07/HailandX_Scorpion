@@ -3,7 +3,7 @@ import { BackHeader, Screen, SUPPORT_WHATSAPP } from '@hailandx/kit';
 export const metadata = { title: 'Aide aux vendeurs' };
 
 const FAQ: [string, string][] = [
-  ['Comment ouvrir ma boutique ?', 'Trois étapes : repérez votre bâtiment avec NavigationX, créez votre boutique, puis demandez la certification. Un agent Hailand vérifie votre emplacement ; la vente s’ouvre ensuite.'],
+  ['Comment ouvrir ma boutique ?', 'Trois étapes : repérez votre bâtiment ici même (position GPS et vue satellite), créez votre boutique, puis demandez la certification. Un agent Hailand vérifie votre emplacement ; la vente s’ouvre ensuite.'],
   ['Pourquoi je ne peux pas encore ajouter de produits ?', 'Les produits s’ajoutent dès que la vente est ouverte, c’est-à-dire quand l’adresse de votre boutique est certifiée par Hailand.'],
   ['Une commande arrive : que faire ?', 'Onglet Commandes : préparez le colis, imprimez l’étiquette si vous voulez, puis touchez « Colis prêt ». Un livreur Hailand vient le chercher et scanne le QR.'],
   ['Quand suis-je payé ?', 'L’argent d’une vente vous revient quand le colis est remis au client, commission Hailand déduite. Hailand vous verse ce qui vous est dû ; tout est visible dans Menu, « Argent ».'],

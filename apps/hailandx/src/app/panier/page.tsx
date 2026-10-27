@@ -3,9 +3,9 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { PhotoSlot } from '@hailandx/ui';
 import { formatGnf } from '@hailandx/commerce';
-import { browserClient, Icon } from '@hailandx/kit';
-import { cartCount, cartSubtotal, moveToCart, removeLater, removeLine, saveForLater, setQty, syncPrices, useCart, useLater, type CartLine } from '@/lib/cart';
-import { RecentlyViewed } from '@/components/RecentlyViewed';
+import { aUnNom, browserClient, Icon, PhoneLoginInline, useSession } from '@hailandx/kit';
+import { cartCount, cartSubtotal, keepShop, removeLine, setQty, syncPrices, useCart, type CartLine } from '@/lib/cart';
+import { OrderSteps } from '@/components/OrderSteps';
 
 /** État en direct d'une offre du panier : prix du moment, offre active, stock de chaque variante, boutique ouverte. */
 interface Live { price: number; active: boolean; open: boolean; stock: Map<string, number> }
@@ -42,10 +42,13 @@ function issueOf(l: CartLine, live: Map<string, Live> | null, before?: number): 
   return null;
 }
 
-/** Panier (v2, inspiré des grandes applications de vente) : un colis par boutique, état en direct, « mis de côté », récapitulatif clair. */
+/**
+ * Étape 1 de la commande (maquette v9 « Panier », HAILANDX.md §49) : les articles d'UNE boutique (un colis), état en direct,
+ * puis le numéro du client vérifié par SMS sans quitter la page. Déjà connecté : cette partie est sautée.
+ */
 export default function CartPage() {
   const lines = useCart();
-  const later = useLater();
+  const session = useSession();
   const live = useLive(lines);
   // Prix vus avant la mise à jour, pour signaler un changement au client.
   const [before, setBefore] = useState<Map<string, number>>(new Map());
@@ -56,94 +59,64 @@ export default function CartPage() {
     if (changed.size) { setBefore((b) => new Map([...b, ...changed])); syncPrices(new Map([...live].map(([k, v]) => [k, v.price]))); }
   }, [live, lines]);
 
-  const shops = [...new Set(lines.map((l) => l.shopSlug))];
+  const shops = [...new Map(lines.map((l) => [l.shopSlug, l.shopName])).entries()];
+  const shop = shops[0];
   const count = cartCount(lines);
   const blocked = lines.some((l) => issueOf(l, live, before.get(l.offerId))?.tone === 'block');
+  const ready = aUnNom(session);
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3.5 bg-bg pb-40">
-      <header className="sticky top-0 z-20 flex items-center gap-2 border-b border-line-soft bg-bg/95 px-3 pb-2.5 pt-[max(12px,env(safe-area-inset-top))] backdrop-blur">
-        <Link href="/" aria-label="Continuer mes achats" className="flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
-        <h1 className="flex-1 font-display text-[19px] font-semibold">Panier{count ? <span className="font-sans text-[14px] font-bold text-muted"> · {count} article{count > 1 ? 's' : ''}</span> : null}</h1>
+      <header className="sticky top-0 z-20 flex flex-col gap-2.5 border-b border-line-soft bg-bg/95 px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] backdrop-blur">
+        <div className="flex items-center gap-2">
+          <Link href={shop ? `/b/${shop[0]}` : '/'} aria-label="Retour à la boutique" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
+          <h1 className="flex-1 font-display text-[19px] font-semibold">Votre commande</h1>
+        </div>
+        <OrderSteps current={1} />
       </header>
 
-      {lines.length === 0 ? (
+      {lines.length === 0 || !shop ? (
         <section className="mx-4 flex flex-col items-center gap-3 rounded-[24px] border border-line-soft bg-card px-6 py-10 text-center">
           <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-sand"><Icon name="box" size={30} /></span>
           <p className="font-display text-[19px] font-semibold">Votre panier est vide</p>
-          <p className="max-w-[260px] text-[13.5px] font-medium leading-relaxed text-muted">Ajoutez des produits depuis la rue : ils vous attendront ici, même si vous fermez l’application.</p>
-          <Link href="/" className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Découvrir les produits</Link>
+          <p className="max-w-[260px] text-[13.5px] font-medium leading-relaxed text-muted">Ouvrez le lien du produit que le vendeur vous a envoyé, puis touchez « Commander ».</p>
+          <Link href="/commandes" className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-ink px-7 text-[15px] font-extrabold text-white">Mes commandes</Link>
         </section>
       ) : (
         <>
+          {shops.length > 1 && (
+            <section role="alert" className="mx-4 flex flex-col gap-2 rounded-2xl bg-amber-soft px-4 py-3 text-[13px] font-bold text-[#6b5317]">
+              <p>Une commande = une seule boutique. Choisissez celle que vous gardez :</p>
+              <div className="flex flex-wrap gap-2">{shops.map(([slug, name]) => <button key={slug} type="button" onClick={() => keepShop(slug)} className="h-10 rounded-xl bg-card px-3.5 text-[13px] font-extrabold text-ink">Garder {name}</button>)}</div>
+            </section>
+          )}
           {blocked && <p role="alert" className="mx-4 rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13px] font-bold text-[#8a2a1c]">Certains articles ne sont plus disponibles en cette quantité. Corrigez-les pour commander.</p>}
-          {shops.map((s, i) => {
-            const mine = lines.filter((l) => l.shopSlug === s);
-            const sub = cartSubtotal(mine);
-            return (
-              <section key={s} aria-label={`Colis de ${mine[0]!.shopName}`} className="mx-4 flex flex-col overflow-hidden rounded-[22px] border border-line-soft bg-card">
-                <div className="flex items-center justify-between gap-2 border-b border-line-soft px-4 py-3">
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Icon name="shop" size={17} className="shrink-0 text-muted" />
-                    <span className="truncate text-[13.5px] font-extrabold">{shops.length > 1 ? `Colis ${i + 1} · ` : ''}<Link href={`/b/${s}`} className="underline-offset-2 hover:underline">{mine[0]!.shopName}</Link></span>
-                  </span>
-                  <span className="shrink-0 text-[11.5px] font-bold text-ok">Vendeur certifié</span>
-                </div>
-                <ul className="flex flex-col divide-y divide-line-soft">
-                  {mine.map((l) => <Line key={`${l.offerId}-${l.variantId}`} l={l} issue={issueOf(l, live, before.get(l.offerId))} />)}
-                </ul>
-                <div className="flex items-center justify-between bg-[#faf9f5] px-4 py-2.5 text-[12.5px] font-bold text-muted">
-                  <span>Sous-total du colis</span><span className="font-display text-[14px] font-semibold text-ink">{formatGnf(sub)}</span>
-                </div>
-              </section>
-            );
-          })}
+          {shops.map(([slug, name]) => (
+            <section key={slug} aria-label={`Colis de ${name}`} className="mx-4 flex flex-col overflow-hidden rounded-[22px] border border-line-soft bg-card">
+              <div className="flex items-center gap-2 border-b border-line-soft px-4 py-3">
+                <Icon name="shop" size={17} className="shrink-0 text-muted" />
+                <span className="truncate text-[13.5px] font-extrabold">Chez <Link href={`/b/${slug}`} className="underline-offset-2 hover:underline">{name}</Link> · un seul colis</span>
+              </div>
+              <ul className="flex flex-col divide-y divide-line-soft">
+                {lines.filter((l) => l.shopSlug === slug).map((l) => <Line key={`${l.offerId}-${l.variantId}`} l={l} issue={issueOf(l, live, before.get(l.offerId))} />)}
+              </ul>
+              <Link href={`/b/${slug}`} className="border-t border-line-soft px-4 py-3 text-[13px] font-extrabold text-blue-ink">+ Ajouter un autre produit de {name}</Link>
+            </section>
+          ))}
 
-          <section aria-label="Récapitulatif" className="mx-4 flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card px-4 py-3.5">
-            <h2 className="text-[14px] font-extrabold">Récapitulatif</h2>
-            <p className="flex justify-between text-[13.5px] font-semibold"><span>Articles ({count})</span><span>{formatGnf(cartSubtotal(lines))}</span></p>
-            <p className="flex justify-between gap-3 text-[13.5px] font-semibold"><span>Livraison{shops.length > 1 ? ` (${shops.length} colis)` : ''}</span><span className="text-right text-muted">calculée selon votre adresse</span></p>
-            <p className="flex justify-between border-t border-line-soft pt-2 font-display text-[16px] font-semibold"><span>Total des articles</span><span>{formatGnf(cartSubtotal(lines))}</span></p>
-            <p className="text-[11.5px] font-semibold leading-snug text-muted">{shops.length > 1 ? 'Une boutique = un colis, livré séparément au bâtiment de votre adresse Hailand. ' : ''}Les frais de livraison s’affichent à l’étape suivante, avant de confirmer.</p>
-          </section>
-
-          <ul aria-label="Garanties" className="mx-4 grid grid-cols-3 gap-2 text-center">
-            {([['shield', 'Payé à la remise ou Orange Money'], ['check', 'Remis contre votre code'], ['alert', '72 h pour signaler un problème']] as const).map(([icon, t]) => (
-              <li key={t} className="flex flex-col items-center gap-1.5 rounded-2xl bg-card px-2 py-3 text-[11px] font-bold leading-tight text-muted"><Icon name={icon} size={18} className="text-ink" />{t}</li>
-            ))}
-          </ul>
+          {session !== undefined && !ready && <div className="mx-4"><PhoneLoginInline /></div>}
+          {ready && session && <p className="mx-4 rounded-2xl bg-card px-4 py-3 text-[12.5px] font-semibold text-muted">Commande au nom de <b className="text-ink">{(session.user.user_metadata as { full_name?: string }).full_name}</b> · suivi et code de remise par SMS.</p>}
         </>
       )}
 
-      {later.length > 0 && (
-        <section aria-label="Mis de côté" className="mx-4 flex flex-col overflow-hidden rounded-[22px] border border-line-soft bg-card">
-          <h2 className="border-b border-line-soft px-4 py-3 text-[13.5px] font-extrabold">Mis de côté ({later.length})</h2>
-          <ul className="flex flex-col divide-y divide-line-soft">
-            {later.map((l) => (
-              <li key={`${l.offerId}-${l.variantId}`} className="flex gap-3 px-4 py-3">
-                <Link href={`/p/${l.slug}?b=${l.shopSlug}`} className="block h-[64px] w-[64px] shrink-0 overflow-hidden rounded-2xl"><PhotoSlot src={l.photoUrl} color="#f2f0ea" className="h-full" label={l.name} /></Link>
-                <span className="flex min-w-0 flex-1 flex-col gap-1">
-                  <Link href={`/p/${l.slug}?b=${l.shopSlug}`} className="line-clamp-2 text-[13.5px] font-bold leading-snug">{l.name}</Link>
-                  <span className="font-display text-[14px] font-semibold">{formatGnf(l.priceGnf)}</span>
-                  <span className="flex gap-4 text-[12.5px] font-extrabold">
-                    <button type="button" onClick={() => moveToCart(l.offerId, l.variantId)} className="text-blue-ink">Remettre au panier</button>
-                    <button type="button" onClick={() => removeLater(l.offerId, l.variantId)} className="text-muted">Supprimer</button>
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <RecentlyViewed title={lines.length ? 'Vous avez aussi regardé' : 'Vus récemment'} />
-
       {lines.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md items-center gap-3 border-t border-line-soft bg-card px-4 pb-[max(18px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(18,20,28,0.06)]">
-          <span className="flex min-w-0 flex-col"><span className="text-[11.5px] font-bold text-muted">Total ({count} article{count > 1 ? 's' : ''})</span><span className="font-display text-[19px] font-semibold">{formatGnf(cartSubtotal(lines))}</span><span className="text-[10.5px] font-semibold text-muted">+ livraison</span></span>
-          {blocked
-            ? <span className="flex h-[54px] flex-1 items-center justify-center rounded-2xl bg-sand text-center text-[13.5px] font-extrabold text-muted">Corrigez le panier</span>
-            : <Link href="/commande" className="flex h-[54px] flex-1 items-center justify-center rounded-2xl bg-ink text-[15.5px] font-extrabold text-white">Commander</Link>}
+        <div className="fixed inset-x-0 bottom-0 z-30 mx-auto flex max-w-md flex-col gap-2 border-t border-line-soft bg-card px-4 pb-[max(18px,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(18,20,28,0.06)]">
+          <span className="flex justify-between text-[13.5px] font-bold"><span className="text-muted">Articles ({count})</span><span className="font-display text-[16px] font-semibold">{formatGnf(cartSubtotal(lines))}</span></span>
+          {blocked || shops.length > 1
+            ? <span className="flex h-[54px] items-center justify-center rounded-2xl bg-sand text-center text-[13.5px] font-extrabold text-muted">Corrigez le panier</span>
+            : !ready
+              ? <span className="flex h-[54px] items-center justify-center rounded-2xl bg-sand text-center text-[13.5px] font-extrabold text-muted">Vérifiez d’abord votre numéro</span>
+              : <Link href="/commande" className="flex h-[54px] items-center justify-center rounded-2xl bg-blue text-[15.5px] font-extrabold text-white">Continuer : où livrer ?</Link>}
         </div>
       )}
     </main>
@@ -170,7 +143,6 @@ function Line({ l, issue }: { l: CartLine; issue: Issue }) {
             <span className="w-7 text-center text-[14px] font-extrabold" aria-live="polite" aria-label={`Quantité ${l.qty}`}>{l.qty}</span>
             <button type="button" aria-label="Ajouter un" onClick={() => setQty(l.offerId, l.variantId, l.qty + 1)} className="flex h-9 w-10 items-center justify-center text-[18px] font-bold">+</button>
           </span>
-          <button type="button" onClick={() => saveForLater(l.offerId, l.variantId)} className="text-[12.5px] font-extrabold text-blue-ink">Mettre de côté</button>
           <button type="button" onClick={() => removeLine(l.offerId, l.variantId)} className="text-[12.5px] font-extrabold text-muted">Supprimer</button>
         </div>
       </div>

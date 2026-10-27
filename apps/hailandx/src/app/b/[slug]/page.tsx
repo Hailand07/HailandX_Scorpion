@@ -5,7 +5,7 @@ import { badgesOf } from '@/data/sample';
 import { getCatalog, trustFor } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
 import { hoursSummary, isOpenNow, onVacation } from '@hailandx/commerce';
-import { FollowButton } from '@/components/FollowButton';
+import { ShareButton } from '@/components/ShareButton';
 import { ShopProducts, type Section } from '@/components/ShopProducts';
 
 type Params = { params: Promise<{ slug: string }> };
@@ -18,7 +18,10 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   return { title: s.name, description, openGraph: { title: s.name, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN' } };
 }
 
-/** Boutique d'un vendeur : tous ses produits, comme si l'on entrait dans sa boutique depuis la rue. */
+/**
+ * Boutique d'un vendeur (maquette v9 A3) : seulement ses produits, par rayon. Pas de recherche ni de produits d'autres vendeurs
+ * (phase de lancement, HAILANDX.md §49).
+ */
 export default async function ShopPage({ params }: Params) {
   const { slug } = await params;
   const cat = await getCatalog();
@@ -29,17 +32,13 @@ export default async function ShopPage({ params }: Params) {
   const away = onVacation(s.vacationUntil);
   const open = isOpenNow(s.hours);
   const summary = hoursSummary(s.hours);
-  // Identifiant, rayons et abonnés : lus à la demande (la vitrine mise en cache ne les porte pas). Boutiques d'exemple : pas de suivi.
-  let shopId: string | null = null; let sections: Section[] = []; let followers = 0;
+  // Rayons : lus à la demande (la vitrine mise en cache ne les porte pas).
+  let sections: Section[] = [];
   const sb = cat.source === 'base' ? serverClient() : null;
   if (sb) {
     const { data: row } = await sb.from('shops').select('id').eq('slug', s.slug).maybeSingle();
-    shopId = (row as { id: string } | null)?.id ?? null;
-    if (shopId) {
-      const [sec, fol] = await Promise.all([sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name'), sb.rpc('fn_shop_followers', { p_shop: shopId })]);
-      sections = (sec.data as Section[]) ?? [];
-      followers = typeof fol.data === 'number' ? fol.data : 0;
-    }
+    const shopId = (row as { id: string } | null)?.id;
+    if (shopId) sections = ((await sb.from('shop_sections').select('id,name').eq('shop_id', shopId).order('position').order('name')).data as Section[]) ?? [];
   }
   const wa = s.whatsapp ? s.whatsapp.replace(/\D/g, '') : '';
 
@@ -71,12 +70,13 @@ export default async function ShopPage({ params }: Params) {
         </div>
         <div className="flex flex-wrap gap-1.5">{badgesOf(s).map((b) => <Badge key={b}>{b}</Badge>)}</div>
         <div className="flex flex-wrap items-center gap-2">
-          {shopId && <FollowButton shopId={shopId} shopSlug={s.slug} initialCount={followers} />}
-          {wa && <a href={`https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${s.name}, je vous écris depuis HailandX.`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center gap-1.5 rounded-full border border-line bg-card px-4 text-[13.5px] font-extrabold text-ok">WhatsApp</a>}
+          {wa && <a href={`https://wa.me/${wa}?text=${encodeURIComponent(`Bonjour ${s.name}, je vous écris depuis HailandX.`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center gap-1.5 rounded-full bg-ok px-4 text-[13.5px] font-extrabold text-white">Écrire sur WhatsApp</a>}
+          <ShareButton title={s.name} path={`/b/${s.slug}`} />
         </div>
       </section>
 
       <ShopProducts shopSlug={s.slug} products={products} sections={sections} />
+      <p className="px-5 pt-1 text-[12px] font-semibold text-muted">Seuls les produits de {s.name}. Livrés à votre porte par la Flotte Hailand.</p>
       {s.policy && (
         <section aria-labelledby="politique" className="mx-5 mt-2 flex flex-col gap-1 rounded-2xl border border-line-soft bg-card px-4 py-3">
           <h2 id="politique" className="text-[13px] font-extrabold">Échanges et garantie de la boutique</h2>

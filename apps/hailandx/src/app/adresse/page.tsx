@@ -1,16 +1,16 @@
 'use client';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Badge, Wordmark } from '@hailandx/ui';
-import { browserClient, Icon, LienHailand, lienEnregistrement, useSession } from '@hailandx/kit';
+import { browserClient, Icon, useSession } from '@hailandx/kit';
+import { AdresseClient } from '@/components/AdresseClient';
 
 interface Decl { id: string; declared_label: string | null; hailand_code: string | null; location_floor: string | null; location_door: string | null; declared_landmark: string | null }
 
 /**
- * Mes adresses de livraison. L'enregistrement d'un emplacement se fait UNIQUEMENT dans NavigationX (décision du fondateur,
- * 2026-10-14) : on y est envoyé directement sur le parcours d'enregistrement, et un bouton ramène ici (ou à la commande) à la fin.
- * Le panier reste sur l'appareil pendant l'aller-retour.
+ * Mes adresses de livraison. Phase de lancement (§49, 2026-10-27) : l'emplacement s'enregistre ICI, avec le parcours recopié
+ * de NavigationX (il n'y a plus de détour par NavigationX). `?next=` ramène à la page demandée à la fin (ex. la commande).
  */
 function Page() {
   const nextParam = useSearchParams().get('next');
@@ -19,6 +19,8 @@ function Page() {
   const sb = browserClient();
   const [list, setList] = useState<Decl[] | null>(null);
   const [levels, setLevels] = useState<Record<string, number>>({});
+  const [adding, setAdding] = useState(false);
+  const router = useRouter();
 
   const load = useCallback(async () => {
     if (!sb || !session) return;
@@ -30,6 +32,8 @@ function Page() {
     setLevels(lv);
   }, [sb, session]);
   useEffect(() => { void load(); }, [load]);
+
+  if (adding) return <AdresseClient cta={next === '/adresse' ? 'Voir mes adresses' : 'Continuer'} onDone={() => { setAdding(false); if (next === '/adresse') void load(); else router.replace(next); }} onClose={() => setAdding(false)} />;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-6">
@@ -51,13 +55,8 @@ function Page() {
       )}
       {session && list && (
         <section className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-4">
-          <p className="text-[14px] font-medium leading-relaxed text-muted">
-            {list.length ? 'Une autre adresse ? ' : 'Pour être livré jusqu’à votre porte, '}enregistrez-la une fois dans <b className="font-extrabold text-ink">NavigationX</b>, l’application officielle des adresses Hailand. Elle servira pour toutes vos commandes.
-          </p>
-          <LienHailand app="navigationx" href={lienEnregistrement('hailandx', next)} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-extrabold text-white">
-            <Icon name="pin" size={18} />Enregistrer mon adresse avec NavigationX
-          </LienHailand>
-          <p className="text-[12px] font-semibold text-muted">{next === '/commande' ? 'Votre panier vous attend ici : vous revenez à votre commande à la fin.' : 'À la fin, un bouton vous ramène ici.'}</p>
+          <p className="text-[14px] font-medium leading-relaxed text-muted">{list.length ? 'Une autre adresse ? ' : 'Pour être livré jusqu’à votre porte, '}repérez le bâtiment ici même : position GPS, vue satellite, vous confirmez. Elle servira pour toutes vos commandes.</p>
+          <button type="button" onClick={() => setAdding(true)} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-blue text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Repérer mon bâtiment</button>
         </section>
       )}
     </main>
