@@ -9,6 +9,7 @@ import { serverClient } from '@hailandx/kit';
 import { AskQuestion } from '@/components/AskQuestion';
 import { BuyBar } from '@/components/BuyBar';
 import { CartButton } from '@/components/CartButton';
+import { SuiviCommande } from '@/components/SuiviCommande';
 import { ProductGallery, ReadMore } from '@/components/ProductGallery';
 
 interface Question { id: string; question: string; answer: string | null; answered_at: string | null; created_at: string; shops: { name: string } | null }
@@ -96,7 +97,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
             <span className="text-[11.5px] font-bold text-blue-ink">Voir la boutique</span>
           </span>
         </Link>
-        <CartButton />
+        <span className="flex shrink-0 items-center gap-2"><SuiviCommande /><CartButton /></span>
       </header>
 
       <div className="px-[18px]">

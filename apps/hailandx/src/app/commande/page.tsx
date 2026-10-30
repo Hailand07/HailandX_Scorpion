@@ -39,6 +39,8 @@ function Checkout() {
   const [promo, setPromo] = useState('');
   const [promoCheck, setPromoCheck] = useState<{ code: string; discount: number; lines: { shop_name: string; discount_gnf: number; reason: string | null }[] } | null>(null);
   const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
+  // HailandPay (Syli, argent de test) : réservé à l'équipe pendant la phase de lancement (§49) — les clients ne le voient pas.
+  const [team, setTeam] = useState(false);
   // Frais de livraison connus AVANT de commander (A9) : un colis par boutique, chacun avec ses frais (comme Jumia ou Amazon).
   const [quote, setQuote] = useState<{ shop_id: string; shop_name: string; distance_km: number; fee_gnf: number }[] | null>(null);
   const offerKey = lines.map((l) => l.offerId).sort().join(',');
@@ -62,6 +64,7 @@ function Checkout() {
       const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
       const open = mode === 'chapchappay' || mode === 'djomy';
       setOmAvailable({ ok: open || a.data === true, trial: !open });
+      setTeam(a.data === true);
       const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false });
       const list = (data as Decl[]) ?? [];
       const lv: Record<string, number> = {};
@@ -83,10 +86,25 @@ function Checkout() {
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
     const code = promoCheck && promoCheck.discount > 0 ? promoCheck.code : null;
     const { data, error: err } = await sb!.rpc('fn_place_order', { p_items: items, p_declaration: decl, p_phone: n, p_payment: pay, p_source: currentSource(), ...(code ? { p_promo: code } : {}) });
-    setBusy(false);
-    if (err) return setError(explainOrderError(err.message.replace(/^.*?:\s*/, ''), lines).slice(0, 300) || 'La commande n’a pas pu être passée.');
+    if (err) { setBusy(false); return setError(explainOrderError(err.message.replace(/^.*?:\s*/, ''), lines).slice(0, 300) || 'La commande n’a pas pu être passée.'); }
     clearCart();
-    router.replace(`/commandes/${data as string}${pay === 'orange_money' ? '?paiement=payer' : ''}`);
+    const orderId = data as string;
+    // Paiement en ligne : la page du fournisseur (Chap Chap Pay ou Djomy) s'ouvre tout de suite, sans étape intermédiaire.
+    // En cas d'échec, la page de la commande garde le bouton « Payer maintenant » et affiche la raison.
+    if (pay === 'orange_money') {
+      try {
+        const token = (await sb!.auth.getSession()).data.session?.access_token ?? '';
+        const r = await fetch('/api/paiement/demarrer', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ order: orderId }) });
+        const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+        if (body.url) { window.location.assign(body.url); return; }
+        router.replace(`/commandes/${orderId}?paiement=erreur&raison=${encodeURIComponent((body.error ?? 'Le paiement n’a pas pu démarrer.').slice(0, 200))}`);
+      } catch {
+        router.replace(`/commandes/${orderId}?paiement=erreur&raison=${encodeURIComponent('Connexion interrompue : touchez « Payer maintenant ».')}`);
+      }
+      return;
+    }
+    setBusy(false);
+    router.replace(`/commandes/${orderId}`);
   }
 
   /** Vérifie le code auprès de la base (réduction par boutique du panier) ; la commande le revérifie. */
@@ -112,6 +130,8 @@ function Checkout() {
   );
 
   if (session === undefined) return <main className="mx-auto max-w-md px-5 pt-6">{Head}</main>;
+  // Pendant l'envoi, le panier est déjà vidé : on garde l'écran « Ouverture du paiement… » jusqu'à la redirection.
+  if (busy && lines.length === 0) return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<Chargement enLigne texte="Ouverture du paiement sécurisé…" /></main>;
   if (lines.length === 0) {
     return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<p className="text-[14px] font-medium text-muted">Votre panier est vide.</p><Link href="/commandes" className="font-bold text-blue-ink">Mes commandes</Link></main>;
   }
@@ -151,10 +171,12 @@ function Checkout() {
             <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> <span className="flex flex-col">Mobile Money ou carte<span className="text-[11.5px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Visa…</span></span>
             <span className="ml-auto text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
           </label>
+          {team && (
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'hailandpay' ? 'border-2 border-ink' : 'border border-line'}`}>
             <input type="radio" name="pay" disabled={!wallet} checked={pay === 'hailandpay'} onChange={() => setPay('hailandpay')} /> <span>Hailand<span className="text-blue">Pay</span></span>
             <span className="ml-auto text-[11.5px]">{wallet ? `${formatSyli(wallet.balance)} · TEST` : '…'}</span>
           </label>
+          )}
           {pay === 'hailandpay' && wallet && (wallet.balance >= toPay
             ? <p className="text-[12.5px] font-medium text-muted">Payé tout de suite en Syli (argent de test, 1 Syli = 1 GNF). L’argent reste bloqué par Hailand jusqu’à la remise du colis, et vous est rendu si la commande est annulée. Solde après paiement : <b className="text-ink">{formatSyli(wallet.balance - toPay)}</b>.</p>
             : <p className="text-[12.5px] font-bold text-[#a3321f]">Solde insuffisant ({formatSyli(wallet.balance)} pour {formatSyli(toPay)}). <Link href="/compte/hailandpay/recharger" className="text-blue-ink underline">Recharger</Link></p>)}
@@ -183,7 +205,7 @@ function Checkout() {
           ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>
         {error && <p role="alert" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a1c]">{error}</p>}
-        <Button type="submit" disabled={busy || !decl}>{busy ? 'Envoi…' : 'Passer la commande'}</Button>
+        <Button type="submit" disabled={busy || !decl}>{busy ? (pay === 'orange_money' ? 'Ouverture du paiement…' : 'Envoi…') : pay === 'orange_money' ? `Payer ${formatGnf(toPay)}` : 'Passer la commande'}</Button>
       </form>
     </main>
   );
