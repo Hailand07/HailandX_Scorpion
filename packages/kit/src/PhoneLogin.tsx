@@ -30,7 +30,7 @@ const T = {
 
 type Step = 'numero' | 'code' | 'existant' | 'nom';
 
-function Form({ defaultNext, brand, tone }: { defaultNext: string; brand?: ReactNode; tone: Tone }) {
+function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; brand?: ReactNode; tone: Tone; homeHref: string | null }) {
   const t = T[tone];
   const router = useRouter();
   const nextParam = useSearchParams().get('next');
@@ -106,7 +106,7 @@ function Form({ defaultNext, brand, tone }: { defaultNext: string; brand?: React
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-5 pb-10 pt-8">
-      <Link href="/" aria-label="Accueil">{brand ?? <Wordmark />}</Link>
+      {homeHref ? <Link href={homeHref} aria-label="Accueil">{brand ?? <Wordmark />}</Link> : <span>{brand ?? <Wordmark />}</span>}
 
       {step === 'numero' && (
         <form onSubmit={sendCode} className="flex flex-1 flex-col gap-5">
@@ -204,7 +204,10 @@ function Form({ defaultNext, brand, tone }: { defaultNext: string; brand?: React
   );
 }
 
-/** Page de connexion « Compte Hailand » prête à l'emploi : `defaultNext` = où aller après la connexion sans paramètre `next`. */
-export function PhoneLogin({ defaultNext = '/', brand, tone = 'clair' }: { defaultNext?: string; brand?: ReactNode; tone?: Tone }) {
-  return <Suspense><Form defaultNext={defaultNext} brand={brand} tone={tone} /></Suspense>;
+/**
+ * Page de connexion « Compte Hailand » prête à l'emploi : `defaultNext` = où aller après la connexion sans paramètre `next` ;
+ * `homeHref` = lien du logo (`null` : aucun lien, pour les clients de HailandX qui ne doivent pas quitter leur commande).
+ */
+export function PhoneLogin({ defaultNext = '/', brand, tone = 'clair', homeHref = '/' }: { defaultNext?: string; brand?: ReactNode; tone?: Tone; homeHref?: string | null }) {
+  return <Suspense><Form defaultNext={defaultNext} brand={brand} tone={tone} homeHref={homeHref} /></Suspense>;
 }

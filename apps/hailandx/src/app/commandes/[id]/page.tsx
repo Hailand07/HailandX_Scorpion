@@ -224,8 +224,10 @@ function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
     if (order.payment_status !== 'en_attente' || typeof window === 'undefined') return;
     const back = new URLSearchParams(window.location.search).get('paiement');
     if (!back) return;
+    const raison = new URLSearchParams(window.location.search).get('raison');
     window.history.replaceState(null, '', window.location.pathname);
-    if (back === 'payer') { setAutoPay(true); return; } // juste après la commande : on ouvre le paiement
+    if (back === 'payer') { setAutoPay(true); return; } // ancien relais après la commande : on ouvre le paiement
+    if (back === 'erreur') { setMsg(`Le paiement n’a pas pu s’ouvrir : ${raison ?? 'réessayez'}.`); return; } // la commande l'a déjà tenté
     (async () => { setMsg('Vérification du paiement…'); const r = await call('verifier'); if (r.body.state === 'bloque' || r.body.state === 'deja_paye') onDone(); else { setMsg(back === 'annule' ? 'Paiement annulé : vous pouvez réessayer.' : null); await load(); } })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.payment_status]);

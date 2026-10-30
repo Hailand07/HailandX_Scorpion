@@ -141,6 +141,5 @@ export default function OrdersPage() {
 const Empty = ({ text }: { text: string }) => (
   <div className="flex flex-col items-center gap-3 rounded-[22px] border border-dashed border-line px-5 py-8 text-center">
     <p className="text-[14px] font-semibold text-muted">{text}</p>
-    <Link href="/" className="flex h-11 items-center rounded-2xl bg-ink px-5 text-[14px] font-extrabold text-white">Découvrir les boutiques</Link>
   </div>
 );

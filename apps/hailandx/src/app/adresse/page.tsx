@@ -37,7 +37,7 @@ function Page() {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-6">
-      <Link href="/" aria-label="Accueil"><Wordmark /></Link>
+      <Wordmark />
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-[26px] font-semibold tracking-tight">Où livrer ?</h1>
         <p className="text-[14px] font-medium text-muted">Votre adresse guide le livreur jusqu’à votre porte, sans appel.</p>

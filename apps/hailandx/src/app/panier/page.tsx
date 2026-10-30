@@ -69,7 +69,7 @@ export default function CartPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3.5 bg-bg pb-40">
       <header className="sticky top-0 z-20 flex flex-col gap-2.5 border-b border-line-soft bg-bg/95 px-4 pb-3 pt-[max(12px,env(safe-area-inset-top))] backdrop-blur">
         <div className="flex items-center gap-2">
-          <Link href={shop ? `/b/${shop[0]}` : '/'} aria-label="Retour à la boutique" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
+          <Link href={shop ? `/b/${shop[0]}` : '/commandes'} aria-label="Retour à la boutique" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2.2} /></Link>
           <h1 className="flex-1 font-display text-[19px] font-semibold">Votre commande</h1>
         </div>
         <OrderSteps current={1} />
