@@ -84,6 +84,8 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
   const [tap, setTap] = useState<{ point: [number, number]; result: TapResult } | null>(null);
   /** Vue satellite indisponible (réseau faible, Mapbox injoignable) : on continue sans elle plutôt que de bloquer le client. */
   const [noSatellite, setNoSatellite] = useState(false);
+  /** Raison donnée par Mapbox quand la vue satellite échoue (affichée pour diagnostiquer : jeton, adresse autorisée, réseau). */
+  const [satError, setSatError] = useState<string | null>(null);
   const phaseRef = useRef<Phase>('loading');
   phaseRef.current = phase;
   /** Contour encadré par les crochets (recalculé à chaque déplacement de la carte). */
@@ -145,6 +147,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
     if (!mapDivRef.current) return;
     let cancelled = false;
     const timers: number[] = [];
+    if (!token) setSatError('Jeton Mapbox absent (variable NEXT_PUBLIC_MAPBOX_TOKEN non posée lors du déploiement)');
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
@@ -204,7 +207,14 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       });
     };
     timers.push(window.setTimeout(fallback, 15000));
-    map.on('error', () => { if (!map.loaded()) fallback(); });
+    map.on('error', (e) => {
+      const err = (e as { error?: { status?: number; message?: string } }).error;
+      const st = err?.status;
+      setSatError((cur) => cur ?? (st === 401 ? 'Mapbox 401 : jeton absent ou invalide'
+        : st === 403 ? 'Mapbox 403 : jeton refusé pour cette adresse web (restrictions d’URL du jeton)'
+        : st ? `Mapbox ${st} : ${err?.message ?? 'erreur'}` : `Mapbox : ${err?.message ?? 'erreur inconnue'}`));
+      if (!map.loaded()) fallback();
+    });
 
     map.on('load', () => {
       if (cancelled || loaded) return;
@@ -713,6 +723,11 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
           {fmtCoord(position[1])} · {fmtCoord(position[0])}
         </div>
       </div>
+      {satError && (
+        <p role="status" className="absolute inset-x-4 top-[72px] z-10 rounded-xl bg-[#3a1a1a]/90 px-3 py-2 text-center text-[12px] font-bold text-[#ffb4a8]">
+          Vue satellite indisponible — {satError}
+        </p>
+      )}
 
       {/* Feuille du bas : complète au repos ; dès que l'utilisateur manipule la carte, elle se réduit au seul bouton principal,
           puis revient après quelques secondes de calme (même principe que le panneau « Mon domicile »). */}
