@@ -173,7 +173,7 @@ const resolutionText = (d: { resolution: string | null; refund_gnf: number | nul
       : `Décision de l’équipe Hailand : en votre faveur. Remboursement partiel de ${formatGnf(d.refund_gnf ?? 0)} ; l’équipe vous contacte pour vous le remettre.`
     : 'Décision de l’équipe Hailand : la livraison est confirmée.';
 
-/** Signaler un problème (colis en route ou remis depuis moins de 72 h) ; suivi de la décision de l'équipe. */
+/** Signaler un problème (colis en route ou remis depuis moins de 48 h) ; suivi de la décision de l'équipe. */
 function Problem({ parcel, status, onDone }: { parcel: string; status: ParcelStatus; onDone: () => void }) {
   const sb = browserClient();
   const [open, setOpen] = useState(false);
@@ -256,7 +256,7 @@ function PaymentBox({ order, onDone }: { order: Order; onDone: () => void }) {
           <button type="button" disabled={busy} onClick={pay} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-50">
             {busy ? 'Ouverture du paiement…' : pending ? 'Reprendre le paiement' : 'Payer maintenant'}
           </button>
-          <span className="text-[12px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Soutra Money ou carte bancaire, sur la page sécurisée de {gateway}{testMode ? ' — mode essai : aucun argent réel' : ''}.</span>
+          <span className="text-[12px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Soutra Money ou carte bancaire, sur la page sécurisée de {gateway}{state?.mode === 'djomy_test' ? ' — serveur de test Djomy : aucun argent réel' : state?.mode === 'chapchappay_test' ? ' — réservé à l’équipe : ARGENT RÉEL si les clés de production sont posées' : ''}.</span>
           {pending && <span className="text-[12.5px] font-bold">Un paiement est en cours de confirmation par l’opérateur (parfois quelques minutes) : ne payez pas une seconde fois. <button type="button" disabled={busy} onClick={check} className="underline">Vérifier maintenant</button></span>}
         </>
       ) : state?.admin && state.mode === 'simulation' ? (

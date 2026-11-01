@@ -33,7 +33,7 @@ describe('signature Chap Chap Pay', () => {
 
 describe('notification et statut', () => {
   it('lit la notification : opération, montant, statut, moyen, référence', () => {
-    expect(parseResult(callback)).toEqual({ orderRef: `${ORDER}-lx1`, operationId: '2db401d7-cad3-449f-9e3e-ec2cf9e48472', amountGnf: 10000, status: 'success', method: 'orange_money', reference: 'REF12345' });
+    expect(parseResult(callback)).toEqual({ orderRef: `${ORDER}-lx1`, operationId: '2db401d7-cad3-449f-9e3e-ec2cf9e48472', amountGnf: 10000, status: 'success', method: 'orange_money', reference: 'REF12345', isTest: null });
     expect(parseResult('pas du json')).toBeNull();
     expect(parseResult(JSON.stringify({ operation_id: 'x', amount: 5, status: { code: 'bizarre' } }))).toBeNull();
     expect(normalizeStatus('completed')).toBe('success');
@@ -65,5 +65,14 @@ describe('appels à l’API', () => {
     await expect(ccpCreate('x', KEY, { amount: 1, orderRef: 'abcd', description: '', returnUrl: '', cancelUrl: '', callbackUrl: '' }, bad as unknown as typeof fetch)).rejects.toThrow('Clé invalide');
     const ok = vi.fn(async () => new Response(JSON.stringify({ operation_id: 'op-1', amount: 239000, order_id: `${ORDER}-a`, status: { code: 'completed', payment_method: 'paycard' } }), { status: 200 }));
     expect(await ccpStatus('x', 'op-1', ok as unknown as typeof fetch)).toMatchObject({ status: 'success', amountGnf: 239000, method: 'paycard' });
+  });
+});
+
+describe('mode réel de l’opération (is_test)', () => {
+  it('lit is_test quand Chap Chap Pay l’envoie, sinon null', () => {
+    const base = { order_id: 'x', operation_id: 'op', amount: 5000, status: { code: 'success' } };
+    expect(parseResult({ ...base, is_test: true })?.isTest).toBe(true);
+    expect(parseResult({ ...base, is_test: false })?.isTest).toBe(false);
+    expect(parseResult(base)?.isTest).toBeNull();
   });
 });

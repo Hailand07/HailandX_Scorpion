@@ -36,7 +36,11 @@ export function normalizeStatus(code: unknown): CcpStatus | null {
   return (STATUSES as string[]).includes(c) ? (c as CcpStatus) : null;
 }
 
-export interface CcpResult { orderRef: string; operationId: string; amountGnf: number; status: CcpStatus; method: string | null; reference: string | null }
+export interface CcpResult {
+  orderRef: string; operationId: string; amountGnf: number; status: CcpStatus; method: string | null; reference: string | null;
+  /** Mode réel de l'opération quand Chap Chap Pay l'indique (`is_test`) : c'est la clé API qui décide, pas le réglage de la Console. */
+  isTest?: boolean | null;
+}
 
 /** Corps d'une notification ou d'une vérification de statut E-Commerce ; null si illisible. */
 export function parseResult(input: string | Record<string, unknown>): CcpResult | null {
@@ -51,7 +55,8 @@ export function parseResult(input: string | Record<string, unknown>): CcpResult 
   const tr = (j.transaction ?? {}) as Record<string, unknown>;
   const method = (tr.payment_method ?? (typeof st === 'object' && st ? st.payment_method : null)) as string | null;
   const reference = (tr.payment_reference ?? tr.payment_method_reference ?? null) as string | null;
-  return { orderRef: String(j.order_id ?? ''), operationId, amountGnf: Math.round(amount), status, method: method ? String(method) : null, reference: reference ? String(reference) : null };
+  const isTest = typeof j.is_test === 'boolean' ? j.is_test : null;
+  return { orderRef: String(j.order_id ?? ''), operationId, amountGnf: Math.round(amount), status, method: method ? String(method) : null, reference: reference ? String(reference) : null, isTest };
 }
 
 /** Référence de commande envoyée à Chap Chap Pay : l'identifiant HailandX + un suffixe (un nouveau lien après expiration). */
@@ -73,7 +78,11 @@ export async function ccpCreate(apiKey: string, encryptionKey: string, c: CcpCre
     body,
   });
   const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (res.status !== 201 && res.status !== 200) throw new Error(String(j.message ?? `Chap Chap Pay a répondu ${res.status}`));
+  // Message exact de Chap Chap Pay (et le détail des champs refusés, s'il y en a) : affiché au client et gardé dans les journaux.
+  if (res.status !== 201 && res.status !== 200) {
+    const detail = j.errors && typeof j.errors === 'object' ? ` (${Object.entries(j.errors as Record<string, unknown>).map(([k, v]) => `${k} : ${String(v)}`).join(' ; ')})` : '';
+    throw new Error(`${String(j.message ?? `réponse ${res.status}`)}${detail}`.slice(0, 300));
+  }
   const operationId = String(j.operation_id ?? ''); const paymentUrl = String(j.payment_url ?? '');
   if (!operationId || !/^https:\/\//.test(paymentUrl)) throw new Error('réponse de Chap Chap Pay incomplète');
   return { operationId, paymentUrl };

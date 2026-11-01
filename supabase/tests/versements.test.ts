@@ -105,6 +105,10 @@ describe('versements de la semaine (§48)', () => {
     await db.exec(`update payout_methods set usable_from = now() - interval '1 hour'`);
     expect(await as(db, U.admin, () => refused(db.query(`select fn_payout_record('boutique', $1, $2)`, [shop, s.balance_gnf])))).toMatch(/supérieur au disponible/);
     await age();
+    // §50 : un litige ouvert retient la part du vendeur, même après 48 h, jusqu'à la décision de l'équipe.
+    await db.exec(`update parcels set status = 'litige' where id = '${p.id}'`);
+    expect((await summary(U.vendeur, shop)).payable_gnf).toBe(Math.max(0, (await summary(U.vendeur, shop)).balance_gnf - net));
+    await db.exec(`update parcels set status = 'remis' where id = '${p.id}'`);
     s = await summary(U.vendeur, shop);
     expect(s.payable_gnf).toBe(s.balance_gnf);
     const row = (await due()).find((r) => r.target_id === shop)!;
