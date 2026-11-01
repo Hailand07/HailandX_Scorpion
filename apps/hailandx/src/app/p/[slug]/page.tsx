@@ -181,7 +181,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
-      {/* Ce que garantit Hailand (remise par code, argent bloqué jusqu'à la remise, litige sous 72 h) et la politique de la boutique. */}
+      {/* Ce que garantit Hailand (remise par code, argent bloqué jusqu'à la remise, litige sous 48 h) et la politique de la boutique. */}
       <section aria-labelledby="garanties" className="flex flex-col gap-2 px-[18px]">
         <h2 id="garanties" className="text-sm font-extrabold">Livraison, paiement et retours</h2>
         <dl className="flex flex-col divide-y divide-line-soft rounded-2xl border border-line-soft">
@@ -195,7 +195,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
             <div key={t} className="grid grid-cols-[minmax(0,2fr)_minmax(0,5fr)] gap-3 px-4 py-2.5 text-[13px]"><dt className="font-bold text-muted">{t}</dt><dd className="m-0 whitespace-pre-line font-semibold leading-snug">{d}</dd></div>
           ))}
         </dl>
-        <p className="text-[12px] font-semibold text-muted">Un problème à la réception ? Signalez-le dans les 72 h depuis votre commande : l’équipe Hailand tranche, l’argent reste bloqué en attendant.</p>
+        <p className="text-[12px] font-semibold text-muted">Un problème à la réception ? Signalez-le dans les 48 h depuis votre commande, avec un motif et une preuve (photo) : l’équipe Hailand tranche, l’argent reste bloqué en attendant.</p>
       </section>
 
       <section aria-labelledby="avis" className="flex flex-col gap-2.5 px-[18px]">

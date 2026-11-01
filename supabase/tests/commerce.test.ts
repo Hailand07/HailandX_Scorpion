@@ -340,7 +340,7 @@ describe('avis vérifiés', () => {
 
 describe('litiges : signalement par l’acheteur, décision de l’équipe', () => {
   let disputeId: string; let relBefore = 0;
-  it('seul l’acheteur signale un problème, une seule fois, sur un colis en route ou remis depuis moins de 72 h', async () => {
+  it('seul l’acheteur signale un problème, une seule fois, sur un colis en route ou remis depuis moins de 48 h', async () => {
     expect(await as(db, U.acheteur2, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [parcelId])))).toMatch(/seul l'acheteur/);
     expect(await as(db, U.vendeur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [parcelId])))).toMatch(/seul l'acheteur/);
     expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'inconnu')`, [parcelId])))).toMatch(/check|violates/);
@@ -350,12 +350,12 @@ describe('litiges : signalement par l’acheteur, décision de l’équipe', () 
     expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'autre')`, [parcelId])))).toMatch(/déjà ouvert|n'est plus|en route ou remis/);
   });
 
-  it('un colis remis depuis plus de 72 h ne peut plus être signalé ; un colis non livré non plus', async () => {
+  it('un colis remis depuis plus de 48 h ne peut plus être signalé ; un colis non livré non plus', async () => {
     const o = await as(db, U.acheteur, async () => (await one<{ fn_place_order: string }>('select fn_place_order($1::jsonb, $2, $3, $4)', [JSON.stringify([{ offer_id: offerId, variant_id: variantId, qty: 1 }]), buyerDecl, '+224 620 00 00 00', 'livraison'])).fn_place_order);
     const p = (await one<{ id: string }>('select id from parcels where order_id = $1', [o])).id;
     expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [p])))).toMatch(/en route ou remis/);
-    await db.exec(`update parcels set status = 'remis', delivered_at = now() - interval '80 hours' where id = '${p}'`);
-    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [p])))).toMatch(/72 h/);
+    await db.exec(`update parcels set status = 'remis', delivered_at = now() - interval '49 hours' where id = '${p}'`);
+    expect(await as(db, U.acheteur, () => refused(db.query(`select fn_open_dispute($1, 'non_recu')`, [p])))).toMatch(/48 h/);
   });
 
   it('lecture : acheteur, vendeur de la boutique et équipe voient le litige ; un autre vendeur ou acheteur non ; aucune écriture directe', async () => {

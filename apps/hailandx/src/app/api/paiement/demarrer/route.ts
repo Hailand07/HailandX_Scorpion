@@ -31,7 +31,10 @@ export async function POST(req: Request) {
   const origin = new URL(req.url).origin;
   const returnUrl = `${origin}/commandes/${order}?paiement=retour`; const cancelUrl = `${origin}/commandes/${order}?paiement=annule`;
   const description = `Commande HailandX ${order.slice(0, 8).toUpperCase()}`;
-  const live = mode === provider; // « chapchappay » / « djomy » = production ; « …_test » = clés et serveur de test
+  // Djomy : « djomy_test » = serveur de test (sandbox). Chap Chap Pay : un seul serveur, c'est la CLÉ posée dans Vercel qui décide
+  // test ou production ; « chapchappay_test » veut seulement dire « réservé à l'équipe ». On note donc le paiement comme réel
+  // (clés de production attendues), corrigé par `is_test` si Chap Chap Pay l'indique dans sa notification.
+  const live = provider === 'chapchappay' ? true : mode === provider;
   try {
     let op: { operationId: string; paymentUrl: string };
     if (provider === 'chapchappay') {
@@ -48,6 +51,7 @@ export async function POST(req: Request) {
     if (att.error) return NextResponse.json({ error: clean(att.error.message) }, { status: 409 });
     return NextResponse.json({ url: op.paymentUrl });
   } catch (e) {
+    console.error(`[paiement] création refusée par ${provider} (commande ${order}, ${row.amount_gnf} GNF) :`, (e as Error).message);
     return NextResponse.json({ error: `${provider === 'djomy' ? 'Djomy' : 'Chap Chap Pay'} indisponible : ${clean((e as Error).message)}` }, { status: 502 });
   }
 }

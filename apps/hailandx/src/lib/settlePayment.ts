@@ -10,6 +10,8 @@ export async function settle(sb: SupabaseClient, orderId: string, r: CcpResult &
   if (st.error) return { ok: false, state: 'erreur', error: st.error.message };
   // Frais réellement prélevés par le fournisseur (Djomy les donne) : servent au calcul d'une annulation tardive (§45).
   if (r.feesGnf != null) await sb.rpc('fn_pay_provider_fee', { p_order: orderId, p_fee: r.feesGnf });
+  // Argent réel ou paiement de test : on garde ce que dit le fournisseur quand il le dit (la clé API décide, pas la Console).
+  if (typeof r.isTest === 'boolean') await sb.from('payments').update({ provider_test: r.isTest }).eq('order_id', orderId);
   if (r.status !== 'success') return { ok: true, state: r.status };
   const c = await sb.rpc('fn_payment_confirm', { p_order: orderId, p_ref: r.reference ?? r.operationId, p_amount: r.amountGnf });
   if (c.error && /déjà payée/.test(c.error.message)) return { ok: true, state: 'deja_paye' };
