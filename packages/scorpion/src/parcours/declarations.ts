@@ -9,6 +9,9 @@ import type { AddressLevel } from '../levels';
  */
 export type DeclaredLevel = Exclude<AddressLevel, 3>;
 
+/** `gps` : mesuré sur place. `hors_cercle` : sur place, bâtiment montré hors du cercle (GPS faux). `a_distance` : montré sans y être. */
+export type LocatedBy = 'gps' | 'hors_cercle' | 'a_distance';
+
 export interface AdminAddress {
   region_nom?: string | null;
   prefecture_nom?: string | null;
@@ -26,6 +29,8 @@ export interface DeclarationRecord {
   polygon: GeoJSON.Polygon | null;
   admin: AdminAddress;
   certifiedBuildingId: string | null;
+  /** Comment l'endroit a été donné : mesure GPS sur place, désignation sur place hors du cercle GPS, ou à distance. */
+  locatedBy: LocatedBy;
   hailandCode: string;
   declared: { label?: string; buildingType?: string; floors?: number; floor?: string; door?: string; landmark?: string };
   createdAt: string;
@@ -52,6 +57,7 @@ function fromRow(r: any): DeclarationRecord {
     polygon: r.osm_polygon_geom ?? null,
     admin: { region_nom: r.regions?.nom ?? null, prefecture_nom: r.prefectures?.nom ?? null, commune_nom: r.communes?.nom ?? null, quartier_nom: r.quartiers?.nom ?? null, source: r.admin_source ?? null },
     certifiedBuildingId: r.certified_building_id ?? null,
+    locatedBy: (r.located_by as LocatedBy | undefined) ?? 'gps',
     hailandCode: r.hailand_code,
     declared: { label: r.declared_label ?? undefined, floor: r.location_floor ?? undefined, door: r.location_door ?? undefined, landmark: r.declared_landmark ?? undefined, buildingType: r.declared_building_type ?? undefined, floors: r.declared_floor_count ?? undefined },
     createdAt: r.created_at,
@@ -85,6 +91,10 @@ export interface SubmitInput {
   polygon: GeoJSON.Polygon | null;
   anchor?: [number, number] | null;
   certifiedBuildingId?: string | null;
+  /** Absent = `gps`. Les deux autres valeurs demandent la migration 2026-11-09 (colonne `located_by`). */
+  locatedBy?: LocatedBy;
+  /** Photo du portail ou de l'entrée (chemin dans le stockage), montrée au livreur. */
+  gatePhotoPath?: string | null;
   declared: DeclarationRecord['declared'];
 }
 
@@ -98,11 +108,14 @@ export async function submitDeclaration(sb: SupabaseClient, input: SubmitInput):
     .insert({
       user_id: user.id,
       gps_point: wktPoint(input.gps),
-      gps_accuracy_m: input.accuracy,
+      gps_accuracy_m: input.accuracy > 0 ? input.accuracy : null,
       osm_polygon_id: input.osmPolygonId,
       osm_polygon_geom: input.polygon ? wktPolygon(input.polygon) : null,
       ...(input.anchor ? { anchor_point: wktPoint(input.anchor) } : {}),
       ...(input.certifiedBuildingId ? { certified_building_id: input.certifiedBuildingId } : {}),
+      // Colonnes de la migration 2026-11-09 : envoyées seulement quand elles servent (une adresse GPS sans photo passe avant elle).
+      ...(input.locatedBy && input.locatedBy !== 'gps' ? { located_by: input.locatedBy } : {}),
+      ...(input.gatePhotoPath ? { gate_photo_path: input.gatePhotoPath } : {}),
       detected_level: input.polygon ? 2 : 1,
       declared_label: input.declared.label ?? null,
       location_floor: input.declared.floor || null,
@@ -117,6 +130,7 @@ export async function submitDeclaration(sb: SupabaseClient, input: SubmitInput):
     const msg = `${error?.message || ''} ${(error as { hint?: string } | null)?.hint || ''}`;
     if (msg.includes('ADRESSE_ADMINISTRATIVE_INTROUVABLE')) throw new DeclarationError('outside', 'Votre position est hors des zones administratives connues : impossible d’attribuer un code.');
     if ((error as { code?: string } | null)?.code === '23505') throw new DeclarationError('duplicate', 'Vous avez déjà enregistré ce bâtiment.');
+    if (/located_by|gate_photo_path/.test(msg)) throw new DeclarationError('other', 'Cette façon d’enregistrer n’est pas encore ouverte. Réessayez sur place, avec le GPS.');
     if ((typeof navigator !== 'undefined' && !navigator.onLine) || /fetch|network/i.test(msg)) throw new DeclarationError('network', 'Pas de connexion. Réessayez dès que le réseau revient.');
     throw new DeclarationError('other', 'L’enregistrement a échoué. Réessayez dans un instant.');
   }

@@ -11,6 +11,7 @@
  */
 export * from './levels';
 export * from './gpsAcquisition';
+export * from './attempts';
 export * from './buildingDetection';
 export * from './geoDiagnostic';
 export * from './osmDetection';

@@ -34,6 +34,14 @@ interface Props {
   onPicked: (p: PickedBuilding) => void;
   onRetry: () => void;
   onClose: () => void;
+  /**
+   * Désignation libre : `'hors_cercle'` (plusieurs tentatives GPS ont échoué, l'utilisateur est sur place mais le GPS est faux)
+   * ou `'a_distance'` (il n'est pas sur place). Pas d'analyse automatique ni de cercle limite : il montre son bâtiment.
+   * Aucun rattachement à un bâtiment certifié dans ces modes (la base le refuse aussi) : le livreur confirmera.
+   */
+  free?: 'hors_cercle' | 'a_distance' | null;
+  /** « Ma maison n'est pas dans le cercle » : relancer la récupération avec des consignes renforcées. */
+  onOutside?: () => void;
   /** Le bâtiment est déjà l'une des adresses du compte : on la réutilise (rien n'est enregistré une seconde fois). */
   onUseExisting: (d: DeclarationRecord) => void;
 }
@@ -70,7 +78,7 @@ const metersPerPx = (map: mapboxgl.Map, lat: number) => (40075016.686 * Math.cos
  * Étape « Identification » : vue satellite, lignes de précision graduées en mètres, cercle de précision, balayage, contours
  * examinés un à un, puis crochets resserrés sur le bâtiment retenu. Tout ce qui est affiché vient du calcul (`buildingDetection.ts`).
  */
-export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, adminLine, homes, onDetected, onConfirm, onPicked, onRetry, onClose, onUseExisting }) => {
+export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, adminLine, homes, onDetected, onConfirm, onPicked, onRetry, onClose, onUseExisting, free = null, onOutside }) => {
   const mapDivRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -147,13 +155,25 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
     if (!mapDivRef.current) return;
     let cancelled = false;
     const timers: number[] = [];
-    if (!token) setSatError('Jeton Mapbox absent (variable NEXT_PUBLIC_MAPBOX_TOKEN non posée lors du déploiement)');
+    if (!token) {
+      // Sans jeton, la carte ne peut pas être créée : même repli que lorsque la vue satellite ne se charge pas.
+      setSatError('Jeton Mapbox absent (variable NEXT_PUBLIC_MAPBOX_TOKEN non posée lors du déploiement)');
+      setNoSatellite(true);
+      if (free) { setPhase('pick'); return; }
+      void certifiedBuildingsNear(sb as unknown as BuildingsClient, position).then((hailand) => {
+        if (cancelled) return;
+        setHailandSeen(hailand.length);
+        const d = detectBuilding(position, accuracy, hailand);
+        setDet(d); onDetected(d); setPhase('result');
+      });
+      return () => { cancelled = true; };
+    }
     mapboxgl.accessToken = token;
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: MAPBOX_SATELLITE_STYLE,
       center: position,
-      zoom: 18.6,
+      zoom: free === 'a_distance' ? 16 : 18.6,
       pitch: 0,
       bearing: 0,
       interactive: false,
@@ -197,6 +217,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       if (loaded || cancelled) return;
       loaded = true;
       setNoSatellite(true);
+      if (free) { setPhase('pick'); return; } // sans carte, rien à toucher : le bandeau d'erreur explique
       void certifiedBuildingsNear(sb as unknown as BuildingsClient, position).then((hailand) => {
         if (cancelled) return;
         setHailandSeen(hailand.length);
@@ -302,6 +323,14 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         setPhase('result');
       };
 
+      if (free) {
+        // Désignation libre : pas d'analyse autour du GPS, l'utilisateur déplace la carte et touche son bâtiment.
+        void hailandP;
+        map.dragPan.enable(); map.scrollZoom.enable(); map.touchZoomRotate.enable(); map.touchZoomRotate.disableRotation();
+        map.setPadding({ top: 40, bottom: 220, left: 0, right: 0 });
+        setPhase('pick');
+        return;
+      }
       whenSettled(() => timers.push(window.setTimeout(analyse, 300)));
     });
 
@@ -311,7 +340,10 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       const point: [number, number] = [e.lngLat.lng, e.lngLat.lat];
       const osm = osmPolygonsAround(map, point, 30, [OSM_FILL]).map((o) => ({ source: 'osm' as const, id: o.id, polygon: o.polygon }));
       // Tolérance du doigt ≈ 12 pixels à l'écran, convertie en mètres au zoom courant.
-      const result = detectAtTap(point, position, accuracy, [...hailandRef.current, ...osm], 12 * metersPerPx(map, point[1]));
+      // Désignation libre : pas de limite de distance, et les bâtiments certifiés ne sont pas proposés (pas de rattachement sans GPS fiable).
+      const result = free
+        ? detectAtTap(point, position, accuracy, osm, 12 * metersPerPx(map, point[1]), Infinity)
+        : detectAtTap(point, position, accuracy, [...hailandRef.current, ...osm], 12 * metersPerPx(map, point[1]));
       setTap({ point, result });
       let shape: GeoJSON.Polygon | null = null;
       let color = COLOR_L2;
@@ -319,7 +351,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       else if (result.kind === 'certifie') {
         shape = result.candidate.polygon;
         color = COLOR_L3;
-      } else if (result.kind === 'zone') shape = turf.circle(point, 6, { units: 'meters', steps: 32 }).geometry;
+      } else if (result.kind === 'zone') shape = turf.circle(point, 3, { units: 'meters', steps: 32 }).geometry;
       map.setPaintProperty('reg-tap-fill', 'fill-color', color);
       map.setPaintProperty('reg-tap-line', 'line-color', color);
       (map.getSource('reg-tap') as mapboxgl.GeoJSONSource | undefined)?.setData(shape ? fc([shape]) : empty);
@@ -334,7 +366,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [position[0], position[1], accuracy]);
+  }, [position[0], position[1], accuracy, free]);
 
   /** Passe en mode « montrer mon bâtiment » : carte déplaçable, cercle limite, ancien résultat effacé. */
   const startPick = () => {
@@ -425,7 +457,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         ? 'BÂTIMENT DÉSIGNÉ'
         : tr?.kind === 'certifie'
           ? 'CERTIFIÉ HAILAND'
-          : 'ZONE DÉSIGNÉE'
+          : 'REPÈRE POSÉ'
       : phase === 'result'
         ? chosen
           ? isL3
@@ -485,10 +517,15 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">MONTREZ VOTRE BÂTIMENT</div>
                 <div className="mt-1.5 text-[21px] font-bold leading-tight">Touchez votre bâtiment sur la carte</div>
                 <p className="mt-1 text-[14px] font-medium leading-snug text-muted">
-                  Déplacez et agrandissez la vue satellite si besoin. Votre bâtiment doit se trouver dans le cercle pointillé (à moins de {Math.round(maxTapDistance(accuracy))} m de votre position).
+                  {free
+                    ? 'Déplacez la carte avec un doigt, agrandissez avec deux, puis touchez le toit de votre bâtiment. Le livreur confirmera l’endroit à la première livraison.'
+                    : `Déplacez et agrandissez la vue satellite si besoin. Votre bâtiment doit se trouver dans le cercle pointillé (à moins de ${Math.round(maxTapDistance(accuracy))} m de votre position).`}
                 </p>
               </div>
             ),
+            secondary: !free && onOutside ? (
+              <button type="button" onClick={onOutside} className="pointer-events-auto mt-1 flex h-11 w-full items-center justify-center text-[14px] font-bold text-blue">Mon bâtiment n’est pas dans le cercle</button>
+            ) : undefined,
           }
         : tr.kind === 'trop_loin'
           ? {
@@ -497,10 +534,12 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                   <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">MONTREZ VOTRE BÂTIMENT</div>
                   <div className="mt-1.5 text-[21px] font-bold leading-tight">Trop loin de votre position</div>
                   <p className="mt-1 text-[14px] font-medium leading-snug text-[#a3321f]">
-                    Ce point est à {Math.round(tr.distance)} m de votre position (maximum {Math.round(tr.max)} m). Touchez un bâtiment dans le cercle pointillé.
+                    Ce point est à {Math.round(tr.distance)} m de la position reçue (maximum {Math.round(tr.max)} m). Touchez un bâtiment dans le cercle pointillé.
                   </p>
+                  <p className="mt-2 text-[13px] font-medium leading-snug text-muted">Votre bâtiment est vraiment en dehors du cercle ? Alors la position reçue était fausse : on la reprend.</p>
                 </div>
               ),
+              primary: onOutside ? btn('Mon bâtiment n’est pas dans le cercle', onOutside) : undefined,
             }
           : {
               details: (
@@ -510,7 +549,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                     <LevelBadge level={tr.kind === 'certifie' ? 3 : tr.kind === 'osm' ? 2 : 1} />
                   </div>
                   <div className="mt-1.5 text-[21px] font-bold leading-tight">
-                    {tr.kind === 'certifie' ? tr.candidate.label || 'Bâtiment certifié Hailand' : tr.kind === 'osm' ? 'Est-ce bien celui-ci ?' : 'Aucun contour à cet endroit'}
+                    {tr.kind === 'certifie' ? tr.candidate.label || 'Bâtiment certifié Hailand' : tr.kind === 'osm' ? 'Est-ce bien celui-ci ?' : 'Repère posé ici'}
                   </div>
                   {tr.kind === 'certifie' && tr.candidate.code && <p className="mt-0.5 text-[13.5px] font-medium text-muted">{tr.candidate.code}</p>}
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -537,11 +576,11 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                       ? 'Bâtiment certifié par Hailand : si c’est bien le vôtre, votre adresse y sera rattachée officiellement (niveau 3).'
                       : tr.kind === 'osm'
                         ? 'Bâtiment trouvé autour du point touché : votre adresse sera enregistrée au niveau 2.'
-                        : 'Aucun bâtiment connu à cet endroit : la zone touchée sera enregistrée au niveau 1 (zone approximative).'}
+                        : 'Aucun contour dessiné ici : votre repère est posé exactement à l’endroit touché (niveau 1). Touchez à nouveau pour l’ajuster.'}
                   </p>
                 </div>
               ),
-              primary: btn(tr.kind === 'zone' ? 'Enregistrer cette zone' : 'Oui, c’est mon bâtiment', confirmPick),
+              primary: btn(tr.kind === 'zone' ? 'Oui, mon bâtiment est ici' : 'Oui, c’est mon bâtiment', confirmPick),
               secondary: <p className="mt-2 text-center text-[13px] font-semibold text-muted">Ou touchez un autre endroit de la carte.</p>,
             }
       : phase !== 'result'
@@ -646,7 +685,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       </div>
 
       {/* Affichage d'analyse (au-dessus de la carte, non cliquable) */}
-      {center && (
+      {center && !free && (
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${size.w} ${size.h}`} aria-hidden="true">
           <defs>
             <linearGradient id="reg-sweep" x1="0" y1="0" x2="1" y2="0">
@@ -720,7 +759,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       </button>
       <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
         <div className="flex h-9 items-center gap-2.5 rounded-full bg-black/70 px-3.5 font-mono text-[12px] font-bold tracking-wide text-white backdrop-blur">
-          {fmtCoord(position[1])} · {fmtCoord(position[0])}
+          {free ? (free === 'a_distance' ? 'Adresse montrée à distance' : 'Désignation sans GPS') : `${fmtCoord(position[1])} · ${fmtCoord(position[0])}`}
         </div>
       </div>
       {satError && (
