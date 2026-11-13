@@ -4,12 +4,16 @@ import { Ico } from './ui';
 import { CONFIDENCE_LABELS, MAX_DURATION_MS, TARGET_ACCURACY_M, fmtCoord, fmtM, type GpsSummary } from '../gpsAcquisition';
 import type { Acquisition } from './useGpsAcquisition';
 import { ScanAnimation } from './ScanAnimation';
+import { liveHint } from '../attempts';
 
 interface Props {
   acq: Acquisition;
   /** Passe à l'identification du bâtiment avec la position retenue. */
   onContinue: (summary: GpsSummary) => void;
-  onRetry: () => void;
+  /** Relancer : la cause choisit les consignes de la tentative suivante. */
+  onRetry: (cause: 'faible' | 'erreur') => void;
+  /** Numéro de la tentative en cours (1 = première). */
+  attempt?: number;
   onClose: () => void;
 }
 
@@ -29,7 +33,7 @@ const Row: React.FC<{ label: string; value: string; sub?: string; strong?: boole
  * Étape « Récupération » : animation plein écran (réticule qui passe d'un bâtiment à l'autre) et, à côté, les calculs réels
  * (`gpsAcquisition.ts`) mis à jour à chaque mesure. Confiance faible → recommencer près d'une fenêtre, ou continuer.
  */
-export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, onClose }) => {
+export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, onClose, attempt = 1 }) => {
   const s = acq.summary;
   const done = acq.status === 'done' && s;
   const weak = done && s.confidence === 'faible';
@@ -58,7 +62,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
         <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur">
           <Ico name="x" />
         </button>
-        <div className="flex h-8 items-center rounded-full bg-white/10 px-3 text-[12.5px] font-bold backdrop-blur">Adresse · 2 sur 5 · Récupération</div>
+        <div className="flex h-8 items-center rounded-full bg-white/10 px-3 text-[12.5px] font-bold backdrop-blur">Adresse · 2 sur 5 · {attempt > 1 ? `Essai ${attempt}` : 'Récupération'}</div>
       </div>
 
       {/* Colonne des calculs, à côté de l'animation */}
@@ -97,17 +101,17 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
         )}
         {weak && (
           <p className="mb-3 rounded-2xl bg-[#f5a524]/15 px-4 py-3 text-[14px] font-semibold leading-snug text-[#fcd38a]">
-            Votre position n’est connue qu’à ±{Math.round(s.accuracy)} m. Approchez-vous d’une fenêtre et recommencez pour un résultat plus solide.
+            Votre position n’est connue qu’à ±{Math.round(s.accuracy)} m. {attempt <= 1 ? 'Recommencez depuis un balcon ou le pas de la porte.' : 'Recommencez dehors, à ciel ouvert.'}
           </p>
         )}
         {acq.status === 'error' || weak ? (
           <>
             <button
               type="button"
-              onClick={onRetry}
+              onClick={() => onRetry(acq.status === 'error' ? 'erreur' : 'faible')}
               className="flex h-[56px] w-full items-center justify-center rounded-[18px] bg-blue text-[16px] font-bold text-white active:opacity-80"
             >
-              Recommencer
+              {attempt <= 1 ? 'Réessayer autrement' : 'Réessayer dehors'}
             </button>
             {weak ? (
               <button type="button" onClick={() => onContinue(s)} className="mt-1 flex h-12 w-full items-center justify-center text-[15px] font-bold text-white/70">
@@ -125,7 +129,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
               <div className="h-full rounded-full bg-[#38bdf8] transition-[width] duration-200" style={{ width: `${(done ? 1 : progress) * 100}%` }} />
             </div>
             <div className="mt-2 flex justify-between text-[13px] font-semibold text-white/70">
-              <span>{done ? 'Passage à la vue satellite…' : 'Restez immobile, près d’une fenêtre.'}</span>
+              <span>{done ? 'Passage à la vue satellite…' : liveHint(attempt)}</span>
               {!done && <span className="tabular-nums">{seconds} s</span>}
             </div>
           </div>

@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { browserClient, Icon, useSession } from '@hailandx/kit';
+import { browserClient, useSession } from '@hailandx/kit';
 
 /** Écrans plein écran ou de démarrage : pas de barre du bas. */
 const HIDDEN = ['/connexion', '/ouvrir', '/produits/', '/commandes/', '/marketing/', '/compte/supprimer'];
@@ -12,12 +12,11 @@ const TABS = [
   { href: '/', label: 'Accueil', match: (p: string) => p === '/', icon: <><path d="M3 11 12 3l9 8" /><path d="M5 10v10h14V10" /></> },
   { href: '/commandes', label: 'Commandes', match: (p: string) => p.startsWith('/commandes'), icon: <><path d="M21 8 12 3 3 8v8l9 5 9-5z" /><path d="m3 8 9 5 9-5" /><path d="M12 13v8" /></> },
   { href: '/produits', label: 'Produits', match: (p: string) => p.startsWith('/produits'), icon: <><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z" /><path d="M7.5 7.5h.01" /></> },
-  { href: '/marketing', label: 'Marketing', match: (p: string) => p.startsWith('/marketing'), icon: <><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 8.5a5 5 0 0 1 0 7" /><path d="M18.5 5.5a9 9 0 0 1 0 13" /></> },
-  { href: '/plus', label: 'Menu', match: (p: string) => ['/plus', '/argent', '/statistiques', '/clients', '/boutique', '/equipe', '/avis', '/questions', '/reglages', '/notifications', '/aide'].some((x) => p.startsWith(x)), icon: <path d="M4 6h16M4 12h16M4 18h16" /> },
+  { href: '/plus', label: 'Boutique', match: (p: string) => ['/plus', '/argent', '/statistiques', '/boutique', '/avis', '/questions', '/reglages', '/notifications', '/aide', '/marketing'].some((x) => p.startsWith(x)), icon: <><path d="M4 9 5.5 4h13L20 9" /><path d="M4 9h16v2a3 3 0 0 1-5.3 1.9A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1.1A3 3 0 0 1 4 11z" /><path d="M5 13.5V20h14v-6.5" /></> },
 ];
 
 /**
- * Barre du bas de HailandX Vendeur (maquettes v6) : Accueil, Commandes, Produits, Marketing, Menu. Rien de ce qui est ici n'est répété sur l'accueil.
+ * Barre du bas de HailandX Vendeur (refonte §51) : Accueil, Commandes, Produits, Boutique. Le marketing, l'équipe et les clients sont retirés : le vendeur partage ses liens.
  * Elle n'apparaît qu'une fois la vente ouverte ; avant, l'application est un seul parcours (ouvrir ma boutique).
  */
 export function VendeurNav() {
@@ -44,7 +43,7 @@ export function VendeurNav() {
   return (
     <>
       <div aria-hidden="true" className="h-[88px]" />
-      <nav aria-label="Navigation de HailandX Vendeur" className="fixed inset-x-0 bottom-0 z-40 mx-auto grid max-w-md grid-cols-5 border-t border-line bg-card/[0.97] px-2 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+      <nav aria-label="Navigation de HailandX Vendeur" className="fixed inset-x-0 bottom-0 z-40 mx-auto grid max-w-md grid-cols-4 border-t border-line bg-card/[0.97] px-2 pb-[max(14px,env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         {TABS.map((t) => {
           const active = t.match(path);
           const badge = t.href === '/commandes' ? toPrepare : 0;

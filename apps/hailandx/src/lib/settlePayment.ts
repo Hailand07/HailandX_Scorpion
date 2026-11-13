@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CcpResult } from './chapchappay';
+import { notifyShopsOfOrder } from './sms';
 
 /**
  * Applique un résultat Chap Chap Pay ou Djomy (notification ou vérification) à la commande, au nom du serveur de paiement.
@@ -16,6 +17,8 @@ export async function settle(sb: SupabaseClient, orderId: string, r: CcpResult &
   const c = await sb.rpc('fn_payment_confirm', { p_order: orderId, p_ref: r.reference ?? r.operationId, p_amount: r.amountGnf });
   if (c.error && /déjà payée/.test(c.error.message)) return { ok: true, state: 'deja_paye' };
   if (c.error) return { ok: false, state: 'refuse', error: c.error.message };
+  // Premier passage seulement (une notification répétée tombe sur « déjà payée ») : SMS à chaque vendeur concerné (§51).
+  await notifyShopsOfOrder(sb, orderId);
   return { ok: true, state: 'bloque' };
 }
 

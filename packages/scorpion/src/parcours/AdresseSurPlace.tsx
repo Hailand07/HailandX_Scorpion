@@ -4,14 +4,18 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { pointOnFeature } from '@turf/turf';
 import type { Detection } from '../buildingDetection';
 import type { GpsSummary } from '../gpsAcquisition';
+import { combineAttempts, guidanceFor, type RetryCause } from '../attempts';
 import { RegistrationGuide } from './RegistrationGuide';
 import { GpsAcquisitionView } from './GpsAcquisitionView';
 import { BuildingScan, type PickedBuilding } from './BuildingScan';
 import { useGpsAcquisition } from './useGpsAcquisition';
-import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel } from './declarations';
+import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel, type LocatedBy } from './declarations';
 import { Ico, LevelBadge } from './ui';
 
-type Step = 'guide' | 'acquire' | 'detect' | 'info' | 'done';
+type Step = 'guide' | 'acquire' | 'detect' | 'free' | 'info' | 'done';
+
+/** Centre de Conakry : point de départ de la carte quand aucune position n'est connue (jamais enregistré comme adresse). */
+const CONAKRY: [number, number] = [-13.6773, 9.537];
 
 export interface AdresseSurPlaceProps {
   sb: SupabaseClient;
@@ -20,6 +24,8 @@ export interface AdresseSurPlaceProps {
   /** « client » : adresse de livraison (Domicile, Travail…) ; « boutique » : emplacement de la boutique (type Commerce). */
   usage: 'client' | 'boutique';
   guide: { kicker?: string; title: string; intro: string; aside?: React.ReactNode; startLabel?: string };
+  /** Envoi de la photo du portail (stockage de l'application) : renvoie le chemin enregistré. Absent = pas de photo proposée. */
+  uploadPhoto?: (file: File) => Promise<string>;
   /** Écran final : note propre à l'application et bouton de retour (« Revenir à ma commande »). */
   done: { note?: React.ReactNode; cta: string };
   /** Adresse enregistrée (ou déjà au compte) : l'application reprend la main avec son identifiant. */
@@ -43,11 +49,19 @@ const chip = (on: boolean) => `flex h-11 items-center gap-1.5 rounded-full borde
  * facultatives → adresse prête. Écrit une ligne de `declarations` (niveau 1 ou 2, ou rattachement à un bâtiment certifié) ;
  * ne certifie jamais rien et n'écrit jamais dans `buildings`.
  */
-export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose }) => {
+export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto }) => {
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
   const [step, setStep] = useState<Step>('guide');
   const [attempt, setAttempt] = useState(0);
+  // Tentatives GPS terminées (on les garde toutes : la meilleure est retenue, deux qui s'accordent se confirment).
+  const [attempts, setAttempts] = useState<GpsSummary[]>([]);
+  const [cause, setCause] = useState<RetryCause | null>(null);
+  // Désignation libre : sur place mais GPS écarté (`hors_cercle`), ou pas sur place (`a_distance`, clients seulement).
+  const [locatedBy, setLocatedBy] = useState<LocatedBy>('gps');
+  const [freeStart, setFreeStart] = useState<[number, number]>(CONAKRY);
+  const [gate, setGate] = useState<{ file: File; url: string } | null>(null);
+  useEffect(() => () => { if (gate) URL.revokeObjectURL(gate.url); }, [gate]);
   const [gps, setGps] = useState<{ lngLat: [number, number]; accuracy: number } | null>(null);
   const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(null);
   const [osmId, setOsmId] = useState<string | null>(null);
@@ -65,10 +79,26 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
   const [record, setRecord] = useState<DeclarationRecord | null>(null);
 
   const acq = useGpsAcquisition(step === 'acquire', attempt);
+  const reset = () => { setPolygon(null); setOsmId(null); setTapPoint(null); setCertifiedId(null); setAdmin({}); };
+  /** Fin d'une récupération : la tentative rejoint les précédentes ; un GPS instable renvoie aux consignes renforcées. */
   const startDetection = (s: GpsSummary) => {
-    setGps({ lngLat: s.position, accuracy: Math.round(s.accuracy) });
-    setPolygon(null); setOsmId(null); setTapPoint(null); setCertifiedId(null); setAdmin({});
+    const all = [...attempts, s];
+    setAttempts(all);
+    const c = combineAttempts(all)!;
+    if (c.verdict === 'instable' && all.length < 3) { setCause('instable'); setAttempt((n) => n + 1); setStep('guide'); return; }
+    setGps({ lngLat: c.best.position, accuracy: Math.round(c.best.accuracy) });
+    setLocatedBy('gps'); reset();
     setStep('detect');
+  };
+  /** Désignation libre sur la carte. À distance : la carte s'ouvre près de l'appareil si une position grossière est disponible. */
+  const startFree = (mode: 'hors_cercle' | 'a_distance') => {
+    const best = combineAttempts(attempts)?.best ?? null;
+    setLocatedBy(mode); reset();
+    setFreeStart(best?.position ?? CONAKRY);
+    if (!best && typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((p) => setFreeStart([p.coords.longitude, p.coords.latitude]), () => {}, { enableHighAccuracy: false, timeout: 4000, maximumAge: 600000 });
+    }
+    setStep('free');
   };
   const anchorOf = (g: GeoJSON.Polygon) => pointOnFeature({ type: 'Feature', properties: {}, geometry: g }).geometry.coordinates as [number, number];
   // Même règle que NavigationX : bâtiment certifié → rattachement demandé à la base ; contour OSM → niveau 2 ; sinon niveau 1.
@@ -85,18 +115,29 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     void resolveAdminAddress(sb, a[0], a[1]).then(setAdmin);
   };
   const applyPicked = (p: PickedBuilding) => {
-    setPolygon(p.polygon); setOsmId(p.osmId); setLevel(p.polygon ? 2 : 1); setTapPoint(p.point); setCertifiedId(p.certifiedId);
+    if (locatedBy !== 'gps') {
+      // Sans GPS fiable, le point montré tient lieu de position (la base le sait par `located_by`) ; jamais de rattachement certifié.
+      const best = locatedBy === 'hors_cercle' ? combineAttempts(attempts)?.best ?? null : null;
+      setGps({ lngLat: best?.position ?? p.point, accuracy: best ? Math.round(best.accuracy) : 0 });
+    }
+    setPolygon(p.polygon); setOsmId(p.osmId); setLevel(p.polygon ? 2 : 1); setTapPoint(p.point); setCertifiedId(locatedBy === 'gps' ? p.certifiedId : null);
     const a = p.polygon ? anchorOf(p.polygon) : p.point;
     void resolveAdminAddress(sb, a[0], a[1]).then(setAdmin);
     setStep('info');
   };
-  const retry = useCallback(() => { setAttempt((n) => n + 1); setStep('acquire'); }, []);
+  /** Nouvelle tentative : on repasse par les consignes, adaptées au numéro de l'essai et à la raison. */
+  const retry = useCallback((why: RetryCause = 'choix') => { setCause(why); setAttempt((n) => n + 1); setStep('guide'); }, []);
 
   const submit = async (withDetails: boolean) => {
     if (!gps) return;
     setSaving(true); setSaveError('');
     try {
+      // La photo du portail est facultative : si son envoi échoue, l'adresse est quand même enregistrée.
+      let gatePhotoPath: string | null = null;
+      if (gate && uploadPhoto) { try { gatePhotoPath = await uploadPhoto(gate.file); } catch { gatePhotoPath = null; } }
       const rec = await submitDeclaration(sb, {
+        locatedBy,
+        gatePhotoPath,
         gps: gps.lngLat,
         accuracy: gps.accuracy,
         osmPolygonId: level === 2 ? osmId : null,
@@ -111,11 +152,24 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     } finally { setSaving(false); }
   };
 
-  if (step === 'guide') return <RegistrationGuide {...guide} onStart={() => setStep('acquire')} onClose={onClose} />;
-  if (step === 'acquire') return <GpsAcquisitionView acq={acq} onContinue={startDetection} onRetry={retry} onClose={onClose} />;
+  const n = attempt + 1; // numéro de la tentative en cours ou à venir
+  if (step === 'guide') {
+    const alternatives = [
+      // Après deux essais sans résultat sûr : montrer son bâtiment sans le GPS (toujours sur place).
+      ...(attempts.length >= 2 || (n >= 3) ? [{ label: 'Montrer mon bâtiment sur la carte, sans le GPS', onClick: () => startFree('hors_cercle') }] : []),
+      // Pas sur place : réservé aux adresses de livraison (une boutique se repère toujours sur place, avant la visite de l'agent).
+      ...(usage === 'client' ? [{ label: 'Je ne suis pas sur place', onClick: () => startFree('a_distance') }] : []),
+    ];
+    return <RegistrationGuide {...guide} guidance={guidanceFor(n, cause)} attempt={n} alternatives={alternatives} onStart={() => setStep('acquire')} onClose={onClose} />;
+  }
+  if (step === 'acquire') return <GpsAcquisitionView acq={acq} attempt={n} onContinue={startDetection} onRetry={(why) => { const sm = acq.summary; if (sm) setAttempts((l) => [...l, sm]); retry(why); }} onClose={onClose} />;
   if (step === 'detect' && gps) {
     return <BuildingScan sb={sb} token={token} position={gps.lngLat} accuracy={gps.accuracy} adminLine={adminLine(admin)} homes={homes}
-      onDetected={applyDetection} onConfirm={() => setStep('info')} onPicked={applyPicked} onRetry={retry} onClose={onClose} onUseExisting={onDone} />;
+      onDetected={applyDetection} onConfirm={() => setStep('info')} onPicked={applyPicked} onRetry={() => retry('choix')} onOutside={() => retry('hors_cercle')} onClose={onClose} onUseExisting={onDone} />;
+  }
+  if (step === 'free') {
+    return <BuildingScan key={`${locatedBy}-${freeStart[0]}-${freeStart[1]}`} sb={sb} token={token} position={freeStart} accuracy={0} adminLine="" homes={homes} free={locatedBy === 'a_distance' ? 'a_distance' : 'hors_cercle'}
+      onDetected={() => {}} onConfirm={() => {}} onPicked={applyPicked} onRetry={() => retry('choix')} onClose={onClose} onUseExisting={onDone} />;
   }
 
   const head = (n: number) => (
@@ -153,6 +207,18 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
             <label className="flex flex-col gap-1.5 text-[13px] font-bold text-muted">Étage<input value={floor} onChange={(e) => setFloor(e.target.value.slice(0, 20))} placeholder="Ex. 2e" className={field} /></label>
             <label className="flex flex-col gap-1.5 text-[13px] font-bold text-muted">Porte<input value={door} onChange={(e) => setDoor(e.target.value.slice(0, 20))} placeholder="Ex. B" className={field} /></label>
           </div>
+          {uploadPhoto && (
+            <label className="mt-4 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-dashed border-line bg-card p-3">
+              <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-soft text-blue-ink">
+                {gate ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.url} alt="Photo du portail" className="h-full w-full object-cover" /> : <Ico name="camera" size={26} />}
+              </span>
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="text-[14.5px] font-extrabold text-ink">{gate ? 'Photo ajoutée — toucher pour changer' : usage === 'boutique' ? 'Photo de la devanture' : 'Photo du portail ou de l’entrée'}</span>
+                <span className="text-[12.5px] font-semibold leading-snug text-muted">Le livreur la voit en arrivant : il reconnaît l’endroit sans vous appeler.</span>
+              </span>
+              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) setGate({ file: f, url: URL.createObjectURL(f) }); }} />
+            </label>
+          )}
           <label className="mt-2.5 flex flex-col gap-1.5 text-[13px] font-bold text-muted">Repère<input value={landmark} onChange={(e) => setLandmark(e.target.value.slice(0, 120))} placeholder="Ex. portail bleu, en face de la pharmacie" className={field} /></label>
         </div>
         {saveError && <p role="alert" className="px-6 pb-3 text-center text-[14px] font-bold text-[#a3321f]">{saveError}</p>}
@@ -176,6 +242,9 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
         <span className="mt-1.5 inline-flex h-10 items-center gap-1.5 rounded-xl bg-ink px-3.5 font-mono text-[16px] font-bold tracking-wide text-white"><span className="text-lime">#</span>{record?.hailandCode}</span>
         <p className="mt-2.5 text-[14px] font-semibold text-muted">{[admin.quartier_nom, admin.commune_nom, admin.prefecture_nom].filter(Boolean).join(' · ')}</p>
         <div className="mt-2"><LevelBadge level={lv} text={lv === 3 ? 'Niveau 3 · bâtiment certifié' : lv === 2 ? 'Niveau 2 · bâtiment repéré' : 'Niveau 1 · zone'} /></div>
+        {record && record.locatedBy !== 'gps' && (
+          <p className="mt-4 w-full rounded-2xl bg-amber-soft px-4 py-3 text-left text-[13px] font-semibold leading-snug text-[#6b5317]">Adresse montrée sur la carte, sans mesure GPS : le livreur confirmera l’endroit exact à la première livraison.</p>
+        )}
         {done.note && <div className="mt-5 w-full text-left">{done.note}</div>}
       </div>
       <div className="px-5 pb-[max(24px,env(safe-area-inset-bottom))]">

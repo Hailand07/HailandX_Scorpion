@@ -1,6 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { browserClient } from '@hailandx/kit';
+import { browserClient, uploadPhoto } from '@hailandx/kit';
 
 /** Parcours d'adresse sur place (§49 étape 4), chargé seulement dans le navigateur (carte Mapbox). */
 const Parcours = dynamic(() => import('@hailandx/scorpion/parcours').then((m) => m.AdresseSurPlace), { ssr: false });
@@ -17,6 +17,7 @@ export function AdresseBoutique({ kicker, onDone, onClose }: { kicker: string; o
     <Parcours
       sb={sb}
       token={TOKEN}
+      uploadPhoto={async (file) => { const uid = (await sb.auth.getSession()).data.session?.user.id; if (!uid) throw new Error('connexion requise'); return uploadPhoto(sb, uid, file); }}
       usage="boutique"
       guide={{
         kicker,

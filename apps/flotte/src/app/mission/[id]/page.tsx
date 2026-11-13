@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { QrScanner, Chargement } from '@hailandx/ui';
 import { MAX_HANDOVER_ATTEMPTS, formatGnf, formatGnPhone } from '@hailandx/commerce';
 import { browserClient } from '@/lib/supabase';
+import { mediaUrl } from '@hailandx/kit';
 import { useSession } from '@/lib/useSession';
 import { useGeo } from '@/lib/useGeo';
 import { telHref, useHeight, useVoice, useWakeLock } from '@/lib/device';
@@ -16,7 +17,7 @@ import { FLOAT_BTN, MAP_AREA, SHEET, SheetHead, StopBadge, WARN, useWide } from 
 
 interface Stop {
   name?: string; phone: string | null; lat: number; lng: number; quartier: string | null; commune: string | null; code: string | null; level: number;
-  landmark: string | null; floor: string | null; door: string | null; accuracy_m?: number | null; outline: GeoJSON.Geometry | null;
+  landmark: string | null; floor: string | null; door: string | null; photo?: string | null; located_by?: string | null; accuracy_m?: number | null; outline: GeoJSON.Geometry | null;
 }
 interface Detail { status: 'accepte' | 'retire'; fee_gnf: number; distance_km: number; cod_amount_gnf: number; handover_failures: number; pickup: Stop; dropoff: Stop }
 type Mode = 'apercu' | 'guidage' | 'arrivee';
@@ -390,6 +391,14 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
                 {/* Maquette F6 : remise au client, dans l'ordre code → photo → espèces. */}
                 <div className="flex items-center gap-3"><StopBadge letter="D" size={32} /><span className="flex min-w-0 flex-col"><span className="font-display text-[19px] font-semibold">Remise au client</span><span className="truncate text-[12.5px] font-bold text-night-muted">{place(info.dropoff)}{info.dropoff.code ? ` · code ${info.dropoff.code}` : ''}</span></span></div>
                 {(details(info.dropoff) || info.dropoff.level < 3) && <p className="rounded-2xl bg-night px-3.5 py-3 text-[13px] font-bold leading-relaxed">{[details(info.dropoff), info.dropoff.level < 3 ? LEVEL[info.dropoff.level] : ''].filter(Boolean).join(' · ')}</p>}
+                {info.dropoff.located_by && info.dropoff.located_by !== 'gps' && <p className="rounded-2xl bg-[#3a2f12] px-3.5 py-3 text-[13px] font-bold leading-relaxed text-[#fcd38a]">Adresse montrée sur la carte par le client, sans mesure GPS : vérifiez l’endroit avec lui avant de remettre.</p>}
+                {mediaUrl(info.dropoff.photo) && (
+                  <a href={mediaUrl(info.dropoff.photo)!} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 rounded-2xl bg-night p-2.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={mediaUrl(info.dropoff.photo)!} alt="Photo de l’entrée donnée par le client" className="h-20 w-20 shrink-0 rounded-xl object-cover" />
+                    <span className="text-[13px] font-bold leading-snug">Photo de l’entrée, donnée par le client. Touchez pour l’agrandir.</span>
+                  </a>
+                )}
                 {buyerTel && <a href={buyerTel} className={ghost}>{Ico.phone(18)}Appeler le client · {formatGnPhone(buyerTel.slice(4))}</a>}
                 <form onSubmit={handover} className="flex flex-col gap-3">
                   <label htmlFor="code-remise" className="text-[13.5px] font-extrabold">1. Code à 4 chiffres donné par le client</label>

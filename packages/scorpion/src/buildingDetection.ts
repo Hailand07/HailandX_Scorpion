@@ -138,9 +138,11 @@ export function detectAtTap(
   inputs: CandidateInput[],
   /** Tolérance du doigt en mètres (dépend du zoom : environ 12 pixels à l'écran), bornée entre 1,5 et 8 m. */
   snapM = TAP_SNAP_M,
+  /** Limite de distance au GPS ; `Infinity` quand la désignation est libre (GPS écarté après plusieurs tentatives, ou adresse à distance). */
+  maxM: number = maxTapDistance(accuracy),
 ): TapResult {
   const distance = turf.distance(turf.point(gps), turf.point(tap), { units: 'meters' });
-  const max = maxTapDistance(accuracy);
+  const max = maxM;
   if (distance > max) return { kind: 'trop_loin', distance, max };
   // La touche fait foi : on retient le bâtiment SOUS le doigt, jamais « le plus proche » à des dizaines de mètres.
   const circle = turf.circle(tap, 1, { units: 'meters', steps: 16 });

@@ -92,6 +92,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-11-06_djomy.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-07_versements.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-08_reclamation_48h.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-11-09_adresse_designee.sql', import.meta.url), 'utf8'));
   return db;
 }
 

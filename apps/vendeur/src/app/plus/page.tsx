@@ -7,7 +7,7 @@ import { browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Sc
 import { useMyShop } from '@/lib/useMyShop';
 import { Chargement } from '@hailandx/ui';
 
-/** Menu (ex-« Plus ») : les pages rangées de la boutique (argent, statistiques, avis, réglages) et le compte du vendeur. */
+/** Onglet « Boutique » (refonte §51) : l’argent, les ventes, les avis, les réglages et le compte. Clients, équipe et marketing ne sont plus proposés. */
 export default function PlusPage() {
   const router = useRouter();
   const { state, session, shop } = useMyShop();
@@ -21,19 +21,18 @@ export default function PlusPage() {
   const since = new Date(session.user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return (
     <Screen className="gap-[18px] pt-6">
-      <h1 className="font-display text-[26px] font-semibold tracking-tight">Menu</h1>
+      <h1 className="font-display text-[26px] font-semibold tracking-tight">Ma boutique</h1>
 
       {shop && (
         <section aria-label="Ma boutique" className="flex flex-col gap-2">
           <GroupTitle>{shop.name}{owner ? '' : ' · employé'}</GroupTitle>
           <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
             {open && owner && <ListRow href="/argent" icon="wallet" label="Argent" />}
-            {open && <ListRow href="/statistiques" icon="chart" label="Statistiques et liens suivis" />}
-            {open && <ListRow href="/clients" icon="users" label="Clients" />}
+            {open && <ListRow href="/statistiques" icon="chart" label="Ventes et visites" />}
             {open && <ListRow href="/avis" icon="star" label="Avis des clients" />}
             {open && <ListRow href="/questions" icon="help" label="Questions des clients" />}
             {owner && <ListRow href="/boutique" icon="shop" label="Boutique en ligne" value={<span className="text-[12px] font-bold text-muted">horaires, congés</span>} />}
-            {owner && <ListRow href="/equipe" icon="users" label="Équipe" />}
+            {open && <ListRow href="/marketing/qr" icon="eye" label="Affiche avec QR code" value={<span className="text-[12px] font-bold text-muted">à imprimer</span>} />}
             {owner && <ListRow href="/reglages" icon="sliders" label="Réglages de la boutique" />}
             <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex min-h-[58px] items-center gap-3 px-4">
               <Icon name="eye" /><span className="flex-1 text-[15px] font-bold">Voir ma boutique sur HailandX</span><span aria-hidden="true" className="font-extrabold text-[#9a9db0]">↗</span>
