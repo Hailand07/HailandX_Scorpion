@@ -1,3 +1,4 @@
+import { FraisLivraison } from '@/components/FraisLivraison';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -122,7 +123,7 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
       </div>
 
       <section aria-label="Livraison" className="mx-[18px] flex flex-col gap-1 rounded-2xl bg-bg px-4 py-3">
-        <span className="flex items-baseline justify-between gap-2 text-[13.5px] font-extrabold"><span>Livraison à votre porte</span><span className="text-[12px] font-bold text-muted">calculée à l’adresse</span></span>
+        <span className="flex items-baseline justify-between gap-2 text-[13.5px] font-extrabold"><span>Livraison à votre porte</span><FraisLivraison offerId={p.offerId} /></span>
         <span className="text-[12.5px] font-semibold leading-snug text-muted">Par la Flotte Hailand, ≈ {p.etaMinutes} min après la préparation. Vous payez en ligne (argent bloqué jusqu’à la remise) ou en espèces au livreur.</span>
       </section>
 
