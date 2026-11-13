@@ -8,6 +8,7 @@ import { aUnNom, browserClient, Icon, PhoneLoginInline, useSession, useWallet } 
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { OrderSteps } from '@/components/OrderSteps';
 import { AdresseClient } from '@/components/AdresseClient';
+import { LienAdresse } from '@/components/LienAdresse';
 import { currentSource } from '@/lib/source';
 import { explainOrderError } from '@/lib/orderError';
 
@@ -33,6 +34,8 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [names, setNames] = useState<Record<string, string>>({});
   const [added, setAdded] = useState<string | null>(null);
   const [pay, setPay] = useState<'livraison' | 'orange_money' | 'hailandpay'>('livraison');
   const { wallet } = useWallet();
@@ -71,6 +74,9 @@ function Checkout() {
       await Promise.all(list.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); lv[d.id] = typeof r.data === 'number' ? r.data : d.detected_level; }));
       const ok = list.filter((d) => (lv[d.id] ?? 0) >= 1);
       const want = added ?? recue;
+      // Adresses reçues par un lien de localisation : on affiche le nom donné au lien (« Chez Maman »).
+      const rq = await sb.from('address_requests').select('declaration_id,label').not('declaration_id', 'is', null);
+      setNames(Object.fromEntries(((rq.data as { declaration_id: string; label: string }[] | null) ?? []).map((x) => [x.declaration_id, `Chez ${x.label}`])));
       setDecls(ok); setLevels(lv); setDecl((want && ok.some((d) => d.id === want) ? want : ok[0]?.id) ?? ''); setReady(true);
     })();
   }, [sb, session, recue, added]);
@@ -143,6 +149,7 @@ function Checkout() {
     return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<PhoneLoginInline /></main>;
   }
 
+  if (linking) return <LienAdresse onDone={(id) => { setLinking(false); setReady(false); setAdded(id); }} onClose={() => setLinking(false)} />;
   if (adding) return <AdresseClient cta="Revenir à ma commande" onDone={(id) => { setAdding(false); setReady(false); setAdded(id); }} onClose={() => setAdding(false)} />;
 
   return (
@@ -155,10 +162,11 @@ function Checkout() {
             <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Repérons votre bâtiment, ici même : position GPS, vue satellite, vous confirmez. Une fois pour toutes vos commandes.</p><button type="button" onClick={() => setAdding(true)} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Où livrer ? Repérer mon bâtiment</button></div>
           ) : (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
-              {decls.map((d) => <option key={d.id} value={d.id}>{d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
+              {decls.map((d) => <option key={d.id} value={d.id}>{names[d.id] || d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
             </select>
           )}
           {ready && decls.length > 0 && <button type="button" onClick={() => setAdding(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Nouvelle adresse (repérer un bâtiment)</button>}
+          {ready && <button type="button" onClick={() => setLinking(true)} className="self-start text-[13px] font-bold text-blue-ink">Le colis est pour quelqu’un d’autre ? Envoyer un lien au destinataire</button>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
