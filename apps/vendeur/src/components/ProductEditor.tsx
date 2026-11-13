@@ -2,11 +2,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, formatGnf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
+import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
-import { PriceCompare } from './PriceCompare';
 import { Chargement } from '@hailandx/ui';
 
 interface Variant { key: number; id: string; label: string; stock: number }
@@ -32,7 +31,6 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   const [cats, setCats] = useState<Cat[]>([]);
   const [name, setName] = useState('');
   const [linked, setLinked] = useState<Linked | null>(null);
-  const [sugg, setSugg] = useState<Linked[]>([]);
   // Fiche détaillée (HAILANDX.md §33) : description, points forts, caractéristiques de la catégorie ; état et mot du vendeur (offre).
   const [desc, setDesc] = useState('');
   const [points, setPoints] = useState<string[]>(['', '', '']);
@@ -73,17 +71,6 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: editing ? v.id : '', label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
     });
   }, [sb, shop.id, offerId, copyFrom, editing]);
-
-  // Fiche commune : si quelqu'un vend déjà ce produit, on y ajoute son offre (même fiche, plusieurs vendeurs).
-  useEffect(() => {
-    const term = name.trim().replace(/[%_,()]/g, ' ').trim();
-    if (!sb || editing || linked || term.length < 3) { setSugg([]); return; }
-    const t = setTimeout(async () => {
-      const { data } = await sb.from('catalog_products').select('id,name,category_id,description,attributes').ilike('name', `%${term}%`).eq('status', 'actif').limit(4);
-      setSugg((data as Linked[]) ?? []);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [name, linked, editing, sb]);
 
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
@@ -208,20 +195,10 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
             <input value={name} onChange={(e) => { setName(e.target.value); setLinked(null); }} autoComplete="off" maxLength={120} placeholder="Ex. Pagne wax 6 yards" className="h-[50px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
           </label>
         )}
-        {!editing && !linked && sugg.map((s) => (
-          <button key={s.id} type="button" onClick={() => { setLinked(s); setName(s.name); setSugg([]); }} className="rounded-[14px] bg-blue-soft px-3 py-2.5 text-left text-[12.5px] font-bold leading-snug text-blue-ink">Déjà vendu sur HailandX : « {s.name} ». Toucher pour y ajouter votre offre.</button>
-        ))}
         {linked && <p className="flex items-center justify-between gap-2 rounded-[14px] bg-ok-soft px-3 py-2.5 text-[12.5px] font-extrabold text-ok">Votre offre s’ajoute à la fiche existante.<button type="button" onClick={() => setLinked(null)} className="underline">Annuler</button></p>}
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix
           <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
             <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="185 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
-            <span className="text-[13px] font-extrabold text-muted">GNF</span>
-          </span>
-        </label>
-        <PriceCompare productId={editing ? existing?.catalog_products?.id : linked?.id} shopId={shop.id} price={Number.isFinite(priceN) ? priceN : 0} />
-        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[11.5px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
-          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
-            <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="numeric" placeholder="210 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
             <span className="text-[13px] font-extrabold text-muted">GNF</span>
           </span>
         </label>
@@ -243,6 +220,21 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         <button type="button" onClick={() => { setVariants((vs) => [...vs, { key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); }} className="h-11 rounded-xl border border-dashed border-[#c9c4b6] text-[13px] font-extrabold">+ Ajouter une variante</button>
       </section>
 
+      {/* Tout le reste est facultatif : le produit se publie avec des photos, un nom, un prix et un stock (§51). */}
+      <details open={editing} className="group flex flex-col rounded-[20px] border border-line-soft bg-card">
+        <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-3.5">
+          <span className="flex flex-col"><span className="text-[14.5px] font-extrabold">Plus de détails</span><span className="text-[12px] font-semibold text-muted">Facultatif · fiche complète à {completeness} %</span></span>
+          <span aria-hidden="true" className="text-[18px] font-extrabold text-muted transition-transform group-open:rotate-180">⌄</span>
+        </summary>
+        <div className="flex flex-col gap-3 border-t border-line-soft p-2.5">
+      <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[11.5px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
+          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
+            <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="numeric" placeholder="210 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
+            <span className="text-[13px] font-extrabold text-muted">GNF</span>
+          </span>
+        </label>
+      </section>
       <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
         <h2 className="text-[14px] font-extrabold">État</h2>
         <div className="flex gap-2">{(['neuf', 'occasion'] as const).map((c) => <button key={c} type="button" aria-pressed={condition === c} onClick={() => setCondition(c)} className={pill(condition === c)}>{c === 'neuf' ? 'Neuf' : 'Occasion'}</button>)}</div>
@@ -302,6 +294,9 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         </div>
         {sections.length === 0 && <p className="text-[12px] font-semibold text-muted">Créez vos rayons depuis la liste des produits (« + Rayon »).</p>}
       </section>
+
+        </div>
+      </details>
 
       {editing && (
         <section className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card px-3.5 py-3">
