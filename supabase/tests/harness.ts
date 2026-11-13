@@ -27,6 +27,8 @@ grant execute on function auth.uid() to anon, authenticated;
 create domain public.geometry as point;
 create function public.st_x(g public.geometry) returns double precision language sql immutable as $$ select (g::point)[0] $$;
 create function public.st_y(g public.geometry) returns double precision language sql immutable as $$ select (g::point)[1] $$;
+create function public.st_makepoint(x double precision, y double precision) returns public.geometry language sql immutable as $$ select point(x, y)::public.geometry $$;
+create function public.st_setsrid(g public.geometry, srid integer) returns public.geometry language sql immutable as $$ select g $$;
 create table public.buildings (id text primary key, status text, is_validated boolean, geom_pg text);
 -- Contours : texte GeoJSON dans le banc (géométrie PostGIS en production) ; st_asgeojson le renvoie tel quel.
 create function public.st_asgeojson(g text) returns text language sql immutable as $$ select g $$;
@@ -35,7 +37,7 @@ create function public.st_pointonsurface(g text) returns public.geometry languag
 create table public.quartiers (id text primary key, nom text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
-  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text, hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz, osm_polygon_geom text, status text not null default 'active');
+  gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text check (declared_label in ('Domicile', 'Travail', 'Autre')), hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz, osm_polygon_geom text, osm_polygon_id text, status text not null default 'active');
 create function public.trg_decl_stub() returns trigger language plpgsql as $f$ begin if new.certification_status = 'demandee' and old.certification_status is distinct from 'demandee' then new.certification_requested_at := now(); end if; return new; end $f$;
 create trigger decl_stub before update on public.declarations for each row execute function public.trg_decl_stub();
 create table public.agents (id uuid primary key, full_name text, role text not null, active boolean not null default true, created_at timestamptz not null default now());
@@ -93,6 +95,7 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-11-07_versements.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-08_reclamation_48h.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-09_adresse_designee.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-11-10_lien_adresse_correction.sql', import.meta.url), 'utf8'));
   return db;
 }
 

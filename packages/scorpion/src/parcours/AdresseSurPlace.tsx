@@ -9,7 +9,7 @@ import { RegistrationGuide } from './RegistrationGuide';
 import { GpsAcquisitionView } from './GpsAcquisitionView';
 import { BuildingScan, type PickedBuilding } from './BuildingScan';
 import { useGpsAcquisition } from './useGpsAcquisition';
-import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel, type LocatedBy } from './declarations';
+import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel, type LocatedBy, type SubmitInput } from './declarations';
 import { Ico, LevelBadge } from './ui';
 
 type Step = 'guide' | 'acquire' | 'detect' | 'free' | 'info' | 'done';
@@ -31,6 +31,13 @@ export interface AdresseSurPlaceProps {
   /** Adresse enregistrée (ou déjà au compte) : l'application reprend la main avec son identifiant. */
   onDone: (d: DeclarationRecord) => void;
   onClose: () => void;
+  /**
+   * Enregistrement propre à l'application, à la place de l'insertion au compte connecté : sert au lien de localisation
+   * (le destinataire, sans compte, enregistre l'adresse pour le demandeur — `fn_address_request_fulfil`).
+   */
+  submit?: (input: SubmitInput) => Promise<DeclarationRecord>;
+  /** Faux : pas de « Je ne suis pas sur place » (le lien de localisation s'utilise sur place). Vrai par défaut. */
+  allowRemote?: boolean;
 }
 
 const BUILDING_TYPES = [
@@ -49,7 +56,7 @@ const chip = (on: boolean) => `flex h-11 items-center gap-1.5 rounded-full borde
  * facultatives → adresse prête. Écrit une ligne de `declarations` (niveau 1 ou 2, ou rattachement à un bâtiment certifié) ;
  * ne certifie jamais rien et n'écrit jamais dans `buildings`.
  */
-export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto }) => {
+export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true }) => {
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
   const [step, setStep] = useState<Step>('guide');
@@ -69,7 +76,8 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
   const [certifiedId, setCertifiedId] = useState<string | null>(null);
   const [admin, setAdmin] = useState<AdminAddress>({});
   const [level, setLevel] = useState<DeclaredLevel>(1);
-  const [label, setLabel] = useState(usage === 'boutique' ? 'Boutique' : 'Domicile');
+  // La base n'admet que Domicile, Travail ou Autre (contrainte de `declarations.declared_label`) : une boutique est un lieu de travail.
+  const [label, setLabel] = useState(usage === 'boutique' ? 'Travail' : 'Domicile');
   const [buildingType, setBuildingType] = useState(usage === 'boutique' ? 'C' : 'R');
   const [floor, setFloor] = useState('');
   const [door, setDoor] = useState('');
@@ -135,7 +143,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
       // La photo du portail est facultative : si son envoi échoue, l'adresse est quand même enregistrée.
       let gatePhotoPath: string | null = null;
       if (gate && uploadPhoto) { try { gatePhotoPath = await uploadPhoto(gate.file); } catch { gatePhotoPath = null; } }
-      const rec = await submitDeclaration(sb, {
+      const rec = await (customSubmit ?? ((i: SubmitInput) => submitDeclaration(sb, i)))({
         locatedBy,
         gatePhotoPath,
         gps: gps.lngLat,
@@ -146,9 +154,9 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
         certifiedBuildingId: certifiedId,
         declared: withDetails ? { label, buildingType, floor: floor.trim(), door: door.trim(), landmark: landmark.trim() } : { label },
       });
-      setRecord(rec); setAdmin(rec.admin); setStep('done');
+      setRecord(rec); if (rec.admin.commune_nom || rec.admin.quartier_nom) setAdmin(rec.admin); setStep('done');
     } catch (e) {
-      setSaveError(e instanceof DeclarationError ? e.message : 'L’enregistrement a échoué. Réessayez dans un instant.');
+      setSaveError(e instanceof DeclarationError || (customSubmit && e instanceof Error) ? e.message : 'L’enregistrement a échoué. Réessayez dans un instant.');
     } finally { setSaving(false); }
   };
 
@@ -158,7 +166,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
       // Après deux essais sans résultat sûr : montrer son bâtiment sans le GPS (toujours sur place).
       ...(attempts.length >= 2 || (n >= 3) ? [{ label: 'Montrer mon bâtiment sur la carte, sans le GPS', onClick: () => startFree('hors_cercle') }] : []),
       // Pas sur place : réservé aux adresses de livraison (une boutique se repère toujours sur place, avant la visite de l'agent).
-      ...(usage === 'client' ? [{ label: 'Je ne suis pas sur place', onClick: () => startFree('a_distance') }] : []),
+      ...(usage === 'client' && allowRemote ? [{ label: 'Je ne suis pas sur place', onClick: () => startFree('a_distance') }] : []),
     ];
     return <RegistrationGuide {...guide} guidance={guidanceFor(n, cause)} attempt={n} alternatives={alternatives} onStart={() => setStep('acquire')} onClose={onClose} />;
   }

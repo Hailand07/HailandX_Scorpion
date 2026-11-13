@@ -17,7 +17,7 @@ import { FLOAT_BTN, MAP_AREA, SHEET, SheetHead, StopBadge, WARN, useWide } from 
 
 interface Stop {
   name?: string; phone: string | null; lat: number; lng: number; quartier: string | null; commune: string | null; code: string | null; level: number;
-  landmark: string | null; floor: string | null; door: string | null; photo?: string | null; located_by?: string | null; accuracy_m?: number | null; outline: GeoJSON.Geometry | null;
+  landmark: string | null; floor: string | null; door: string | null; photo?: string | null; located_by?: string | null; fixed?: boolean; accuracy_m?: number | null; outline: GeoJSON.Geometry | null;
 }
 interface Detail { status: 'accepte' | 'retire'; fee_gnf: number; distance_km: number; cod_amount_gnf: number; handover_failures: number; pickup: Stop; dropoff: Stop }
 type Mode = 'apercu' | 'guidage' | 'arrivee';
@@ -170,6 +170,16 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
     setBusy(false);
     if (error) return setMsg({ tone: 'err', text: errText(error) });
     window.location.href = '/';
+  }
+  /** À la bonne porte alors que le point enregistré est faux : la position du livreur devient le point de remise (§51). */
+  async function fixDropoff() {
+    setMsg(null); setBusy(true);
+    if (fix) await sb!.rpc('fn_courier_ping', { p_lat: fix.lat, p_lng: fix.lng });
+    const { error } = await sb!.rpc('fn_mission_fix_dropoff', { p_parcel: id });
+    setBusy(false);
+    if (error) return setMsg({ tone: 'err', text: /fn_mission_fix_dropoff/.test(error.message) ? 'Correction pas encore disponible : appelez le client ou l’équipe Hailand.' : errText(error) });
+    await load();
+    setMsg({ tone: 'ok', text: 'Point de remise corrigé : vous pouvez valider la remise ici.' });
   }
   async function handover(e: React.FormEvent) {
     e.preventDefault(); setMsg(null); setBusy(true);
@@ -399,6 +409,9 @@ export default function MissionPage({ params }: { params: Promise<{ id: string }
                     <span className="text-[13px] font-bold leading-snug">Photo de l’entrée, donnée par le client. Touchez pour l’agrandir.</span>
                   </a>
                 )}
+                {info.dropoff.fixed
+                  ? <p className="rounded-2xl bg-night px-3.5 py-3 text-[13px] font-bold leading-relaxed text-lime">Point de remise corrigé à votre position.</p>
+                  : <button type="button" onClick={fixDropoff} disabled={busy || !fix} className={ghost}>Je suis à la bonne porte, le point est faux</button>}
                 {buyerTel && <a href={buyerTel} className={ghost}>{Ico.phone(18)}Appeler le client · {formatGnPhone(buyerTel.slice(4))}</a>}
                 <form onSubmit={handover} className="flex flex-col gap-3">
                   <label htmlFor="code-remise" className="text-[13.5px] font-extrabold">1. Code à 4 chiffres donné par le client</label>
