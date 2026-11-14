@@ -36,11 +36,6 @@ export interface AdresseSurPlaceProps {
    * (le destinataire, sans compte, enregistre l'adresse pour le demandeur — `fn_address_request_fulfil`).
    */
   submit?: (input: SubmitInput) => Promise<DeclarationRecord>;
-  /**
-   * `a_distance` : le client a déjà dit qu'il n'est pas à l'adresse de livraison ; le parcours s'ouvre directement sur la carte
-   * (désignation sans GPS, confirmée par le livreur). Absent : parcours normal, sur place.
-   */
-  startAt?: 'a_distance';
   /** Faux : pas de « Je ne suis pas sur place » (le lien de localisation s'utilise sur place). Vrai par défaut. */
   allowRemote?: boolean;
 }
@@ -61,7 +56,7 @@ const chip = (on: boolean) => `flex h-11 items-center gap-1.5 rounded-full borde
  * facultatives → adresse prête. Écrit une ligne de `declarations` (niveau 1 ou 2, ou rattachement à un bâtiment certifié) ;
  * ne certifie jamais rien et n'écrit jamais dans `buildings`.
  */
-export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true, startAt }) => {
+export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true }) => {
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
   const [step, setStep] = useState<Step>('guide');
@@ -125,9 +120,6 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     }
     setStep('free');
   };
-  // Choix fait avant d'ouvrir le parcours (« je ne suis pas sur place ») : la carte s'ouvre tout de suite.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (startAt === 'a_distance') startFree('a_distance'); }, []);
   const anchorOf = (g: GeoJSON.Polygon) => pointOnFeature({ type: 'Feature', properties: {}, geometry: g }).geometry.coordinates as [number, number];
   // Même règle que NavigationX : bâtiment certifié → rattachement demandé à la base ; contour OSM → niveau 2 ; sinon niveau 1.
   const applyDetection = (d: Detection) => {
