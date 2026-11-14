@@ -1,4 +1,5 @@
 'use client';
+import { BtnLink, EmptyState, PageTitle } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatGnf, type ParcelStatus, sellerTab, type SellerTab } from '@hailandx/commerce';
@@ -40,7 +41,7 @@ function Orders({ shopId }: { shopId: string }) {
 
   return (
     <Screen className="pt-5">
-      <h1 className="font-display text-[26px] font-semibold tracking-tight">Commandes</h1>
+      <PageTitle>Commandes</PageTitle>
       <label className="flex h-12 items-center gap-2.5 rounded-2xl border border-line bg-card px-3.5 text-muted focus-within:border-blue">
         <Icon name="search" size={18} stroke={2} />
         <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Numéro HX-… ou nom de produit" aria-label="Chercher une commande" className="min-w-0 flex-1 bg-transparent text-[15px] font-semibold text-ink outline-none" />
@@ -51,9 +52,10 @@ function Orders({ shopId }: { shopId: string }) {
       ]} />}
       {parcels === null && <Chargement />}
       {parcels && list.length === 0 && (
-        <p className="mt-2 rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">
-          {needle ? 'Aucune commande ne correspond.' : tab === 'problemes' ? 'Aucun problème signalé. Bravo.' : tab === 'preparer' ? 'Rien à préparer pour l’instant. Partagez le lien d’un produit (onglet Produits) pour attirer des clients.' : 'Rien ici pour l’instant.'}
-        </p>
+        needle ? <EmptyState icon="search" title="Aucune commande ne correspond" text="Vérifiez le numéro ou le nom du produit." />
+        : tab === 'problemes' ? <EmptyState icon="check" title="Aucun problème signalé" text="Vos clients sont satisfaits." />
+        : tab === 'preparer' ? <EmptyState icon="box" title="Rien à préparer" text="Partagez le lien d’un produit pour recevoir des commandes." action={<BtnLink href="/produits" variant="secondary" size="md">Partager un produit</BtnLink>} />
+        : <EmptyState icon="box" title="Rien ici pour l’instant" />
       )}
       {list.map((p) => {
         const [pillClass, pillText] = statusPill(p.status, p.created_at);
@@ -62,14 +64,14 @@ function Orders({ shopId }: { shopId: string }) {
         return (
           <Link key={p.id} href={`/commandes/${p.id}`} className="flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card p-4 active:bg-bg">
             <span className="flex items-center justify-between gap-2">
-              <span className="text-[12.5px] font-extrabold text-muted">{orderCode(p.id)}</span>
+              <span className="text-[13px] font-extrabold text-muted">{orderCode(p.id)}</span>
               <span className="font-display text-[15px] font-semibold">{formatGnf(p.subtotal_gnf)}</span>
             </span>
-            <span className="line-clamp-2 text-[14.5px] font-extrabold leading-snug">{items}</span>
+            <span className="line-clamp-2 text-[15px] font-extrabold leading-snug">{items}</span>
             <span className="flex flex-wrap items-center gap-1.5">
-              <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${pillClass}`}>{pillText}</span>
-              <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-extrabold ${pay.paid ? 'bg-ok-soft text-ok' : 'bg-sand'}`}>{pay.text}</span>
-              {p.discount_gnf > 0 && <span className="rounded-full bg-blue-soft px-2.5 py-1 text-[11.5px] font-extrabold text-blue-ink">code promo</span>}
+              <span className={`rounded-full px-2.5 py-1 text-[12px] font-extrabold ${pillClass}`}>{pillText}</span>
+              <span className={`rounded-full px-2.5 py-1 text-[12px] font-extrabold ${pay.paid ? 'bg-ok-soft text-ok' : 'bg-sand'}`}>{pay.text}</span>
+              {p.discount_gnf > 0 && <span className="rounded-full bg-blue-soft px-2.5 py-1 text-[12px] font-extrabold text-blue-ink">code promo</span>}
             </span>
           </Link>
         );

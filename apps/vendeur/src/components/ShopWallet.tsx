@@ -26,7 +26,7 @@ export function ShopWallet({ shopId }: { shopId: string }) {
     if (error) return setErr(error.message.replace(/^.*?:\s*/, ''));
     await done(`${formatSyli(n)} passés vers votre portefeuille personnel.`);
   }
-  const btn = 'flex h-11 flex-1 items-center justify-center rounded-2xl text-[13.5px] font-extrabold';
+  const btn = 'flex h-11 flex-1 items-center justify-center rounded-2xl text-[14px] font-extrabold';
   return (
     <section aria-label="HailandPay de la boutique" className="flex flex-col gap-2.5">
       <h2 className="mx-1 mt-1.5 font-display text-[16px] font-semibold">HailandPay</h2>
@@ -40,9 +40,9 @@ export function ShopWallet({ shopId }: { shopId: string }) {
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Montant à passer vers votre portefeuille
             <span className="flex h-12 items-center gap-2 rounded-2xl border border-line px-4"><input value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder={String(shop.balance)} className="min-w-0 flex-1 bg-transparent text-[16px] font-semibold outline-none" /><span className="text-[13px] font-extrabold text-muted">Syli</span></span>
           </label>
-          <button type="button" onClick={() => setAmount(String(shop.balance))} className="self-start text-[12.5px] font-bold text-blue-ink">Tout ({formatSyli(shop.balance)})</button>
-          {err && <p role="alert" className="text-[13px] font-bold text-[#a3321f]">{err}</p>}
-          <button type="button" disabled={busy || n <= 0 || n > shop.balance} onClick={move} className="h-12 rounded-2xl bg-lime text-[14.5px] font-extrabold text-ink disabled:opacity-40">{busy ? '…' : `Passer ${n > 0 ? formatSyli(n) : ''}`}</button>
+          <button type="button" onClick={() => setAmount(String(shop.balance))} className="self-start text-[13px] font-bold text-blue-ink">Tout ({formatSyli(shop.balance)})</button>
+          {err && <p role="alert" className="text-[13px] font-bold text-danger">{err}</p>}
+          <button type="button" disabled={busy || n <= 0 || n > shop.balance} onClick={move} className="h-12 rounded-2xl bg-lime text-[15px] font-extrabold text-ink disabled:opacity-40">{busy ? '…' : `Passer ${n > 0 ? formatSyli(n) : ''}`}</button>
         </div>
       )}
       {mode === 'withdraw' && <div className="rounded-[20px] border border-line-soft bg-card p-3.5"><WithdrawForm max={shop.balance} shopId={shopId} onDone={done} /></div>}

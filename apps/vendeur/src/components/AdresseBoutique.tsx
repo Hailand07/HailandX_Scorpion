@@ -24,7 +24,7 @@ export function AdresseBoutique({ kicker, onDone, onClose }: { kicker: string; o
         title: 'Où est votre boutique ?',
         intro: 'Les livreurs viennent y chercher les colis. On repère le bâtiment ici même, comme pour les clients : position GPS, vue satellite, vous confirmez.',
         startLabel: 'Localiser ma boutique',
-        aside: <p className="rounded-[18px] bg-blue-soft px-4 py-3 text-[13px] font-semibold leading-snug text-blue-ink"><b className="font-extrabold">Vente ouverte au niveau 3.</b> Ensuite, demandez la certification : l’équipe Hailand la traite en priorité, un agent passe confirmer. En attendant, préparez votre boutique.</p>,
+        aside: <p className="rounded-[20px] bg-blue-soft px-4 py-3 text-[13px] font-semibold leading-snug text-blue-ink"><b className="font-extrabold">Vente ouverte au niveau 3.</b> Ensuite, demandez la certification : l’équipe Hailand la traite en priorité, un agent passe confirmer. En attendant, préparez votre boutique.</p>,
       }}
       done={{ cta: 'Continuer', note: <p className="rounded-2xl bg-card px-4 py-3 text-[13px] font-semibold leading-snug text-muted">Prochaine étape : demander la certification de cette adresse. La vente s’ouvre quand elle est certifiée (niveau 3).</p> }}
       onDone={(d) => onDone(d.id)}

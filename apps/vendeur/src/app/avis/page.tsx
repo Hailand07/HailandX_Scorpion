@@ -1,4 +1,5 @@
 'use client';
+import { EmptyState } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { BackHeader, browserClient, errText, Notice, Screen } from '@hailandx/kit';
 import { ago } from '@hailandx/commerce';
@@ -40,38 +41,38 @@ function Reviews({ shopId }: { shopId: string }) {
   return (
     <Screen>
       <BackHeader href="/plus" title="Avis des clients" label="Retour" />
-      <section className="flex items-center gap-[18px] rounded-[22px] border border-line-soft bg-card p-4">
+      <section className="flex items-center gap-[18px] rounded-[20px] border border-line-soft bg-card p-4">
         <span className="flex min-w-[84px] flex-col items-center gap-0.5">
-          <span className="font-display text-[34px] font-semibold">{shown.length ? avg.toFixed(1).replace('.', ',') : '—'}</span>
+          <span className="font-display text-[30px] font-semibold">{shown.length ? avg.toFixed(1).replace('.', ',') : '—'}</span>
           <span className="text-[13px] tracking-[1px] text-[#c48a00]" aria-label={`${avg.toFixed(1)} sur 5`}>{stars(Math.round(avg))}</span>
-          <span className="text-[11.5px] font-bold text-muted">{shown.length} avis</span>
+          <span className="text-[12px] font-bold text-muted">{shown.length} avis</span>
         </span>
         <span className="flex flex-1 flex-col gap-[5px]">
           {dist.map((d) => (
-            <span key={d.n} className="grid grid-cols-[14px_1fr_22px] items-center gap-2 text-[11.5px] font-bold text-muted">
-              <span>{d.n}</span><span className="block h-[7px] overflow-hidden rounded-full bg-[#efece4]"><span className="block h-full rounded-full bg-ink" style={{ width: `${(d.count / top) * 100}%` }} /></span><span className="text-right">{d.count}</span>
+            <span key={d.n} className="grid grid-cols-[14px_1fr_22px] items-center gap-2 text-[12px] font-bold text-muted">
+              <span>{d.n}</span><span className="block h-[7px] overflow-hidden rounded-full bg-sand"><span className="block h-full rounded-full bg-ink" style={{ width: `${(d.count / top) * 100}%` }} /></span><span className="text-right">{d.count}</span>
             </span>
           ))}
         </span>
       </section>
       <Notice msg={msg} />
-      {list?.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-semibold text-muted">Aucun avis pour l’instant. Vos clients notent après la remise du colis.</p>}
+      {list?.length === 0 && <EmptyState icon="star" title="Aucun avis pour l’instant" text="Vos clients notent après la remise du colis." />}
       {list?.map((r) => {
         const rep = r.review_reports?.[0];
         const product = r.parcels?.order_items?.[0]?.name_snapshot;
         return (
           <article key={r.id} className={`flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card px-4 py-3.5 ${r.hidden ? 'opacity-60' : ''}`}>
-            <div className="flex items-center justify-between gap-2.5"><span className="text-[13px] tracking-[1px] text-[#c48a00]">{stars(r.rating)}</span><span className="text-[11.5px] font-bold text-muted">{ago(r.created_at)}</span></div>
+            <div className="flex items-center justify-between gap-2.5"><span className="text-[13px] tracking-[1px] text-[#c48a00]">{stars(r.rating)}</span><span className="text-[12px] font-bold text-muted">{ago(r.created_at)}</span></div>
             {r.comment && <p className="text-[14px] font-semibold leading-snug">{r.comment}</p>}
-            {product && <span className="text-[11.5px] font-bold text-muted">{product}</span>}
+            {product && <span className="text-[12px] font-bold text-muted">{product}</span>}
             {r.hidden && <span className="self-start rounded-full bg-sand px-2.5 py-1 text-[12px] font-extrabold">Masqué par l’équipe Hailand</span>}
             {rep && !r.hidden && <span className="self-start rounded-full bg-amber-soft px-2.5 py-1 text-[12px] font-extrabold text-[#6b5317]">{rep.status === 'ouvert' ? 'Signalé · l’équipe Hailand vérifie' : 'Signalement examiné : avis maintenu'}</span>}
-            {!rep && !r.hidden && reporting !== r.id && <button type="button" onClick={() => setReporting(r.id)} className="h-9 self-start text-[12.5px] font-extrabold text-muted underline">Signaler un avis abusif</button>}
+            {!rep && !r.hidden && reporting !== r.id && <button type="button" onClick={() => setReporting(r.id)} className="h-9 self-start text-[13px] font-extrabold text-muted underline">Signaler un avis abusif</button>}
             {reporting === r.id && (
               <div className="flex flex-col gap-2 rounded-2xl bg-bg p-3">
                 <select value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Raison" className="h-11 rounded-xl border border-line bg-card px-3 text-[15px]">{REASONS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                 <textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={500} rows={2} placeholder="Précisions (facultatif)" className="rounded-xl border border-line bg-card px-3 py-2 text-[15px]" />
-                <div className="flex gap-2"><button type="button" onClick={() => send(r.id)} className="h-11 flex-1 rounded-xl bg-ink text-[13.5px] font-extrabold text-white">Envoyer</button><button type="button" onClick={() => setReporting(null)} className="h-11 rounded-xl border border-line bg-card px-4 text-[13.5px] font-bold">Annuler</button></div>
+                <div className="flex gap-2"><button type="button" onClick={() => send(r.id)} className="h-11 flex-1 rounded-xl bg-ink text-[14px] font-extrabold text-white">Envoyer</button><button type="button" onClick={() => setReporting(null)} className="h-11 rounded-xl border border-line bg-card px-4 text-[14px] font-bold">Annuler</button></div>
               </div>
             )}
           </article>

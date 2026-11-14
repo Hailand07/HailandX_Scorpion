@@ -53,19 +53,19 @@ function Stats({ shopId }: { shopId: string }) {
       <BackHeader href="/plus" title="Ventes et visites" label="Retour" />
       <Chips label="Période" value={period} onChange={setPeriod} items={[{ id: '7', label: '7 jours' }, { id: '30', label: '30 jours' }, { id: '90', label: '90 jours' }]} />
 
-      <section aria-label="Ventes par jour" className="flex flex-col gap-3 rounded-[22px] border border-line-soft bg-card p-4">
-        <div className="flex items-baseline justify-between gap-3"><h2 className="text-[14.5px] font-extrabold">Ventes par jour</h2><span className="flex flex-col items-end"><span className="font-display text-[15px] font-semibold">{stats ? formatGnf(stats.revenue) : '…'}</span>{stats && <span className="text-[11.5px] font-bold text-muted">commandé · {formatGnf(stats.delivered)} encaissés</span>}</span></div>
+      <section aria-label="Ventes par jour" className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-4">
+        <div className="flex items-baseline justify-between gap-3"><h2 className="text-[15px] font-extrabold">Ventes par jour</h2><span className="flex flex-col items-end"><span className="font-display text-[15px] font-semibold">{stats ? formatGnf(stats.revenue) : '…'}</span>{stats && <span className="text-[12px] font-bold text-muted">commandé · {formatGnf(stats.delivered)} encaissés</span>}</span></div>
         <div role="img" aria-label={`Ventes par jour sur ${period} jours`} className={`grid h-[110px] items-end ${short ? 'gap-2' : 'gap-[2px]'}`} style={{ gridTemplateColumns: `repeat(${Math.max(1, (series ?? []).length)}, minmax(0, 1fr))` }}>
           {(series ?? []).map((d, i) => <span key={d.day} title={`${new Date(d.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} : ${formatGnf(d.revenue_gnf)}`} className={`block ${short ? 'rounded-md' : 'rounded-t-[3px]'} ${i === (series ?? []).length - 1 ? 'bg-blue' : d.revenue_gnf ? 'bg-[#d9defc]' : 'bg-line'}`} style={{ height: `${heights[i]}%` }} />)}
         </div>
         {series && series.length > 0 && (short
           ? <div className="grid grid-cols-7 gap-2 text-center text-[11px] font-bold text-muted">{series.map((d) => <span key={d.day}>{new Date(d.day).toLocaleDateString('fr-FR', { weekday: 'short' })}</span>)}</div>
           : <div className="flex justify-between text-[11px] font-bold text-muted"><span>{new Date(series[0]!.day).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span><span>Aujourd’hui</span></div>)}
-        {stats && <p className="text-[12.5px] font-semibold text-muted">{stats.parcels} commande{stats.parcels > 1 ? 's' : ''} sur la période.</p>}
+        {stats && <p className="text-[13px] font-semibold text-muted">{stats.parcels} commande{stats.parcels > 1 ? 's' : ''} sur la période.</p>}
       </section>
 
-      <section aria-label="Produits les plus vendus" className="flex flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
-        <h2 className="text-[14.5px] font-extrabold">Produits les plus vendus</h2>
+      <section aria-label="Produits les plus vendus" className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-4">
+        <h2 className="text-[15px] font-extrabold">Produits les plus vendus</h2>
         {top.length === 0 && <p className="text-[13px] font-semibold text-muted">Pas encore de vente sur la période.</p>}
         {top.map(([name, x], i) => (
           <div key={name} className="flex items-center gap-2.5 text-[13px] font-bold">
@@ -78,8 +78,8 @@ function Stats({ shopId }: { shopId: string }) {
       </section>
 
       {nets.length > 0 && (
-        <section aria-label="Visites de vos liens" className="flex flex-col gap-2.5 rounded-[22px] border border-line-soft bg-card p-4">
-          <h2 className="text-[14.5px] font-extrabold">Visites de vos liens</h2>
+        <section aria-label="Visites de vos liens" className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-4">
+          <h2 className="text-[15px] font-extrabold">Visites de vos liens</h2>
           <p className="-mt-1 text-[12px] font-semibold text-muted">Clics sur vos liens suivis et commandes venues de chaque réseau : le réseau où vos clients achètent le plus mérite vos publications.</p>
           {nets.map((x) => (
             <div key={x.n} className="flex items-center justify-between text-[13px] font-bold">

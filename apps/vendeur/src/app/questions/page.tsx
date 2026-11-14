@@ -1,4 +1,5 @@
 'use client';
+import { EmptyState } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import { BackHeader, browserClient, errText, HAILANDX_URL, LienHailand, Notice, Screen } from '@hailandx/kit';
 import { ago } from '@hailandx/commerce';
@@ -42,28 +43,28 @@ function Questions({ shopId }: { shopId: string }) {
       {list && list.length > 0 && <p className="text-[13px] font-extrabold">{waiting > 0 ? `${waiting} question${waiting > 1 ? 's' : ''} sans réponse` : 'Toutes les questions ont une réponse.'}</p>}
       <Notice msg={msg} />
       {list === null && <Chargement />}
-      {list?.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-semibold text-muted">Aucune question pour l’instant.</p>}
+      {list?.length === 0 && <EmptyState icon="help" title="Aucune question pour l’instant" text="Les clients posent leurs questions sur la fiche de vos produits." />}
       {list?.map((q) => (
         <article key={q.id} className="flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">
           <div className="flex items-baseline justify-between gap-2">
-            <LienHailand app="hailandx" href={`${HAILANDX_URL}/p/${q.product_slug}`} target="_blank" className="truncate text-[12.5px] font-extrabold text-blue-ink">{q.product_name} ↗</LienHailand>
-            <span className="shrink-0 text-[11.5px] font-bold text-muted">{ago(q.created_at)}</span>
+            <LienHailand app="hailandx" href={`${HAILANDX_URL}/p/${q.product_slug}`} target="_blank" className="truncate text-[13px] font-extrabold text-blue-ink">{q.product_name} ↗</LienHailand>
+            <span className="shrink-0 text-[12px] font-bold text-muted">{ago(q.created_at)}</span>
           </div>
-          <p className="text-[14.5px] font-bold leading-snug">{q.question}</p>
+          <p className="text-[15px] font-bold leading-snug">{q.question}</p>
           {q.answer && editing !== q.id && (
             <>
-              <p className="whitespace-pre-line rounded-2xl bg-bg px-3 py-2.5 text-[13.5px] font-medium leading-relaxed">{q.answer}</p>
-              {q.answered_by_me ? <button type="button" onClick={() => { setEditing(q.id); setText(q.answer ?? ''); setMsg(null); }} className="h-9 self-start text-[12.5px] font-extrabold text-muted underline">Modifier ma réponse</button>
-                : <span className="text-[11.5px] font-bold text-muted">Réponse d’une autre boutique qui vend ce produit</span>}
+              <p className="whitespace-pre-line rounded-2xl bg-bg px-3 py-2.5 text-[14px] font-medium leading-relaxed">{q.answer}</p>
+              {q.answered_by_me ? <button type="button" onClick={() => { setEditing(q.id); setText(q.answer ?? ''); setMsg(null); }} className="h-9 self-start text-[13px] font-extrabold text-muted underline">Modifier ma réponse</button>
+                : <span className="text-[12px] font-bold text-muted">Réponse d’une autre boutique qui vend ce produit</span>}
             </>
           )}
-          {!q.answer && editing !== q.id && <button type="button" onClick={() => { setEditing(q.id); setText(''); setMsg(null); }} className="h-11 rounded-xl bg-ink text-[13.5px] font-extrabold text-white">Répondre</button>}
+          {!q.answer && editing !== q.id && <button type="button" onClick={() => { setEditing(q.id); setText(''); setMsg(null); }} className="h-11 rounded-xl bg-ink text-[14px] font-extrabold text-white">Répondre</button>}
           {editing === q.id && (
             <div className="flex flex-col gap-2">
               <textarea autoFocus value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} rows={3} aria-label="Votre réponse" placeholder="Répondez précisément : taille, compatibilité, garantie, délai…" className="rounded-xl border border-line px-3 py-2.5 text-[15px] leading-relaxed" />
               <div className="flex gap-2">
-                <button type="button" disabled={busy || text.trim().length < 2} onClick={() => void answer(q.id)} className="h-11 flex-1 rounded-xl bg-ink text-[13.5px] font-extrabold text-white disabled:opacity-40">{busy ? 'Envoi…' : 'Publier la réponse'}</button>
-                <button type="button" onClick={() => setEditing(null)} className="h-11 rounded-xl border border-line bg-card px-4 text-[13.5px] font-bold">Annuler</button>
+                <button type="button" disabled={busy || text.trim().length < 2} onClick={() => void answer(q.id)} className="h-11 flex-1 rounded-xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-40">{busy ? 'Envoi…' : 'Publier la réponse'}</button>
+                <button type="button" onClick={() => setEditing(null)} className="h-11 rounded-xl border border-line bg-card px-4 text-[14px] font-bold">Annuler</button>
               </div>
             </div>
           )}

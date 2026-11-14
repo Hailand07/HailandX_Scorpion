@@ -46,8 +46,8 @@ function Poster({ name, slug }: { name: string; slug: string }) {
     <Screen>
       <BackHeader href="/plus" title="QR code de la boutique" />
       <p className="text-[13px] font-semibold leading-relaxed text-muted">Imprimez cette affiche pour votre vitrine, vos sacs ou vos cartes : le client scanne et arrive sur votre boutique HailandX.</p>
-      <canvas ref={ref} role="img" aria-label={`Affiche QR de ${name}`} className="w-full rounded-[18px] border border-line-soft shadow-[0_12px_30px_rgba(18,20,28,.12)]" />
-      <button type="button" disabled={!ready} onClick={() => ref.current && downloadCanvas(ref.current, `qr-${slug}.png`)} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50"><Icon name="download" size={19} />Enregistrer l’affiche</button>
+      <canvas ref={ref} role="img" aria-label={`Affiche QR de ${name}`} className="w-full rounded-[20px] border border-line-soft shadow-[0_12px_30px_rgba(18,20,28,.12)]" />
+      <button type="button" disabled={!ready} onClick={() => ref.current && downloadCanvas(ref.current, `qr-${slug}.png`)} className="flex h-[54px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50"><Icon name="download" size={19} />Enregistrer l’affiche</button>
     </Screen>
   );
 }

@@ -19,6 +19,12 @@
   --color-ok-soft: #e3f6e9;
   --color-amber: #f5cf6b;
   --color-amber-soft: #fff4dc;
+  /* États : danger (annuler, supprimer, erreur), alerte (rupture, attente), texte discret (chevrons, légendes). */
+  --color-danger: #a3321f;
+  --color-danger-soft: #fde8e4;
+  --color-warn: #c2410c;
+  --color-warn-soft: #fff1e6;
+  --color-faint: #9a9db0;
   --color-night: #0f1424;
   --color-night-card: #151a2e;
   --color-night-line: #2a3150;
