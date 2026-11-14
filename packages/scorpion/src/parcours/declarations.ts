@@ -12,6 +12,10 @@ export type DeclaredLevel = Exclude<AddressLevel, 3>;
 /** `gps` : mesuré sur place. `hors_cercle` : sur place, bâtiment montré hors du cercle (GPS faux). `a_distance` : montré sans y être. */
 export type LocatedBy = 'gps' | 'hors_cercle' | 'a_distance';
 
+/** Durée d'une adresse temporaire (client hors de son domicile, §53) : proposée pour de nouvelles commandes pendant 30 jours. */
+export const TEMPORARY_DAYS = 30;
+export const temporaryUntil = (from = Date.now()) => new Date(from + TEMPORARY_DAYS * 86_400_000).toISOString();
+
 export interface AdminAddress {
   region_nom?: string | null;
   prefecture_nom?: string | null;
@@ -31,6 +35,8 @@ export interface DeclarationRecord {
   certifiedBuildingId: string | null;
   /** Comment l'endroit a été donné : mesure GPS sur place, désignation sur place hors du cercle GPS, ou à distance. */
   locatedBy: LocatedBy;
+  /** Adresse temporaire (séjour, travail, de passage) : date jusqu'à laquelle elle est proposée. `null` = adresse durable (domicile). */
+  temporaryUntil: string | null;
   hailandCode: string;
   declared: { label?: string; buildingType?: string; floors?: number; floor?: string; door?: string; landmark?: string };
   createdAt: string;
@@ -58,6 +64,7 @@ function fromRow(r: any): DeclarationRecord {
     admin: { region_nom: r.regions?.nom ?? null, prefecture_nom: r.prefectures?.nom ?? null, commune_nom: r.communes?.nom ?? null, quartier_nom: r.quartiers?.nom ?? null, source: r.admin_source ?? null },
     certifiedBuildingId: r.certified_building_id ?? null,
     locatedBy: (r.located_by as LocatedBy | undefined) ?? 'gps',
+    temporaryUntil: r.temporary_until ?? null,
     hailandCode: r.hailand_code,
     declared: { label: r.declared_label ?? undefined, floor: r.location_floor ?? undefined, door: r.location_door ?? undefined, landmark: r.declared_landmark ?? undefined, buildingType: r.declared_building_type ?? undefined, floors: r.declared_floor_count ?? undefined },
     createdAt: r.created_at,
@@ -95,6 +102,8 @@ export interface SubmitInput {
   locatedBy?: LocatedBy;
   /** Photo du portail ou de l'entrée (chemin dans le stockage), montrée au livreur. */
   gatePhotoPath?: string | null;
+  /** Adresse temporaire : date de fin (migration 2026-11-11). Absent = adresse durable. */
+  temporaryUntil?: string | null;
   declared: DeclarationRecord['declared'];
 }
 
@@ -116,6 +125,7 @@ export async function submitDeclaration(sb: SupabaseClient, input: SubmitInput):
       // Colonnes de la migration 2026-11-09 : envoyées seulement quand elles servent (une adresse GPS sans photo passe avant elle).
       ...(input.locatedBy && input.locatedBy !== 'gps' ? { located_by: input.locatedBy } : {}),
       ...(input.gatePhotoPath ? { gate_photo_path: input.gatePhotoPath } : {}),
+      ...(input.temporaryUntil ? { temporary_until: input.temporaryUntil } : {}),
       detected_level: input.polygon ? 2 : 1,
       declared_label: input.declared.label ?? null,
       location_floor: input.declared.floor || null,
@@ -130,6 +140,7 @@ export async function submitDeclaration(sb: SupabaseClient, input: SubmitInput):
     const msg = `${error?.message || ''} ${(error as { hint?: string } | null)?.hint || ''}`;
     if (msg.includes('ADRESSE_ADMINISTRATIVE_INTROUVABLE')) throw new DeclarationError('outside', 'Votre position est hors des zones administratives connues : impossible d’attribuer un code.');
     if ((error as { code?: string } | null)?.code === '23505') throw new DeclarationError('duplicate', 'Vous avez déjà enregistré ce bâtiment.');
+    if (/temporary_until/.test(msg)) throw new DeclarationError('other', 'L’adresse temporaire n’est pas encore ouverte. Réessayez plus tard.');
     if (/located_by|gate_photo_path/.test(msg)) throw new DeclarationError('other', 'Cette façon d’enregistrer n’est pas encore ouverte. Réessayez sur place, avec le GPS.');
     if ((typeof navigator !== 'undefined' && !navigator.onLine) || /fetch|network/i.test(msg)) throw new DeclarationError('network', 'Pas de connexion. Réessayez dès que le réseau revient.');
     throw new DeclarationError('other', 'L’enregistrement a échoué. Réessayez dans un instant.');

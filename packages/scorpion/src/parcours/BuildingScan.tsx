@@ -28,7 +28,7 @@ interface Props {
   homes: DeclarationRecord[];
   /** Résultat de l'analyse, dès qu'il est connu (pour l'adresse administrative et l'enregistrement). */
   onDetected: (d: Detection) => void;
-  /** « Oui, c'est mon bâtiment » (ou « Continuer » quand rien n'est trouvé). */
+  /** « Confirmer ce bâtiment » (ou « Continuer » quand rien n'est trouvé). */
   onConfirm: () => void;
   /** Bâtiment (ou zone) montré par l'utilisateur après « Ce n'est pas le mien » ou « aucun bâtiment ». */
   onPicked: (p: PickedBuilding) => void;
@@ -457,12 +457,12 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         ? 'BÂTIMENT DÉSIGNÉ'
         : tr?.kind === 'certifie'
           ? 'CERTIFIÉ HAILAND'
-          : 'REPÈRE POSÉ'
+          : 'EMPLACEMENT INDIQUÉ'
       : phase === 'result'
         ? chosen
           ? isL3
             ? 'CERTIFIÉ HAILAND'
-            : 'CIBLE VERROUILLÉE'
+            : 'BÂTIMENT DÉTECTÉ'
           : 'AUCUNE CIBLE'
         : 'ANALYSE…';
   const primaryCls = 'mt-2.5 flex h-[52px] w-full items-center justify-center rounded-[18px] bg-blue text-[16px] font-bold text-white active:opacity-80 disabled:opacity-40';
@@ -496,16 +496,16 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
   });
   const sheet: { details: React.ReactNode; primary?: React.ReactNode; secondary?: React.ReactNode } =
     own && phase === 'pick'
-      ? ownSheet(own, <p className="mt-2 text-center text-[13px] font-semibold text-muted">Ou touchez un autre endroit de la carte.</p>)
+      ? ownSheet(own, <p className="mt-2 text-center text-[13px] font-semibold text-muted">Pour corriger, touchez un autre endroit de la carte.</p>)
       : own && phase === 'result'
       ? ownSheet(
           own,
           <div className="mt-1 flex items-center justify-between">
             <button type="button" onClick={onRetry} className="h-11 px-1 text-[14.5px] font-bold text-muted">
-              Recommencer
+              Relancer la localisation
             </button>
             <button type="button" onClick={startPick} className="h-11 px-1 text-[14.5px] font-bold text-blue">
-              Montrer un autre bâtiment
+              Choisir un autre bâtiment
             </button>
           </div>,
         )
@@ -514,7 +514,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         ? {
             details: (
               <div role="status">
-                <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">MONTREZ VOTRE BÂTIMENT</div>
+                <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">INDIQUEZ VOTRE BÂTIMENT</div>
                 <div className="mt-1.5 text-[21px] font-bold leading-tight">Touchez votre bâtiment sur la carte</div>
                 <p className="mt-1 text-[14px] font-medium leading-snug text-muted">
                   {free
@@ -524,14 +524,14 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
               </div>
             ),
             secondary: !free && onOutside ? (
-              <button type="button" onClick={onOutside} className="pointer-events-auto mt-1 flex h-11 w-full items-center justify-center text-[14px] font-bold text-blue">Mon bâtiment n’est pas dans le cercle</button>
+              <button type="button" onClick={onOutside} className="pointer-events-auto mt-1 flex h-11 w-full items-center justify-center text-[14px] font-bold text-blue">Mon bâtiment est hors du cercle</button>
             ) : undefined,
           }
         : tr.kind === 'trop_loin'
           ? {
               details: (
                 <div role="status">
-                  <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">MONTREZ VOTRE BÂTIMENT</div>
+                  <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">INDIQUEZ VOTRE BÂTIMENT</div>
                   <div className="mt-1.5 text-[21px] font-bold leading-tight">Trop loin de votre position</div>
                   <p className="mt-1 text-[14px] font-medium leading-snug text-[#a3321f]">
                     Ce point est à {Math.round(tr.distance)} m de la position reçue (maximum {Math.round(tr.max)} m). Touchez un bâtiment dans le cercle pointillé.
@@ -539,17 +539,17 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                   <p className="mt-2 text-[13px] font-medium leading-snug text-muted">Votre bâtiment est vraiment en dehors du cercle ? Alors la position reçue était fausse : on la reprend.</p>
                 </div>
               ),
-              primary: onOutside ? btn('Mon bâtiment n’est pas dans le cercle', onOutside) : undefined,
+              primary: onOutside ? btn('Mon bâtiment est hors du cercle', onOutside) : undefined,
             }
           : {
               details: (
                 <div role="status">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">MONTREZ VOTRE BÂTIMENT</div>
+                    <div className="text-[12.5px] font-bold tracking-[0.07em] text-muted">INDIQUEZ VOTRE BÂTIMENT</div>
                     <LevelBadge level={tr.kind === 'certifie' ? 3 : tr.kind === 'osm' ? 2 : 1} />
                   </div>
                   <div className="mt-1.5 text-[21px] font-bold leading-tight">
-                    {tr.kind === 'certifie' ? tr.candidate.label || 'Bâtiment certifié Hailand' : tr.kind === 'osm' ? 'Est-ce bien celui-ci ?' : 'Repère posé ici'}
+                    {tr.kind === 'certifie' ? tr.candidate.label || 'Bâtiment certifié Hailand' : tr.kind === 'osm' ? 'Est-ce votre bâtiment ?' : 'Emplacement indiqué'}
                   </div>
                   {tr.kind === 'certifie' && tr.candidate.code && <p className="mt-0.5 text-[13.5px] font-medium text-muted">{tr.candidate.code}</p>}
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
@@ -580,8 +580,8 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                   </p>
                 </div>
               ),
-              primary: btn(tr.kind === 'zone' ? 'Oui, mon bâtiment est ici' : 'Oui, c’est mon bâtiment', confirmPick),
-              secondary: <p className="mt-2 text-center text-[13px] font-semibold text-muted">Ou touchez un autre endroit de la carte.</p>,
+              primary: btn(tr.kind === 'zone' ? 'Confirmer cet emplacement' : 'Confirmer ce bâtiment', confirmPick),
+              secondary: <p className="mt-2 text-center text-[13px] font-semibold text-muted">Pour corriger, touchez un autre endroit de la carte.</p>,
             }
       : phase !== 'result'
         ? {
@@ -610,11 +610,11 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 <div>
                   <div className="flex items-center justify-between gap-2">
                     <div className="text-[12.5px] font-bold tracking-[0.07em]" style={{ color: isL3 ? '#15803d' : '#b45309' }}>
-                      {isL3 ? (det?.method === 'hailand_proche' ? 'CERTIFIÉ HAILAND · LE PLUS PROCHE' : 'BÂTIMENT CERTIFIÉ HAILAND') : det?.method === 'osm_proche' ? 'BÂTIMENT LE PLUS PROCHE' : 'BÂTIMENT IDENTIFIÉ'}
+                      {isL3 ? (det?.method === 'hailand_proche' ? 'CERTIFIÉ HAILAND · LE PLUS PROCHE' : 'BÂTIMENT CERTIFIÉ HAILAND') : det?.method === 'osm_proche' ? 'BÂTIMENT LE PLUS PROCHE' : 'BÂTIMENT DÉTECTÉ'}
                     </div>
                     <LevelBadge level={isL3 ? 3 : 2} />
                   </div>
-                  <div className="mt-1.5 text-[21px] font-bold leading-tight">{isL3 ? chosen.label || 'Bâtiment enregistré' : 'Est-ce bien votre bâtiment ?'}</div>
+                  <div className="mt-1.5 text-[21px] font-bold leading-tight">{isL3 ? chosen.label || 'Bâtiment certifié Hailand' : 'Est-ce votre bâtiment ?'}</div>
                   <p className="mt-0.5 text-[14px] font-medium text-muted">{isL3 && chosen.code ? `${chosen.code} · ` : ''}{adminLine}</p>
                   <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
                     {[
@@ -635,20 +635,20 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                   </p>
                   {imprecise && (
                     <p role="alert" className="mt-2 rounded-2xl bg-[#f5a524]/15 px-3 py-2 text-[13px] font-semibold leading-snug text-[#8a5a00]">
-                      Votre position n’est connue qu’à ±{Math.round(accuracy)} m : ce bâtiment n’est qu’une supposition. Touchez votre bâtiment sur la vue satellite pour que le livreur trouve la bonne porte.
+                      Position connue à ±{Math.round(accuracy)} m seulement. Vérifiez sur la vue satellite que c’est bien votre bâtiment ; sinon, touchez « Choisir un autre bâtiment ».
                     </p>
                   )}
                 </div>
               ),
-              primary: imprecise && !noSatellite ? btn('Montrer mon bâtiment sur la carte', startPick) : btn('Oui, c’est mon bâtiment', onConfirm),
+              primary: btn('Confirmer ce bâtiment', onConfirm),
               secondary: (
                 <div className="mt-1 flex items-center justify-between">
                   <button type="button" onClick={onRetry} className="h-11 px-1 text-[14.5px] font-bold text-muted">
-                    Recommencer
+                    Relancer la localisation
                   </button>
                   {!noSatellite && (
                     <button type="button" onClick={startPick} className="h-11 px-1 text-[14.5px] font-bold text-blue">
-                      Ce n’est pas le mien
+                      Choisir un autre bâtiment
                     </button>
                   )}
                 </div>
@@ -669,10 +669,10 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                   </p>
                 </div>
               ),
-              primary: noSatellite ? btn('Continuer avec cette position', onConfirm) : btn('Montrer mon bâtiment sur la carte', startPick),
+              primary: noSatellite ? btn('Continuer avec cette position', onConfirm) : btn('Indiquer mon bâtiment sur la carte', startPick),
               secondary: (
                 <button type="button" onClick={onRetry} className="mt-1 flex h-11 w-full items-center justify-center text-[14.5px] font-bold text-muted">
-                  Refaire la récupération
+                  Relancer la localisation
                 </button>
               ),
             };

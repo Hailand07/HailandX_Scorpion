@@ -1,4 +1,5 @@
 'use client';
+import { myAddresses } from '@/lib/addresses';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
@@ -16,7 +17,7 @@ export default function AccountPage() {
     const sb = browserClient(); const uid = session?.user.id;
     if (!sb || !uid) return;
     Promise.all([
-      sb.from('declarations').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'active'),
+      myAddresses(sb, uid).then((l) => ({ count: l.filter((x) => !x.temporary_until).length })),
       unreadNotifications(sb, 'acheteur'),
     ]).then(([a, n]) => setCounts({ addr: a.count ?? 0, unread: n }));
   }, [session]);

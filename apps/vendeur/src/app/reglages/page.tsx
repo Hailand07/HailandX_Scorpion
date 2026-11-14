@@ -66,13 +66,13 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
       <section aria-label="Vitrine" className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
         <div className="relative h-[104px] bg-[#f1cfae]">
           {cover && /* eslint-disable-next-line @next/next/no-img-element */ <img src={cover} alt="" className="h-full w-full object-cover" />}
-          <label className="absolute right-2.5 top-2.5 flex h-[34px] cursor-pointer items-center rounded-xl bg-white/[0.92] px-3 text-[12px] font-extrabold">Changer le bandeau<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => image('cover', e.target.files?.[0])} /></label>
+          <label className="absolute right-2.5 top-2.5 flex h-[34px] cursor-pointer items-center rounded-xl bg-white/[0.92] px-3 text-[12px] font-extrabold">Changer le bandeau<input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => image('cover', e.target.files?.[0])} /></label>
           <span className="absolute -bottom-7 left-4 flex h-16 w-16 items-center justify-center overflow-hidden rounded-[20px] border-4 border-card bg-[#f6d8bd] font-display text-[18px] font-bold">
             {logo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={logo} alt="" className="h-full w-full object-cover" /> : initials}
           </span>
         </div>
         <div className="flex justify-end px-4 pb-1 pt-2.5">
-          <label className="flex h-9 cursor-pointer items-center text-[13px] font-extrabold text-blue">Changer le logo<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => image('logo', e.target.files?.[0])} /></label>
+          <label className="flex h-9 cursor-pointer items-center text-[13px] font-extrabold text-blue">Changer le logo<input type="file" accept="image/*" className="sr-only" disabled={busy} onChange={(e) => image('logo', e.target.files?.[0])} /></label>
         </div>
         <Row label="Nom" value={shop.name} onClick={() => edit('name', shop.name)} />
         {open === 'name' && <Panel><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={60} aria-label="Nom de la boutique" className={input} /><p className="text-[12px] font-semibold text-muted">L’adresse de votre boutique (/b/{shop.slug}) ne change pas.</p>{actions(() => value.trim().length >= 2 ? void save({ name: value.trim() }, 'Nom enregistré.') : setMsg({ tone: 'err', text: 'Au moins 2 lettres.' }))}</Panel>}

@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Chargement } from '@hailandx/ui';
 import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
-import { aUnNom, browserClient, Icon, PhoneLoginInline, useSession, useWallet } from '@hailandx/kit';
+import { aUnNom, browserClient, HAILANDX_URL, Icon, PhoneLoginInline, useSession, useWallet } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { OrderSteps } from '@/components/OrderSteps';
 import { AdresseClient } from '@/components/AdresseClient';
 import { LienAdresse } from '@/components/LienAdresse';
+import { addrName, myAddresses, type Addr } from '@/lib/addresses';
 import { currentSource } from '@/lib/source';
 import { explainOrderError } from '@/lib/orderError';
 
-interface Decl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number }
+type Decl = Addr;
 const input = 'h-12 w-full rounded-2xl border border-line bg-card px-4 text-[16px] font-medium outline-none focus:border-blue';
 
 /**
@@ -33,7 +34,10 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [adding, setAdding] = useState(false);
+  /** Parcours d'adresse ouvert, toujours sur place : le domicile, ou une adresse temporaire (client hors de chez lui, §53). */
+  const [adding, setAdding] = useState<null | 'domicile' | 'ici'>(null);
+  /** Choix « où livrer ? » déplié (adresse supplémentaire quand le compte en a déjà). */
+  const [choosing, setChoosing] = useState(false);
   const [linking, setLinking] = useState(false);
   const [names, setNames] = useState<Record<string, string>>({});
   const [added, setAdded] = useState<string | null>(null);
@@ -68,8 +72,7 @@ function Checkout() {
       const open = mode === 'chapchappay' || mode === 'djomy';
       setOmAvailable({ ok: open || a.data === true, trial: !open });
       setTeam(a.data === true);
-      const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,detected_level').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false });
-      const list = (data as Decl[]) ?? [];
+      const list: Decl[] = await myAddresses(sb, uid);
       const lv: Record<string, number> = {};
       await Promise.all(list.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); lv[d.id] = typeof r.data === 'number' ? r.data : d.detected_level; }));
       const ok = list.filter((d) => (lv[d.id] ?? 0) >= 1);
@@ -149,8 +152,8 @@ function Checkout() {
     return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<PhoneLoginInline /></main>;
   }
 
-  if (linking) return <LienAdresse onDone={(id) => { setLinking(false); setReady(false); setAdded(id); }} onClose={() => setLinking(false)} />;
-  if (adding) return <AdresseClient cta="Revenir à ma commande" onDone={(id) => { setAdding(false); setReady(false); setAdded(id); }} onClose={() => setAdding(false)} />;
+  if (linking) return <LienAdresse onDone={(id) => { setLinking(false); setChoosing(false); setReady(false); setAdded(id); }} onClose={() => setLinking(false)} />;
+  if (adding) return <AdresseClient cta="Revenir à ma commande" temporary={adding === 'ici'} onDone={(id) => { setAdding(null); setChoosing(false); setReady(false); setAdded(id); }} onClose={() => setAdding(null)} />;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-6">
@@ -158,15 +161,13 @@ function Checkout() {
       <form onSubmit={place} className="flex flex-col gap-4">
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
-          {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length === 0 ? (
-            <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Repérons votre bâtiment, ici même : position GPS, vue satellite, vous confirmez. Une fois pour toutes vos commandes.</p><button type="button" onClick={() => setAdding(true)} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Où livrer ? Repérer mon bâtiment</button></div>
-          ) : (
+          {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length > 0 && (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
-              {decls.map((d) => <option key={d.id} value={d.id}>{names[d.id] || d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
+              {decls.map((d) => <option key={d.id} value={d.id}>{addrName(d, names[d.id])} — niveau {levels[d.id]}</option>)}
             </select>
           )}
-          {ready && decls.length > 0 && <button type="button" onClick={() => setAdding(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Nouvelle adresse (repérer un bâtiment)</button>}
-          {ready && <button type="button" onClick={() => setLinking(true)} className="self-start text-[13px] font-bold text-blue-ink">Le colis est pour quelqu’un d’autre ? Envoyer un lien au destinataire</button>}
+          {ready && (decls.length === 0 || choosing) && <ChezVous first={!decls.some((d) => !d.temporary_until)} onHome={() => setAdding('domicile')} onHere={() => setAdding('ici')} onLink={() => setLinking(true)} />}
+          {ready && decls.length > 0 && !choosing && <button type="button" onClick={() => setChoosing(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Livrer à une autre adresse</button>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
@@ -220,3 +221,47 @@ function Checkout() {
 }
 
 export default function CheckoutPage() { return <Suspense><Checkout /></Suspense>; }
+
+/**
+ * « Êtes-vous chez vous ? » (§53). Une seule question, et l'adresse se repère TOUJOURS sur place (GPS, vue satellite) :
+ *  - oui → c'est le domicile, enregistré une fois pour toutes ;
+ *  - non → « Me livrer ici » : même repérage, là où il est (séjour, travail, de passage), mais l'adresse est TEMPORAIRE
+ *    (30 jours) et ne devient jamais son domicile. S'il préfère être livré chez lui, il envoie le lien à quelqu'un qui y est,
+ *    ou garde son panier et termine une fois rentré.
+ */
+function ChezVous({ first, onHome, onHere, onLink }: { first: boolean; onHome: () => void; onHere: () => void; onLink: () => void }) {
+  const [away, setAway] = useState(false);
+  const [later, setLater] = useState(false);
+  const reminder = `Rappel HailandX : terminer ma commande une fois chez moi. ${typeof window !== 'undefined' ? window.location.origin : HAILANDX_URL}/panier`;
+  const big = 'flex h-[54px] w-full items-center justify-center gap-2 rounded-2xl text-[15px] font-extrabold';
+  if (away) {
+    return (
+      <div className="flex flex-col gap-2.5">
+        <p className="text-[16px] font-extrabold">Où voulez-vous être livré ?</p>
+        <button type="button" onClick={onHere} className={`${big} bg-blue text-white`}><Icon name="pin" size={18} />Ici, là où je suis</button>
+        <p className="-mt-1 text-[12px] font-semibold leading-snug text-muted">Le bâtiment où vous êtes se repère comme un domicile, mais l’adresse reste temporaire : elle ne remplace pas votre domicile.</p>
+        {later ? (
+          <div className="flex flex-col gap-2 rounded-2xl bg-sand p-3.5">
+            <p className="text-[13px] font-semibold leading-snug text-muted">Votre panier est gardé sur ce téléphone. Une fois chez vous, rouvrez le lien du produit : votre domicile s’enregistre en une minute.</p>
+            <a href={`https://wa.me/?text=${encodeURIComponent(reminder)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center rounded-xl bg-ok text-[13px] font-extrabold text-white">M’envoyer un rappel sur WhatsApp</a>
+            <button type="button" onClick={onLink} className="h-10 text-[13px] font-bold text-blue-ink">Quelqu’un est chez moi : je lui envoie le lien</button>
+          </div>
+        ) : <button type="button" onClick={() => setLater(true)} className={`${big} border border-line bg-card`}>Chez moi</button>}
+        <button type="button" onClick={() => { setAway(false); setLater(false); }} className="h-10 text-[13px] font-bold text-muted">Retour</button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1">
+        <p className="text-[16px] font-extrabold">{first ? 'Êtes-vous chez vous en ce moment ?' : 'Êtes-vous chez vous, dans un domicile pas encore enregistré ?'}</p>
+        <p className="text-[13px] font-semibold leading-snug text-muted">L’adresse se repère sur place, en une minute : le livreur trouve ainsi la bonne porte du premier coup.</p>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={onHome} className={`${big} bg-blue text-white`}><Icon name="pin" size={18} />Oui</button>
+        <button type="button" onClick={() => setAway(true)} className={`${big} border border-line bg-card`}>Non</button>
+      </div>
+      <button type="button" onClick={onLink} className="self-start text-[13px] font-bold text-blue-ink">Le colis est pour quelqu’un d’autre ? Envoyez-lui le lien</button>
+    </div>
+  );
+}

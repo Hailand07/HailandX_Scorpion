@@ -43,7 +43,7 @@ export function ShopForm({ cats, decls, addr, setAddr, busy, onCreate }: { cats:
         {logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : <Icon name="plus" size={22} />}
       </span>
       <span className="flex flex-col"><span className="text-[14px] font-extrabold">Logo</span><span className="text-[12px] font-semibold text-muted">Facultatif, modifiable plus tard</span></span>
-      <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
+      <input type="file" accept="image/*" className="sr-only" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
     </label>
     <button type="button" disabled={short || busy} onClick={() => onCreate({ name, cat, logo })} className="h-[54px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:bg-sand disabled:text-faint">{busy ? 'Création…' : 'Créer ma boutique'}</button>
     </Open>

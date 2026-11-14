@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { formatGnf } from '@hailandx/commerce';
-import { VENDEUR_URL } from '@hailandx/kit/src/links';
+import { HAILANDX_URL, VENDEUR_URL } from '@hailandx/kit/src/links';
 
 /**
  * SMS au vendeur à chaque commande payée (refonte §51, décision du fondateur). Côté serveur seulement.
@@ -55,4 +55,19 @@ export async function notifyShopsOfOrder(sb: SupabaseClient, orderId: string, cf
     }
   } catch { /* le SMS est un plus : jamais bloquant */ }
   return sent;
+}
+
+/** Texte court au client (un seul SMS) : paiement reçu, lien direct vers le suivi (le client n'a souvent que le lien du produit). */
+export function buyerOrderText(orderId: string): string {
+  return `HailandX : paiement recu, votre commande est confirmee. Suivez-la ici : ${HAILANDX_URL}/commandes/${orderId}`;
+}
+
+/** Prévient le client à la confirmation du paiement, avec le lien du suivi. Jamais bloquant. */
+export async function notifyBuyerOfOrder(sb: SupabaseClient, orderId: string, cfg: SmsConfig | null = smsConfig()): Promise<boolean> {
+  if (!cfg) return false;
+  try {
+    const { data } = await sb.from('orders').select('buyer_phone').eq('id', orderId).maybeSingle();
+    const to = e164((data as { buyer_phone: string | null } | null)?.buyer_phone);
+    return to ? await sendSms(cfg, to, buyerOrderText(orderId)).catch(() => false) : false;
+  } catch { return false; }
 }

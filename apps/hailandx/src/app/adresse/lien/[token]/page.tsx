@@ -48,7 +48,7 @@ export default function LienAdressePage({ params }: { params: Promise<{ token: s
     const r = data as { id: string; hailand_code: string; level: number; certified_building_id: string | null; located_by: 'gps' | 'hors_cercle' };
     return {
       id: r.id, level: r.level === 2 ? 2 : 1, gps: input.gps, accuracy: Math.round(input.accuracy), osmPolygonId: input.osmPolygonId, polygon: input.polygon,
-      admin: {}, certifiedBuildingId: r.certified_building_id, locatedBy: r.located_by, hailandCode: r.hailand_code, declared: input.declared, createdAt: new Date().toISOString(),
+      admin: {}, certifiedBuildingId: r.certified_building_id, locatedBy: r.located_by, temporaryUntil: null, hailandCode: r.hailand_code, declared: input.declared, createdAt: new Date().toISOString(),
     };
   }
 
