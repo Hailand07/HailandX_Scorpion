@@ -1,4 +1,5 @@
 'use client';
+import { GarderSuivi } from '@/components/GarderSuivi';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, QrScanner, Chargement } from '@hailandx/ui';
@@ -101,6 +102,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             <div className="flex justify-between text-[15px] font-extrabold"><span>Total {order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
             {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
+          {parcels.some((x) => !['remis', 'annule'].includes(x.status)) && <GarderSuivi orderId={id} />}
         </>
       )}
     </main>

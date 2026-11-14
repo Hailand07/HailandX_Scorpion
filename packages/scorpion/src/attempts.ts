@@ -58,7 +58,7 @@ export function guidanceFor(attempt: number, cause: RetryCause | null): Guidance
         { icon: 'window', title: 'Approchez-vous d’une fenêtre', text: 'Le signal GPS traverse mal les murs et les toits.' },
         { icon: 'still', title: 'Ne bougez plus', text: 'Gardez le téléphone immobile pendant 15 secondes au plus.' },
       ],
-      cta: 'Je suis prêt, localiser',
+      cta: 'Lancer la localisation',
     };
   }
   if (attempt === 2) {
@@ -70,7 +70,7 @@ export function guidanceFor(attempt: number, cause: RetryCause | null): Guidance
         { icon: 'sky', title: 'Téléphone face au ciel', text: 'Tenez-le à plat dans la main, loin des murs et des tôles.' },
         { icon: 'still', title: 'Attendez sans bouger', text: 'Laissez les mesures arriver, 15 secondes au plus.' },
       ],
-      cta: 'J’y suis, relancer',
+      cta: 'Relancer la localisation',
     };
   }
   return {
@@ -81,7 +81,7 @@ export function guidanceFor(attempt: number, cause: RetryCause | null): Guidance
       { icon: 'settings', title: 'Localisation précise activée', text: 'Dans les réglages du téléphone : localisation activée, « position exacte » autorisée pour le navigateur.' },
       { icon: 'still', title: 'Restez devant votre bâtiment', text: 'Vous montrerez ensuite votre bâtiment sur la carte s’il n’est pas trouvé.' },
     ],
-    cta: 'Je suis dehors, relancer',
+    cta: 'Relancer la localisation',
   };
 }
 

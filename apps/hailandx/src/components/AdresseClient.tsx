@@ -7,7 +7,7 @@ const Parcours = dynamic(() => import('@hailandx/scorpion/parcours').then((m) =>
 const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
 
 /** Adresse de livraison du client, enregistrée sur place (écrit `declarations`, comme NavigationX). */
-export function AdresseClient({ cta, onDone, onClose }: { cta: string; onDone: (declarationId: string) => void; onClose: () => void }) {
+export function AdresseClient({ cta, onDone, onClose, startAt }: { cta: string; onDone: (declarationId: string) => void; onClose: () => void; /** `a_distance` : le client n'est pas à l'adresse, la carte s'ouvre directement. */ startAt?: 'a_distance' }) {
   const sb = browserClient();
   if (!sb) return null;
   return (
@@ -16,6 +16,7 @@ export function AdresseClient({ cta, onDone, onClose }: { cta: string; onDone: (
       token={TOKEN}
       uploadPhoto={async (file) => { const uid = (await sb.auth.getSession()).data.session?.user.id; if (!uid) throw new Error('connexion requise'); return uploadPhoto(sb, uid, file); }}
       usage="client"
+      startAt={startAt}
       guide={{ kicker: 'COMMANDE · ADRESSE', title: 'Où livrer ? Repérons votre bâtiment', intro: 'Nous allons retrouver votre bâtiment à partir de votre position. Pour un résultat solide, suivez ces trois conseils.' }}
       done={{ cta, note: <p className="rounded-2xl bg-card px-4 py-3 text-[13px] font-semibold leading-snug text-muted">Elle est gardée dans votre Compte Hailand : la prochaine commande la propose directement. Le livreur est guidé jusqu’à ce bâtiment.</p> }}
       onDone={(d) => onDone(d.id)}

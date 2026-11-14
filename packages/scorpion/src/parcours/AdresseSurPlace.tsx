@@ -36,6 +36,11 @@ export interface AdresseSurPlaceProps {
    * (le destinataire, sans compte, enregistre l'adresse pour le demandeur — `fn_address_request_fulfil`).
    */
   submit?: (input: SubmitInput) => Promise<DeclarationRecord>;
+  /**
+   * `a_distance` : le client a déjà dit qu'il n'est pas à l'adresse de livraison ; le parcours s'ouvre directement sur la carte
+   * (désignation sans GPS, confirmée par le livreur). Absent : parcours normal, sur place.
+   */
+  startAt?: 'a_distance';
   /** Faux : pas de « Je ne suis pas sur place » (le lien de localisation s'utilise sur place). Vrai par défaut. */
   allowRemote?: boolean;
 }
@@ -56,7 +61,7 @@ const chip = (on: boolean) => `flex h-11 items-center gap-1.5 rounded-full borde
  * facultatives → adresse prête. Écrit une ligne de `declarations` (niveau 1 ou 2, ou rattachement à un bâtiment certifié) ;
  * ne certifie jamais rien et n'écrit jamais dans `buildings`.
  */
-export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true }) => {
+export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true, startAt }) => {
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
   const [step, setStep] = useState<Step>('guide');
@@ -67,7 +72,19 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
   // Désignation libre : sur place mais GPS écarté (`hors_cercle`), ou pas sur place (`a_distance`, clients seulement).
   const [locatedBy, setLocatedBy] = useState<LocatedBy>('gps');
   const [freeStart, setFreeStart] = useState<[number, number]>(CONAKRY);
-  const [gate, setGate] = useState<{ file: File; url: string } | null>(null);
+  /**
+   * Photo du portail : envoyée DÈS qu'elle est choisie (pas à l'enregistrement), pour que le résultat se voie tout de suite :
+   * envoi en cours, envoyée, ou échec avec la raison et un « Réessayer ». Avant, un échec passait inaperçu.
+   */
+  const [gate, setGate] = useState<{ file: File; url: string; status: 'envoi' | 'ok' | 'erreur'; path?: string; error?: string } | null>(null);
+  const sendGate = useCallback((file: File, url: string) => {
+    if (!uploadPhoto) return;
+    setGate({ file, url, status: 'envoi' });
+    uploadPhoto(file)
+      .then((path) => setGate((g) => (g && g.url === url ? { ...g, status: 'ok', path } : g)))
+      .catch((e: unknown) => setGate((g) => (g && g.url === url ? { ...g, status: 'erreur', error: e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée.' } : g)));
+  }, [uploadPhoto]);
+  const pickGate = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) sendGate(f, URL.createObjectURL(f)); };
   useEffect(() => () => { if (gate) URL.revokeObjectURL(gate.url); }, [gate]);
   const [gps, setGps] = useState<{ lngLat: [number, number]; accuracy: number } | null>(null);
   const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(null);
@@ -108,6 +125,9 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     }
     setStep('free');
   };
+  // Choix fait avant d'ouvrir le parcours (« je ne suis pas sur place ») : la carte s'ouvre tout de suite.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (startAt === 'a_distance') startFree('a_distance'); }, []);
   const anchorOf = (g: GeoJSON.Polygon) => pointOnFeature({ type: 'Feature', properties: {}, geometry: g }).geometry.coordinates as [number, number];
   // Même règle que NavigationX : bâtiment certifié → rattachement demandé à la base ; contour OSM → niveau 2 ; sinon niveau 1.
   const applyDetection = (d: Detection) => {
@@ -141,8 +161,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     setSaving(true); setSaveError('');
     try {
       // La photo du portail est facultative : si son envoi échoue, l'adresse est quand même enregistrée.
-      let gatePhotoPath: string | null = null;
-      if (gate && uploadPhoto) { try { gatePhotoPath = await uploadPhoto(gate.file); } catch { gatePhotoPath = null; } }
+      const gatePhotoPath = gate?.status === 'ok' ? gate.path ?? null : null;
       const rec = await (customSubmit ?? ((i: SubmitInput) => submitDeclaration(sb, i)))({
         locatedBy,
         gatePhotoPath,
@@ -164,7 +183,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
   if (step === 'guide') {
     const alternatives = [
       // Après deux essais sans résultat sûr : montrer son bâtiment sans le GPS (toujours sur place).
-      ...(attempts.length >= 2 || (n >= 3) ? [{ label: 'Montrer mon bâtiment sur la carte, sans le GPS', onClick: () => startFree('hors_cercle') }] : []),
+      ...(attempts.length >= 2 || (n >= 3) ? [{ label: 'Indiquer mon bâtiment sur la carte, sans GPS', onClick: () => startFree('hors_cercle') }] : []),
       // Pas sur place : réservé aux adresses de livraison (une boutique se repère toujours sur place, avant la visite de l'agent).
       ...(usage === 'client' && allowRemote ? [{ label: 'Je ne suis pas sur place', onClick: () => startFree('a_distance') }] : []),
     ];
@@ -216,23 +235,36 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
             <label className="flex flex-col gap-1.5 text-[13px] font-bold text-muted">Porte<input value={door} onChange={(e) => setDoor(e.target.value.slice(0, 20))} placeholder="Ex. B" className={field} /></label>
           </div>
           {uploadPhoto && (
-            <label className="mt-4 flex cursor-pointer items-center gap-3.5 rounded-2xl border border-dashed border-line bg-card p-3">
-              <span className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-soft text-blue-ink">
-                {gate ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.url} alt="Photo du portail" className="h-full w-full object-cover" /> : <Ico name="camera" size={26} />}
-              </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-[14.5px] font-extrabold text-ink">{gate ? 'Photo ajoutée — toucher pour changer' : usage === 'boutique' ? 'Photo de la devanture' : 'Photo du portail ou de l’entrée'}</span>
-                <span className="text-[12.5px] font-semibold leading-snug text-muted">Le livreur la voit en arrivant : il reconnaît l’endroit sans vous appeler.</span>
-              </span>
-              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; if (f) setGate({ file: f, url: URL.createObjectURL(f) }); }} />
-            </label>
+            <div className="mt-4 flex flex-col gap-2.5 rounded-2xl border border-line bg-card p-3">
+              <div className="flex items-center gap-3.5">
+                <span className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-soft text-blue-ink">
+                  {gate ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.url} alt="Photo de l’entrée" className={`h-full w-full object-cover ${gate.status === 'envoi' ? 'opacity-50' : ''}`} /> : <Ico name="camera" size={26} />}
+                  {gate?.status === 'ok' && <span className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-ok text-white"><Ico name="check" size={14} stroke={3} /></span>}
+                </span>
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[15px] font-extrabold text-ink">{usage === 'boutique' ? 'Photo de la devanture' : 'Photo du portail ou de l’entrée'}</span>
+                  <span role="status" className={`text-[13px] font-semibold leading-snug ${gate?.status === 'erreur' ? 'text-[#a3321f]' : gate?.status === 'ok' ? 'text-ok' : 'text-muted'}`}>
+                    {!gate ? 'Le livreur la voit en arrivant : il reconnaît l’endroit sans appeler.' : gate.status === 'envoi' ? 'Envoi de la photo…' : gate.status === 'ok' ? 'Photo enregistrée.' : gate.error}
+                  </span>
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="flex h-11 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-ink text-[13px] font-extrabold text-white">
+                  <Ico name="camera" size={17} />{gate ? 'Reprendre' : 'Prendre la photo'}
+                  <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={pickGate} />
+                </label>
+                {gate?.status === 'erreur'
+                  ? <button type="button" onClick={() => sendGate(gate.file, gate.url)} className="flex h-11 items-center justify-center rounded-xl border border-line text-[13px] font-extrabold">Réessayer l’envoi</button>
+                  : <label className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-line text-[13px] font-extrabold">Galerie<input type="file" accept="image/*" className="sr-only" onChange={pickGate} /></label>}
+              </div>
+            </div>
           )}
           <label className="mt-2.5 flex flex-col gap-1.5 text-[13px] font-bold text-muted">Repère<input value={landmark} onChange={(e) => setLandmark(e.target.value.slice(0, 120))} placeholder="Ex. portail bleu, en face de la pharmacie" className={field} /></label>
         </div>
         {saveError && <p role="alert" className="px-6 pb-3 text-center text-[14px] font-bold text-[#a3321f]">{saveError}</p>}
         <div className="flex gap-2.5 px-5 pb-[max(24px,env(safe-area-inset-bottom))]">
-          <button type="button" onClick={() => submit(false)} disabled={saving} className="flex h-[56px] w-[100px] shrink-0 items-center justify-center text-[15px] font-bold text-muted">Passer</button>
-          <button type="button" onClick={() => submit(true)} disabled={saving} className="flex h-[56px] flex-1 items-center justify-center rounded-[18px] bg-blue text-[16px] font-bold text-white disabled:opacity-50">{saving ? 'Enregistrement…' : 'Enregistrer l’adresse'}</button>
+          <button type="button" onClick={() => submit(false)} disabled={saving || gate?.status === 'envoi'} className="flex h-[56px] w-[100px] shrink-0 items-center justify-center text-[15px] font-bold text-muted">Passer</button>
+          <button type="button" onClick={() => submit(true)} disabled={saving || gate?.status === 'envoi'} className="flex h-[56px] flex-1 items-center justify-center rounded-[18px] bg-blue text-[16px] font-bold text-white disabled:opacity-50">{saving ? 'Enregistrement…' : gate?.status === 'envoi' ? 'Envoi de la photo…' : 'Enregistrer l’adresse'}</button>
         </div>
       </div>
     );

@@ -33,7 +33,10 @@ function Checkout() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [adding, setAdding] = useState(false);
+  /** Parcours d'adresse ouvert : sur place (GPS) ou à distance (montrée sur la carte). */
+  const [adding, setAdding] = useState<null | 'ici' | 'a_distance'>(null);
+  /** Choix « où livrer ? » déplié (adresse supplémentaire quand le compte en a déjà). */
+  const [choosing, setChoosing] = useState(false);
   const [linking, setLinking] = useState(false);
   const [names, setNames] = useState<Record<string, string>>({});
   const [added, setAdded] = useState<string | null>(null);
@@ -149,8 +152,8 @@ function Checkout() {
     return <main className="mx-auto flex max-w-md flex-col gap-4 px-5 pt-6">{Head}<PhoneLoginInline /></main>;
   }
 
-  if (linking) return <LienAdresse onDone={(id) => { setLinking(false); setReady(false); setAdded(id); }} onClose={() => setLinking(false)} />;
-  if (adding) return <AdresseClient cta="Revenir à ma commande" onDone={(id) => { setAdding(false); setReady(false); setAdded(id); }} onClose={() => setAdding(false)} />;
+  if (linking) return <LienAdresse onDone={(id) => { setLinking(false); setChoosing(false); setReady(false); setAdded(id); }} onClose={() => setLinking(false)} />;
+  if (adding) return <AdresseClient cta="Revenir à ma commande" startAt={adding === 'a_distance' ? 'a_distance' : undefined} onDone={(id) => { setAdding(null); setChoosing(false); setReady(false); setAdded(id); }} onClose={() => setAdding(null)} />;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-6">
@@ -158,15 +161,13 @@ function Checkout() {
       <form onSubmit={place} className="flex flex-col gap-4">
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
-          {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length === 0 ? (
-            <div className="flex flex-col gap-2"><p className="text-[13.5px] font-medium leading-relaxed text-muted">Repérons votre bâtiment, ici même : position GPS, vue satellite, vous confirmez. Une fois pour toutes vos commandes.</p><button type="button" onClick={() => setAdding(true)} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-blue text-[14.5px] font-extrabold text-white"><Icon name="pin" size={18} />Où livrer ? Repérer mon bâtiment</button></div>
-          ) : (
+          {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length > 0 && (
             <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
               {decls.map((d) => <option key={d.id} value={d.id}>{names[d.id] || d.declared_label || d.hailand_code || 'Mon adresse'} — niveau {levels[d.id]}</option>)}
             </select>
           )}
-          {ready && decls.length > 0 && <button type="button" onClick={() => setAdding(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Nouvelle adresse (repérer un bâtiment)</button>}
-          {ready && <button type="button" onClick={() => setLinking(true)} className="self-start text-[13px] font-bold text-blue-ink">Le colis est pour quelqu’un d’autre ? Envoyer un lien au destinataire</button>}
+          {ready && (decls.length === 0 || choosing) && <OuLivrer first={decls.length === 0} onHere={() => setAdding('ici')} onRemote={() => setAdding('a_distance')} onLink={() => setLinking(true)} />}
+          {ready && decls.length > 0 && !choosing && <button type="button" onClick={() => setChoosing(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Livrer à une autre adresse</button>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
@@ -220,3 +221,32 @@ function Checkout() {
 }
 
 export default function CheckoutPage() { return <Suspense><Checkout /></Suspense>; }
+
+/**
+ * « Où livrer ? » (§53) : le client dit d'abord s'il est à l'adresse de livraison. Trois cas :
+ *  - il y est : position GPS et vue satellite, l'adresse la plus sûre ;
+ *  - il n'y est pas mais connaît l'endroit : il le montre sur la carte ; le livreur l'appelle et confirme sur place ;
+ *  - quelqu'un y est (ou lui-même y sera plus tard) : il envoie un lien, la personne sur place repère le bâtiment.
+ */
+function OuLivrer({ first, onHere, onRemote, onLink }: { first: boolean; onHere: () => void; onRemote: () => void; onLink: () => void }) {
+  const base = 'flex items-center gap-3 rounded-2xl bg-card px-3.5 py-3 text-left';
+  const row = `${base} border border-line`;
+  const ic = 'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl';
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-[14px] font-extrabold">{first ? 'Où doit arriver le colis ?' : 'Nouvelle adresse de livraison'}</p>
+      <button type="button" onClick={onHere} className={`${base} border-2 border-blue`}>
+        <span className={`${ic} bg-blue text-white`}><Icon name="pin" size={19} /></span>
+        <span className="flex min-w-0 flex-col"><span className="text-[15px] font-extrabold">Là où je suis maintenant</span><span className="text-[12px] font-semibold text-muted">Le plus sûr : position GPS et vue satellite, une minute.</span></span>
+      </button>
+      <button type="button" onClick={onRemote} className={row}>
+        <span className={`${ic} bg-blue-soft text-blue-ink`}><Icon name="search" size={19} /></span>
+        <span className="flex min-w-0 flex-col"><span className="text-[15px] font-extrabold">Ailleurs : je le montre sur la carte</span><span className="text-[12px] font-semibold text-muted">Vous n’y êtes pas ? Touchez le bâtiment sur la vue satellite. Le livreur vous appelle et confirme sur place.</span></span>
+      </button>
+      <button type="button" onClick={onLink} className={row}>
+        <span className={`${ic} bg-lime text-ink`}><Icon name="share" size={19} /></span>
+        <span className="flex min-w-0 flex-col"><span className="text-[15px] font-extrabold">J’envoie un lien à la personne sur place</span><span className="text-[12px] font-semibold text-muted">Elle repère le bâtiment depuis son téléphone, sans compte. Vous pouvez aussi vous l’envoyer pour le faire une fois chez vous.</span></span>
+      </button>
+    </div>
+  );
+}

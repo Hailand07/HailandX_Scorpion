@@ -153,6 +153,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
   const nPhotos = kept.length + files.length;
+  const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => { const list = Array.from(e.target.files ?? []); setFiles((f) => [...f, ...list].slice(0, MAX_PHOTOS - kept.length)); e.target.value = ''; };
   const completeness = ficheCompleteness(cat, desc, attrs, nPhotos);
   const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   return (
@@ -168,14 +169,21 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
 
       <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
         {nPhotos < MAX_PHOTOS && (
-          <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
-            <Icon name="camera" size={22} stroke={1.8} />Photo
-            <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(e) => { const list = Array.from(e.target.files ?? []); setFiles((f) => [...f, ...list].slice(0, MAX_PHOTOS - kept.length)); e.target.value = ''; }} />
-          </label>
+          <>
+            {/* Deux entrées : l'appareil photo directement (un produit se photographie souvent sur le moment), ou la galerie. */}
+            <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
+              <Icon name="camera" size={22} stroke={1.8} />Appareil photo
+              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={addPhotos} />
+            </label>
+            <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] border border-line bg-card text-[12px] font-extrabold">
+              <Icon name="image" size={22} stroke={1.8} />Galerie
+              <input type="file" accept="image/*" multiple className="sr-only" onChange={addPhotos} />
+            </label>
+          </>
         )}
         {kept.map((p) => <Thumb key={p} src={mediaUrl(p)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
         {previews.map((u, i) => <Thumb key={u} src={u} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
-        {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos réelles :<br />elles font vendre.</span>}
+        {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos :<br />elles font vendre.</span>}
       </section>
 
       <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">

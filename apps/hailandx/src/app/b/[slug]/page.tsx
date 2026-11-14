@@ -6,6 +6,7 @@ import { getCatalog, trustFor } from '@/lib/catalog';
 import { serverClient } from '@hailandx/kit';
 import { hoursSummary, isOpenNow, onVacation } from '@hailandx/commerce';
 import { ShareButton } from '@/components/ShareButton';
+import { SuiviCommande } from '@/components/SuiviCommande';
 import { ShopProducts, type Section } from '@/components/ShopProducts';
 
 type Params = { params: Promise<{ slug: string }> };
@@ -44,7 +45,10 @@ export default async function ShopPage({ params }: Params) {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-3 pb-10">
-      <div className="h-[132px] bg-cover bg-center" style={{ background: s.coverUrl ? `center / cover url(${s.coverUrl})` : s.color }} />
+      <div className="relative h-[132px] bg-cover bg-center" style={{ background: s.coverUrl ? `center / cover url(${s.coverUrl})` : s.color }}>
+        {/* Client venu par un lien : son suivi de commande reste accessible depuis la boutique aussi (§53). */}
+        <span className="absolute right-4 top-4"><SuiviCommande /></span>
+      </div>
       <section className="-mt-9 flex flex-col gap-3 px-5">
         <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-3xl border-4 border-bg bg-ink font-display text-2xl font-bold" style={{ color: s.color }}>{s.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={s.logoUrl} alt="" className="h-full w-full object-cover" /> : s.initials}</span>
         <div className="flex flex-col gap-1">
