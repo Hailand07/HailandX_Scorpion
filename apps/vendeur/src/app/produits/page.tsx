@@ -1,7 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatGnf, gapPercent } from '@hailandx/commerce';
+import { formatGnf } from '@hailandx/commerce';
 import { BackHeader, browserClient, colorOf, errText, Icon, mediaUrl, Notice, Screen, Switch } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
@@ -19,7 +19,6 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const [sharing, setSharing] = useState<ShareTarget | null>(null);
   const sb = browserClient();
   const [offers, setOffers] = useState<Offer[] | null>(null);
-  const [market, setMarket] = useState<Map<string, number>>(new Map());
   const [sections, setSections] = useState<Section[]>([]);
   const [rayon, setRayon] = useState<string>('tous');
   const [q, setQ] = useState('');
@@ -41,14 +40,6 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
     const mine = (o.data as unknown as Offer[]) ?? [];
     setOffers(mine);
     setSections((s.data as Section[]) ?? []);
-    // Concurrence par les prix (HAILANDX.md §39) : meilleur prix des AUTRES boutiques sur les mêmes fiches.
-    const ids = [...new Set(mine.map((x) => x.product_id))];
-    if (ids.length) {
-      const { data } = await sb.from('offers').select('product_id,price_gnf,shops!inner(status)').in('product_id', ids.slice(0, 300)).eq('active', true).neq('shop_id', shopId).eq('shops.status', 'ouverte');
-      const best = new Map<string, number>();
-      for (const r of (data as { product_id: string; price_gnf: number }[] | null) ?? []) best.set(r.product_id, Math.min(best.get(r.product_id) ?? Infinity, r.price_gnf));
-      setMarket(best);
-    }
   }, [sb, shopId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -149,9 +140,6 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[14px] font-extrabold">{name}</span>
                   <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
-                  {market.has(o.product_id) && (o.price_gnf <= market.get(o.product_id)!
-                    ? <span className="text-[11.5px] font-extrabold text-ok">Meilleur prix sur HailandX</span>
-                    : <span className={`text-[11.5px] font-extrabold ${gapPercent(o.price_gnf, market.get(o.product_id)!) > 15 ? 'text-[#9a2b16]' : 'text-[#9a6b00]'}`}>+{gapPercent(o.price_gnf, market.get(o.product_id)!)} % au-dessus du meilleur prix ({formatGnf(market.get(o.product_id)!)})</span>)}
                 </span>
               </Link>
               {!selecting && o.active && o.catalog_products && (

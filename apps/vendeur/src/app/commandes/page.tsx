@@ -52,7 +52,7 @@ function Orders({ shopId }: { shopId: string }) {
       {parcels === null && <Chargement />}
       {parcels && list.length === 0 && (
         <p className="mt-2 rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">
-          {needle ? 'Aucune commande ne correspond.' : tab === 'problemes' ? 'Aucun problème signalé. Bravo.' : tab === 'preparer' ? 'Rien à préparer pour l’instant. Partagez un produit depuis Marketing pour attirer des clients.' : 'Rien ici pour l’instant.'}
+          {needle ? 'Aucune commande ne correspond.' : tab === 'problemes' ? 'Aucun problème signalé. Bravo.' : tab === 'preparer' ? 'Rien à préparer pour l’instant. Partagez le lien d’un produit (onglet Produits) pour attirer des clients.' : 'Rien ici pour l’instant.'}
         </p>
       )}
       {list.map((p) => {

@@ -100,7 +100,7 @@ function Visual({ shop }: SellerCtx) {
 
   return (
     <Screen className="pb-[120px]">
-      <BackHeader href="/marketing" title="Visuel à publier" />
+      <BackHeader href="/plus" title="Visuel à publier" />
       {offers?.length === 0 && <p className="rounded-[20px] border border-dashed border-line px-4 py-6 text-center text-[13.5px] font-bold text-muted">Mettez d’abord un produit en vente.</p>}
       {offers && offers.length > 0 && (
         <>

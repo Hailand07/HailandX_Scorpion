@@ -39,7 +39,7 @@ function Promotions({ shopId }: { shopId: string }) {
   const list = [...(offers ?? [])].sort((a, b) => Number(!!b.compare_at_gnf) - Number(!!a.compare_at_gnf));
   return (
     <Screen>
-      <BackHeader href="/marketing" title="Promotions" />
+      <BackHeader href="/plus" title="Promotions" />
       <p className="text-[13px] font-semibold leading-relaxed text-muted">Baissez un prix : l’ancien reste affiché barré sur HailandX avec le pourcentage. Sur l’honneur : l’ancien prix doit être celui que vous pratiquiez vraiment.</p>
       <Notice msg={msg} />
       {offers === null && <Chargement />}

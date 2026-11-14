@@ -35,7 +35,7 @@ function Codes({ shopId, shopName }: { shopId: string; shopName: string }) {
 
   return (
     <Screen>
-      <BackHeader href="/marketing" title="Codes promo" />
+      <BackHeader href="/plus" title="Codes promo" />
       <Notice msg={msg} />
       {!form && <button type="button" onClick={() => setForm(true)} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white">+ Nouveau code promo</button>}
       {form && <NewCode shopId={shopId} shopName={shopName} onCancel={() => setForm(false)} onSaved={async (code) => { setForm(false); setMsg({ tone: 'ok', text: `Code ${code} créé : donnez-le à vos clients (statut WhatsApp, bio TikTok…).` }); await load(); }} />}

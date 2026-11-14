@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { maskPhone } from '@hailandx/commerce';
-import { browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
+import { BackHeader, browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
 import { Chargement } from '@hailandx/ui';
 
@@ -21,7 +21,7 @@ export default function PlusPage() {
   const since = new Date(session.user.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
   return (
     <Screen className="gap-[18px] pt-6">
-      <h1 className="font-display text-[26px] font-semibold tracking-tight">Ma boutique</h1>
+      {open ? <h1 className="font-display text-[26px] font-semibold tracking-tight">Ma boutique</h1> : <BackHeader href="/" title="Mon compte" label="Retour" />}
 
       {shop && (
         <section aria-label="Ma boutique" className="flex flex-col gap-2">
@@ -40,7 +40,7 @@ export default function PlusPage() {
           </div>
         </section>
       )}
-      {!open && <Link href="/" className="flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">{shop ? 'Continuer l’ouverture de ma boutique' : 'Ouvrir ma boutique'}</Link>}
+      {!open && <Link href={shop ? '/' : '/ouvrir'} className="flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">{shop ? 'Continuer l’ouverture de ma boutique' : 'Ouvrir ma boutique'}</Link>}
 
       <section aria-label="Mon compte" className="flex flex-col gap-2">
         <GroupTitle>Mon compte</GroupTitle>
