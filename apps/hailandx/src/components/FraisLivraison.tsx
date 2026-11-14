@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { formatGnf } from '@hailandx/commerce';
 import { browserClient, useSession } from '@hailandx/kit';
+import { myAddresses } from '@/lib/addresses';
 
 /**
  * Frais de livraison dès la fiche (refonte §51) : le client connecté qui a déjà une adresse voit le montant exact
@@ -15,8 +16,9 @@ export function FraisLivraison({ offerId }: { offerId?: string }) {
     if (!sb || !uid || !offerId) { setFee(null); return; }
     let live = true;
     void (async () => {
-      const { data: d } = await sb.from('declarations').select('id').eq('user_id', uid).eq('status', 'active').order('created_at', { ascending: false }).limit(1).maybeSingle();
-      const decl = (d as { id: string } | null)?.id;
+      // Le domicile d'abord ; à défaut, une adresse temporaire encore valable (§53).
+      const list = await myAddresses(sb, uid);
+      const decl = (list.find((x) => !x.temporary_until) ?? list[0])?.id;
       if (!decl) return;
       const { data, error } = await sb.rpc('fn_delivery_quote', { p_declaration: decl, p_offers: [offerId] });
       const q = (data as { fee_gnf: number; distance_km: number }[] | null)?.[0];

@@ -1,4 +1,5 @@
 'use client';
+import { addrName, myAddresses, type Addr } from '@/lib/addresses';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -6,7 +7,7 @@ import { Badge, Wordmark } from '@hailandx/ui';
 import { browserClient, Icon, useSession } from '@hailandx/kit';
 import { AdresseClient } from '@/components/AdresseClient';
 
-interface Decl { id: string; declared_label: string | null; hailand_code: string | null; location_floor: string | null; location_door: string | null; declared_landmark: string | null }
+type Decl = Addr;
 
 /**
  * Mes adresses de livraison. Phase de lancement (§49, 2026-10-27) : l'emplacement s'enregistre ICI, avec le parcours recopié
@@ -24,8 +25,7 @@ function Page() {
 
   const load = useCallback(async () => {
     if (!sb || !session) return;
-    const { data } = await sb.from('declarations').select('id,declared_label,hailand_code,location_floor,location_door,declared_landmark').eq('user_id', session.user.id).eq('status', 'active').order('created_at', { ascending: false });
-    const rows = (data as Decl[]) ?? [];
+    const rows: Decl[] = await myAddresses(sb, session.user.id);
     setList(rows);
     const lv: Record<string, number> = {};
     await Promise.all(rows.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); if (typeof r.data === 'number') lv[d.id] = r.data; }));
@@ -47,7 +47,7 @@ function Page() {
         <section className="flex flex-col gap-2" aria-label="Mes adresses">
           {list.map((d) => (
             <div key={d.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-4 py-3">
-              <span className="flex flex-col"><span className="text-[14px] font-extrabold">{d.declared_label ?? 'Adresse'}</span><span className="text-[12px] font-semibold text-muted">{d.hailand_code}{levels[d.id] ? ` · niveau ${levels[d.id]}` : ''}{d.declared_landmark ? ` · ${d.declared_landmark}` : ''}</span></span>
+              <span className="flex flex-col"><span className="text-[14px] font-extrabold">{addrName(d)}</span><span className="text-[12px] font-semibold text-muted">{d.hailand_code}{levels[d.id] ? ` · niveau ${levels[d.id]}` : ''}{d.declared_landmark ? ` · ${d.declared_landmark}` : ''}</span></span>
               <Badge tone="sand">{[d.location_floor && `Étage ${d.location_floor}`, d.location_door && `Porte ${d.location_door}`].filter(Boolean).join(' · ') || 'Enregistrée'}</Badge>
             </div>
           ))}

@@ -91,3 +91,15 @@ describe('lien de localisation envoyé au destinataire', () => {
     expect(await as(db, U.acheteur, () => refused(db.query(`select fn_address_request_create('x')`)))).toMatch(/trop de liens/);
   });
 });
+
+describe('adresse temporaire (client hors de son domicile, §53)', () => {
+  it('le client commande sur une adresse temporaire ; elle reste distincte de son domicile', async () => {
+    const tmp = (await one<{ id: string }>(`insert into declarations (user_id, gps_point, quartier_id, gps_accuracy_m, declared_label, temporary_until) values ($1, point($2, $3), 'qtr-coleah', 8, 'Autre', now() + interval '30 days') returning id`, [U.acheteur, NEAR.lng, NEAR.lat])).id;
+    const o = (await as(db, U.acheteur, () => one<{ fn_place_order: string }>('select fn_place_order($1::jsonb, $2, $3, $4, $5)', [JSON.stringify([{ offer_id: offerId, variant_id: variantId, qty: 1 }]), tmp, '+224612000001', 'livraison', null]))).fn_place_order;
+    expect((await one<{ delivery_declaration_id: string }>('select delivery_declaration_id from orders where id = $1', [o])).delivery_declaration_id).toBe(tmp);
+    const rows = await q<{ id: string; temporary_until: string | null }>('select id, temporary_until from declarations where user_id = $1', [U.acheteur]);
+    expect(rows.find((r) => r.id === buyerDecl)?.temporary_until).toBeNull();
+    expect(rows.find((r) => r.id === tmp)?.temporary_until).not.toBeNull();
+  });
+});
+
