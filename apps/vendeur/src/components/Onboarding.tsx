@@ -1,9 +1,10 @@
 'use client';
+import { Btn } from '@/components/ui';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { slugify } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, LienHailand, Notice, Screen, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, Icon, Notice, Screen, uploadPhoto } from '@hailandx/kit';
 import { AdresseBoutique } from './AdresseBoutique';
 import { declLabel, type MyCert, type MyDecl, type MyShop } from '@/lib/useMyShop';
 import { Brand } from './Brand';
@@ -78,8 +79,8 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
 
   return (
     <Screen className="gap-2.5">
-      {back ? <BackHeader href={back} title="Ouvrir ma boutique" right={<span className="text-[12.5px] font-extrabold text-muted">{doneAll ? 'Prête' : `Étape ${step} sur 3`}</span>} />
-        : <header className="flex flex-col gap-3 pt-1"><div className="flex items-center justify-between"><Brand /><Link href="/plus" className="flex h-11 items-center rounded-2xl border border-line bg-card px-3.5 text-[13px] font-extrabold">Mon compte</Link></div><div className="flex items-center justify-between"><h1 className="font-display text-[20px] font-semibold tracking-tight">Ouvrir ma boutique</h1><span className="text-[12.5px] font-extrabold text-muted">{doneAll ? 'Prête' : `Étape ${step} sur 3`}</span></div></header>}
+      {back ? <BackHeader href={back} title="Ouvrir ma boutique" right={<span className="text-[13px] font-extrabold text-muted">{doneAll ? 'Prête' : `Étape ${step} sur 3`}</span>} />
+        : <header className="flex flex-col gap-3 pt-1"><div className="flex items-center justify-between"><Brand /><Link href="/plus" className="flex h-11 items-center rounded-2xl border border-line bg-card px-3.5 text-[13px] font-extrabold">Mon compte</Link></div><div className="flex items-center justify-between"><h1 className="font-display text-[20px] font-semibold tracking-tight">Ouvrir ma boutique</h1><span className="text-[13px] font-extrabold text-muted">{doneAll ? 'Prête' : `Étape ${step} sur 3`}</span></div></header>}
       <div className="mb-1.5 grid grid-cols-3 gap-1.5" aria-hidden="true"><span className={bar(step > 1)} /><span className={bar(step > 2)} /><span className={bar(doneAll)} /></div>
       <Notice msg={msg} />
 
@@ -87,13 +88,13 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
       {step === 1 ? (
         <Open n={1} title="Où se trouve votre boutique ?" text="Les livreurs viennent y chercher les colis. On repère le bâtiment ici même : position GPS, vue satellite, vous confirmez.">
           <MapArt />
-          <button type="button" onClick={() => setLocating(true)} className="flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-blue text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Localiser ma boutique</button>
+          <button type="button" onClick={() => setLocating(true)} className="flex h-[54px] items-center justify-center gap-2 rounded-2xl bg-blue text-[15px] font-extrabold text-white"><Icon name="pin" size={18} />Localiser ma boutique</button>
           <p className="text-[12px] font-semibold text-muted">Placez-vous dans la boutique, près d’une fenêtre : 15 secondes de mesures GPS, puis vous confirmez le bâtiment.</p>
         </Open>
       ) : (
         <>
           {depuis && !shop && decls.some((d) => d.id === recue) && (
-            <p role="status" className="flex items-center gap-2.5 rounded-[18px] bg-blue-soft px-4 py-3 text-[13.5px] font-extrabold text-blue-ink"><Icon name="pin" size={18} />{depuis === 'vente' ? 'Point de vente choisi dans NavigationX' : 'Adresse reçue : vous continuez ici.'}</p>
+            <p role="status" className="flex items-center gap-2.5 rounded-[20px] bg-blue-soft px-4 py-3 text-[14px] font-extrabold text-blue-ink"><Icon name="pin" size={18} />{depuis === 'vente' ? 'Point de vente choisi dans NavigationX' : 'Adresse reçue : vous continuez ici.'}</p>
           )}
           <Done title="Votre adresse" sub={(() => { const d = decl ?? decls.find((x) => x.id === addr) ?? decls[0]!; return `${declLabel(d)} · niveau ${d.level}`; })()} onChange={() => setLocating(true)} />
         </>
@@ -104,7 +105,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
       {step === 2 && (
         <Open n={2} title="Votre boutique">
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nom de la boutique
-            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Ex. Kadi Wax" className="h-[50px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
+            <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} placeholder="Ex. Kadi Wax" className="h-[54px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
           </label>
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-2 text-[13px] font-extrabold">Ce que vous vendez</legend>
@@ -122,13 +123,13 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
             </fieldset>
           )}
           <label className="flex cursor-pointer items-center gap-3">
-            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] border border-dashed border-[#c9c4b6] text-muted">
+            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[20px] border border-dashed border-line text-muted">
               {logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={logoUrl} alt="" className="h-full w-full object-cover" /> : <Icon name="plus" size={22} />}
             </span>
-            <span className="flex flex-col"><span className="text-[13.5px] font-extrabold">Logo</span><span className="text-[12px] font-semibold text-muted">Facultatif, modifiable plus tard</span></span>
+            <span className="flex flex-col"><span className="text-[14px] font-extrabold">Logo</span><span className="text-[12px] font-semibold text-muted">Facultatif, modifiable plus tard</span></span>
             <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
           </label>
-          <button type="button" disabled={short || busy} onClick={createShop} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:bg-[#ebe8e0] disabled:text-[#8a8d9c]">{busy ? 'Création…' : 'Créer ma boutique'}</button>
+          <button type="button" disabled={short || busy} onClick={createShop} className="h-[54px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:bg-sand disabled:text-faint">{busy ? 'Création…' : 'Créer ma boutique'}</button>
         </Open>
       )}
       {step > 2 && shop && <Done title={shop.name} sub={`${cats.find((c) => c.id === shop.category_id)?.name ?? 'Boutique'} · boutique créée`} href="/reglages" />}
@@ -146,8 +147,8 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
       )}
       {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && !atHailandMap && !pending && (
         <Open n={3} title="Faites certifier votre adresse" text={refused ? 'Votre dernière demande a été refusée : repérez à nouveau le bâtiment (« Changer » sur votre adresse, plus haut), puis redemandez.' : 'L’équipe Hailand vérifie votre demande, puis un agent passe confirmer que votre boutique est bien dans ce bâtiment. Il vous appelle avant. C’est gratuit.'}>
-          {refused && cert?.console_note && <p className="rounded-[14px] bg-[#fbeae5] px-3.5 py-3 text-[13px] font-semibold leading-snug text-[#a3321f]"><span className="font-extrabold">Motif : </span>{cert.console_note}</p>}
-          <button type="button" disabled={busy} onClick={ask} className="h-[52px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50">Demander la certification</button>
+          {refused && cert?.console_note && <p className="rounded-[14px] bg-[#fbeae5] px-3.5 py-3 text-[13px] font-semibold leading-snug text-danger"><span className="font-extrabold">Motif : </span>{cert.console_note}</p>}
+          <button type="button" disabled={busy} onClick={ask} className="h-[54px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:opacity-50">Demander la certification</button>
         </Open>
       )}
       {step === 3 && shop && shop.status !== 'suspendue' && decl && !certified && (atHailandMap || pending) && (
@@ -158,32 +159,32 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
             <Timeline state={pending ? 'todo' : 'now'} title="Visite de l’agent" sub={pending ? undefined : 'Il vous appelle avant de passer.'} />
             <Timeline state="todo" title="Adresse certifiée, vente ouverte" last />
           </ol>
-          <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[46px] items-center justify-center rounded-[14px] border border-line text-[13.5px] font-extrabold">Voir ma boutique sur HailandX</LienHailand>
-          <button type="button" onClick={() => void reload()} className="h-10 text-[13px] font-bold text-muted">Actualiser</button>
+          <Btn variant="secondary" size="md" onClick={() => void reload()}>Actualiser</Btn>
+          <p className="text-center text-[12px] font-semibold text-muted">Vous serez prévenu ici dès que l’adresse est certifiée.</p>
         </Open>
       )}
       {step === 3 && shop && shop.status !== 'suspendue' && certified && (
-        <section className="flex flex-col gap-3.5 rounded-[22px] bg-ink px-[18px] py-5 text-white">
+        <section className="flex flex-col gap-3.5 rounded-[20px] bg-ink px-[18px] py-5 text-white">
           <div className="flex items-center gap-3">
             <svg width="36" height="36" viewBox="0 0 24 24" fill="#c8f25a" aria-hidden="true"><path d="M12 2l2.4 2.1 3.2-.3.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.3L12 22l-2.4-2.1-3.2.3-.9-3.1L2.7 15.5l1-3-1-3 2.8-1.6.9-3.1 3.2.3z" /><path d="m8.5 12 2.5 2.5 4.5-5" stroke="#12141c" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            <span className="flex flex-col"><span className="font-display text-[19px] font-semibold">Adresse certifiée</span><span className="text-[12.5px] font-semibold text-white/70">Votre boutique peut vendre.</span></span>
+            <span className="flex flex-col"><span className="font-display text-[20px] font-semibold">Adresse certifiée</span><span className="text-[13px] font-semibold text-white/70">Votre boutique peut vendre.</span></span>
           </div>
-          <button type="button" disabled={busy} onClick={open} className="h-[54px] rounded-2xl bg-lime text-[15.5px] font-extrabold text-ink disabled:opacity-60">{busy ? 'Ouverture…' : 'Ouvrir la vente'}</button>
+          <button type="button" disabled={busy} onClick={open} className="h-[54px] rounded-2xl bg-lime text-[16px] font-extrabold text-ink disabled:opacity-60">{busy ? 'Ouverture…' : 'Ouvrir la vente'}</button>
         </section>
       )}
 
-      <p className="mx-1 mt-1.5 flex gap-2 text-[12.5px] font-semibold leading-snug text-muted"><Icon name="info" size={16} stroke={2} className="mt-px" />Vos produits s’ajoutent dans votre tableau de bord, dès que la vente est ouverte.</p>
+      <p className="mx-1 mt-1.5 flex gap-2 text-[13px] font-semibold leading-snug text-muted"><Icon name="info" size={16} stroke={2} className="mt-px" />Vos produits s’ajoutent dans votre tableau de bord, dès que la vente est ouverte.</p>
     </Screen>
   );
 }
 
 function Open({ n, title, text, children }: { n: number; title: string; text?: string; children?: React.ReactNode }) {
   return (
-    <section aria-current="step" className="flex flex-col gap-3.5 rounded-[22px] border-2 border-ink bg-card p-[18px]">
+    <section aria-current="step" className="flex flex-col gap-3.5 rounded-[20px] border-2 border-ink bg-card p-[18px]">
       <div className="flex flex-col gap-1">
         <span className="text-[12px] font-extrabold text-blue">Étape {n}</span>
-        <h2 className="font-display text-[19px] font-semibold">{title}</h2>
-        {text && <p className="text-[13.5px] font-semibold leading-snug text-muted">{text}</p>}
+        <h2 className="font-display text-[20px] font-semibold">{title}</h2>
+        {text && <p className="text-[14px] font-semibold leading-snug text-muted">{text}</p>}
       </div>
       {children}
     </section>
@@ -193,8 +194,8 @@ function Open({ n, title, text, children }: { n: number; title: string; text?: s
 function Done({ title, sub, href, onChange }: { title: string; sub: string; href?: string; onChange?: () => void }) {
   return (
     <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">
-      <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#0f7a5c] text-white"><Icon name="check" size={15} stroke={3} /></span>
-      <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[14.5px] font-extrabold">{title}</span><span className="truncate text-[12.5px] font-semibold text-muted">{sub}</span></span>
+      <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-ok text-white"><Icon name="check" size={15} stroke={3} /></span>
+      <span className="flex min-w-0 flex-1 flex-col"><span className="truncate text-[15px] font-extrabold">{title}</span><span className="truncate text-[13px] font-semibold text-muted">{sub}</span></span>
       {onChange ? <button type="button" onClick={onChange} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</button>
         : href && <Link href={href} className="flex h-10 items-center px-2 text-[13px] font-extrabold text-blue">Changer</Link>}
     </section>
@@ -202,19 +203,19 @@ function Done({ title, sub, href, onChange }: { title: string; sub: string; href
 }
 
 const Locked = ({ n, title }: { n: number; title: string }) => (
-  <section className="flex items-center gap-3 rounded-[20px] border border-dashed border-[#d6d1c4] px-4 py-3.5 text-[#8a8d9c]">
-    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-[#ebe8e0] text-[13px] font-extrabold">{n}</span>
-    <span className="text-[14.5px] font-extrabold">{title}</span>
+  <section className="flex items-center gap-3 rounded-[20px] border border-dashed border-[#d6d1c4] px-4 py-3.5 text-faint">
+    <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-sand text-[13px] font-extrabold">{n}</span>
+    <span className="text-[15px] font-extrabold">{title}</span>
   </section>
 );
 
 function Timeline({ state, title, sub, last }: { state: 'done' | 'now' | 'todo'; title: string; sub?: string; last?: boolean }) {
   return (
     <li className={`flex items-start gap-3 ${last ? '' : 'pb-3.5'}`}>
-      {state === 'done' && <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-[#0f7a5c] text-white"><Icon name="check" size={12} stroke={3.4} /></span>}
+      {state === 'done' && <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-ok text-white"><Icon name="check" size={12} stroke={3.4} /></span>}
       {state === 'now' && <span className="h-[22px] w-[22px] shrink-0 rounded-full border-[6px] border-blue" />}
-      {state === 'todo' && <span className="h-[22px] w-[22px] shrink-0 rounded-full bg-[#ebe8e0]" />}
-      <span className="flex flex-col"><span className={`text-[14px] font-extrabold ${state === 'todo' ? 'text-[#8a8d9c]' : ''}`}>{title}</span>{sub && <span className="text-[12px] font-semibold text-muted">{sub}</span>}</span>
+      {state === 'todo' && <span className="h-[22px] w-[22px] shrink-0 rounded-full bg-sand" />}
+      <span className="flex flex-col"><span className={`text-[14px] font-extrabold ${state === 'todo' ? 'text-faint' : ''}`}>{title}</span>{sub && <span className="text-[12px] font-semibold text-muted">{sub}</span>}</span>
     </li>
   );
 }

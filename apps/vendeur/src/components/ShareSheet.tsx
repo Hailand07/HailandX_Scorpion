@@ -57,7 +57,7 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
     try { await navigator.share({ title: label, text, url: await tracked('autre') }); } catch { /* partage annulé */ }
   }
 
-  const btn = 'flex h-[52px] items-center justify-center gap-2 rounded-2xl text-[14px] font-extrabold disabled:opacity-50';
+  const btn = 'flex h-[54px] items-center justify-center gap-2 rounded-2xl text-[14px] font-extrabold disabled:opacity-50';
   return (
     <div role="dialog" aria-modal="true" aria-label={`Partager ${label}`} className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40" onClick={onClose}>
       <div className="flex w-full max-w-md flex-col gap-3 rounded-t-[26px] bg-card px-5 pb-[max(22px,env(safe-area-inset-bottom))] pt-4" onClick={(e) => e.stopPropagation()}>
@@ -68,16 +68,16 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
           </span>
           <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-bg"><Icon name="close" size={18} /></button>
         </div>
-        <p className="text-[12.5px] font-semibold leading-relaxed text-muted">{target.productSlug ? 'Le client qui clique arrive directement sur ce produit, prêt à commander.' : 'Le client qui clique arrive sur votre vitrine.'} Chaque réseau a son lien : vous verrez d’où viennent vos ventes dans Statistiques.</p>
+        <p className="text-[13px] font-semibold leading-relaxed text-muted">{target.productSlug ? 'Le client qui clique arrive directement sur ce produit, prêt à commander.' : 'Le client qui clique arrive sur votre vitrine.'} Chaque réseau a son lien : vous verrez d’où viennent vos ventes dans Statistiques.</p>
         <div className="grid grid-cols-2 gap-2">
           <button type="button" disabled={!!busy} onClick={() => void share('whatsapp')} className={`${btn} bg-[#1f8f4e] text-white`}>WhatsApp</button>
           <button type="button" disabled={!!busy} onClick={() => void share('tiktok')} className={`${btn} bg-ink text-white`}>TikTok (copier)</button>
           <button type="button" disabled={!!busy} onClick={() => void share('facebook')} className={`${btn} bg-[#1b4fd8] text-white`}>Facebook</button>
           <button type="button" disabled={!!busy} onClick={() => void share('autre')} className={`${btn} border border-line`}>Copier le lien</button>
         </div>
-        {typeof navigator !== 'undefined' && 'share' in navigator && <button type="button" onClick={() => void native()} className="h-11 rounded-2xl bg-bg text-[13.5px] font-extrabold">Autres applications…</button>}
+        {typeof navigator !== 'undefined' && 'share' in navigator && <button type="button" onClick={() => void native()} className="h-11 rounded-2xl bg-bg text-[14px] font-extrabold">Autres applications…</button>}
         <p className="truncate rounded-xl bg-bg px-3 py-2 text-[12px] font-semibold text-muted" title={direct}>Lien direct : {direct.replace(/^https?:\/\//, '')}</p>
-        {note && <p role="status" className={`text-[12.5px] font-bold ${note.ok ? 'text-ok' : 'text-[#a3321f]'}`}>{note.text}</p>}
+        {note && <p role="status" className={`text-[13px] font-bold ${note.ok ? 'text-ok' : 'text-danger'}`}>{note.text}</p>}
       </div>
     </div>
   );

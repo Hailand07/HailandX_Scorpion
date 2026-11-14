@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import { BtnLink, EmptyState } from '@/components/ui';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useMyShop, type MyDecl, type MyShop } from '@/lib/useMyShop';
@@ -20,18 +20,16 @@ export function SellerGate({ title, allowClosed = false, ownerOnly = false, chil
   if (state === 'visiteur' || !uid) {
     return (
       <Screen><BackHeader href="/" title={title} label="Retour" />
-        <p className="text-[14px] font-semibold text-muted">Connectez-vous pour ouvrir cette page.</p>
-        <Link href={`/connexion?next=${encodeURIComponent(path)}`} className="flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Me connecter</Link>
+        <EmptyState icon="user" title="Connectez-vous" text="Cette page fait partie de votre espace vendeur." action={<BtnLink href={`/connexion?next=${encodeURIComponent(path)}`}>Me connecter</BtnLink>} />
       </Screen>
     );
   }
   if (!shop || (!allowClosed && shop.status !== 'ouverte')) {
     return (
       <Screen><BackHeader href="/" title={title} label="Retour" />
-        <section className="flex flex-col gap-3 rounded-[22px] border border-dashed border-line bg-sand p-5">
-          <p className="text-[14px] font-semibold text-muted">{!shop ? 'Ouvrez d’abord votre boutique.' : shop.status === 'suspendue' ? 'Votre boutique est suspendue par l’équipe Hailand.' : 'Cette page s’ouvre avec la vente, dès que l’adresse de votre boutique est certifiée.'}</p>
-          <Link href={!shop ? '/ouvrir' : '/'} className="flex h-12 items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">{!shop ? 'Ouvrir ma boutique' : 'Voir où j’en suis'}</Link>
-        </section>
+        <EmptyState icon="shop" title={!shop ? 'Ouvrez d’abord votre boutique' : shop.status === 'suspendue' ? 'Boutique suspendue' : 'Bientôt disponible'}
+          text={!shop ? 'Trois étapes : votre adresse, votre boutique, la certification.' : shop.status === 'suspendue' ? 'Votre boutique est suspendue par l’équipe Hailand.' : 'Cette page s’ouvre avec la vente, dès que l’adresse de votre boutique est certifiée.'}
+          action={<BtnLink href={!shop ? '/ouvrir' : '/'}>{!shop ? 'Ouvrir ma boutique' : 'Voir où j’en suis'}</BtnLink>} />
       </Screen>
     );
   }
@@ -39,7 +37,7 @@ export function SellerGate({ title, allowClosed = false, ownerOnly = false, chil
   if (ownerOnly && shop.role !== 'proprietaire') {
     return (
       <Screen><BackHeader href="/" title={title} label="Retour" />
-        <p className="rounded-[22px] border border-dashed border-line bg-sand p-5 text-[14px] font-semibold text-muted">Cette page est réservée au propriétaire de la boutique.</p>
+        <EmptyState icon="user" title="Réservé au propriétaire" text="Cette page est réservée au propriétaire de la boutique." />
       </Screen>
     );
   }

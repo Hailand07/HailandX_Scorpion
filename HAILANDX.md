@@ -577,6 +577,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-13 | Écosystème révision 135 : NavigationX reprend la désignation sans GPS de HailandX (« hors du cercle », « pas sur place ») et écrit `declarations.located_by` ; ces adresses ne sont jamais rattachées d'office à un bâtiment certifié. Aucun changement de code ici. |
 | 2026-11-14 | HailandX Vendeur parcouru écran par écran dans un navigateur (faux compte, aucune requête vers la vraie base) et corrigé (§51) : connexion — flèche de retour (accueil, puis du code vers le numéro), numéro groupé à la saisie, code validé seul au 6e chiffre, champ vidé après un code faux, compte déjà connecté renvoyé à sa page ; « Me connecter » ramène à la page demandée ; page inconnue en français ; onglet Boutique avec retour avant l'ouverture, bouton menant droit à `/ouvrir` ; retours des écrans QR vers Boutique ; textes qui citaient l'onglet Marketing ou le Menu réécrits ; lien « Liens suivis » et comparaison de prix retirés ; avertissement avant de quitter un produit non publié ou de publier sans photo ; commission illisible (« NaN ») corrigée ; adresse de la boutique affichée par son code Hailand. 396 tests. |
 | 2026-11-14 | HailandX Vendeur : « Se déconnecter » demande une confirmation (Rester / Me déconnecter) ; l'onglet Produits a un titre sans flèche de retour, comme Commandes. |
+| 2026-11-14 | Design de HailandX Vendeur repris (§52) : palette complétée (`danger`, `warn`, `faint`), couleurs écrites en dur ramenées aux jetons, échelle unique de textes, d'arrondis et de hauteurs de bouton ; composants communs `apps/vendeur/src/components/ui.tsx` (`Btn`, `BtnLink`, `PageTitle`, `EmptyState`, `ActionBar`) ; accueil réordonné (colis à préparer en carte pleine, « Nouveau produit » et « Partager » sous le pouce, puis ventes et argent) ; onglet Boutique avec l'argent en tête et trois blocs ; action principale toujours en barre du bas ; états vides avec icône et action ; écrans Marketing (4), Clients, Équipe, `PriceCompare` et `ShareRow` supprimés ; affiche QR déplacée en `/affiche` ; `ProductPublished` extrait de l'éditeur de produit. 396 tests. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1257,3 +1258,26 @@ Hailand ne prend **aucune commission** sur un colis annulé. Exemple T8 → Sama
 **Essai d'interface de HailandX Vendeur (2026-11-14) ✅** — tous les écrans parcourus dans un navigateur avec un faux compte (réponses de la base simulées : visiteur, compte sans boutique, boutique en attente, boutique ouverte). Corrigé : la connexion partagée (`packages/kit/src/PhoneLogin.tsx`, donc aussi HailandX, Flotte et Console) a une flèche de retour, valide le code seule, groupe le numéro (`phone.ts`, 2 tests) et renvoie un compte déjà connecté ; `SellerGate` garde la page demandée ; `not-found.tsx` ; retours cohérents (`BackAuto`, écrans QR, onglet Boutique avant l'ouverture) ; textes et liens hérités du Marketing retirés ; garde-fous de l'ajout de produit (quitter sans publier, publier sans photo). ⚠️ Non couvert par cet essai : la carte (pas de jeton Mapbox ici), l'envoi réel de photos, les SMS réels.
 
 **Reste** : essai réel complet sur téléphone, report de la localisation renforcée dans NavigationX (tentatives cumulées, hors du cercle).
+
+## 52. Design de HailandX Vendeur : une seule échelle, des composants communs (2026-11-14) — ✅ code, ⚠️ à juger sur téléphone
+
+**Constat (exploration du 2026-11-14)** : identité saine (Sora, Manrope, sable, encre, bleu, citron) mais appliquée sans règle — six hauteurs de bouton, neuf arrondis, vingt-deux tailles de texte, une quinzaine de couleurs écrites en dur ; boutons réécrits à la main dans chaque page ; états vides réduits à un cadre pointillé ; action principale tantôt en bas, tantôt dans le flux.
+
+**Règles posées** (à respecter pour tout nouvel écran de Vendeur) :
+- **Couleurs** : uniquement les jetons de `packages/ui/src/tokens.css`. Ajoutés : `danger` / `danger-soft` (annuler, supprimer, erreur), `warn` / `warn-soft` (rupture, attente), `faint` (chevrons, légendes).
+- **Textes** : 12 (légende), 13, 14 (texte), 15 (titre de ligne, bouton), 16 (saisie), 20 (titre de bloc), 26 (titre de page), 30 (grand chiffre). Plus de demi-pixels.
+- **Arrondis** : 14 (petits blocs), 16 (boutons, champs), 20 (cartes), 24 (cartes sombres).
+- **Boutons** : 54 px (action principale), 48 px (secondaire), 40 px (dans une ligne) — toujours par `Btn` / `BtnLink` (`components/ui.tsx`), jamais à la main.
+- **Action principale** : en bas de l'écran, dans `ActionBar` (au-dessus de la barre d'onglets si elle est visible).
+- **Écran ou bloc vide** : `EmptyState` (icône, phrase, action), jamais un cadre pointillé seul.
+- **Onglets** (Accueil, Commandes, Produits, Boutique) : `PageTitle`, sans flèche de retour ; pages secondaires : `BackHeader`.
+
+**Écrans repris** :
+- **Accueil** : colis à préparer en carte pleine citron, en tête ; autres choses à faire en liste ; « Nouveau produit » et « Partager » côte à côte ; « Bien démarrer » ; ventes (avec lien vers le détail) ; « Hailand vous doit ».
+- **Boutique** : carte sombre « Hailand vous doit » en tête, puis Activité (ventes, avis, questions), Ma boutique (nom, logo, adresse ; horaires et congés ; affiche QR ; voir comme un client), Mon compte.
+- **Produits, Commandes, fiche de commande, horaires, éditeur de produit** : barre d'action commune, états vides, titres d'onglet.
+- **Ouverture de boutique** : à « Certification en cours », le bouton est « Actualiser » (l'aperçu d'une boutique encore fermée est retiré).
+
+**Ménage** : supprimés `app/marketing/{page,codes,promotions,visuel}`, `app/clients`, `app/equipe`, `components/PriceCompare.tsx`, `components/ShareRow.tsx` (restent dans l'historique git ; les tables et fonctions de la base ne sont pas touchées). L'affiche QR passe de `/marketing/qr` à `/affiche`. `ProductPublished.tsx` extrait de `ProductEditor.tsx`. ⚠️ `Onboarding.tsx` (233 lignes) n'est pas encore découpé.
+
+**Limites** : vérifié dans un navigateur avec un faux compte (visiteur, sans boutique, boutique en attente, boutique ouverte) ; pas sur un vrai téléphone, ni avec de vraies données. Les autres applications (HailandX client, Flotte, Console) ne sont pas reprises : seuls les jetons ajoutés et les couleurs de `packages/kit/src/Screen.tsx` les touchent, sans changement visible attendu.

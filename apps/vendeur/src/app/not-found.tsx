@@ -9,8 +9,8 @@ export default function NotFound() {
       <Brand />
       <div className="flex flex-1 flex-col justify-center gap-3">
         <h1 className="font-display text-[26px] font-semibold tracking-tight">Cette page n’existe pas</h1>
-        <p className="text-[14.5px] font-medium leading-relaxed text-muted">Le lien est peut-être ancien ou mal recopié.</p>
-        <Link href="/" className="mt-2 flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Revenir à l’accueil</Link>
+        <p className="text-[15px] font-medium leading-relaxed text-muted">Le lien est peut-être ancien ou mal recopié.</p>
+        <Link href="/" className="mt-2 flex h-[54px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Revenir à l’accueil</Link>
       </div>
     </Screen>
   );

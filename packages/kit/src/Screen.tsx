@@ -78,13 +78,13 @@ export const GroupTitle = ({ children }: { children: ReactNode }) => <h2 classNa
 
 /** Ligne d'une liste groupée (compte, réglages). */
 export function ListRow({ href, icon, label, value, onClick, last }: { href?: string; icon?: keyof typeof ICONS; label: ReactNode; value?: ReactNode; onClick?: () => void; last?: boolean }) {
-  const cls = `flex min-h-[58px] w-full items-center gap-3 px-4 text-left ${last ? '' : 'border-b border-[#f0ede6]'}`;
+  const cls = `flex min-h-[58px] w-full items-center gap-3 px-4 text-left ${last ? '' : 'border-b border-line-soft'}`;
   const body = (
     <>
       {icon && <Icon name={icon} />}
       <span className="min-w-0 flex-1 text-[15px] font-bold">{label}</span>
       {value}
-      <Icon name="chevron" size={16} stroke={2} className="text-[#9a9db0]" />
+      <Icon name="chevron" size={16} stroke={2} className="text-faint" />
     </>
   );
   return href ? <Link href={href} className={cls}>{body}</Link> : <button type="button" onClick={onClick} className={cls}>{body}</button>;
@@ -93,7 +93,7 @@ export function ListRow({ href, icon, label, value, onClick, last }: { href?: st
 /** Message de retour d'une action (succès ou erreur). */
 export function Notice({ msg }: { msg: { tone: 'ok' | 'err'; text: string } | null }) {
   if (!msg) return null;
-  return <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${msg.tone === 'err' ? 'bg-[#fde8e4] text-[#8a2a1c]' : 'bg-ok-soft text-ok'}`}>{msg.text}</p>;
+  return <p role={msg.tone === 'err' ? 'alert' : 'status'} className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${msg.tone === 'err' ? 'bg-danger-soft text-danger' : 'bg-ok-soft text-ok'}`}>{msg.text}</p>;
 }
 
 /** Puces de filtre (onglets) défilant horizontalement. */
@@ -111,7 +111,7 @@ export function Chips<T extends string>({ items, value, onChange, label }: { ite
 /** Contrôle segmenté (deux ou trois choix de même poids). */
 export function Segmented<T extends string>({ items, value, onChange, label, dark = false }: { items: { id: T; label: string }[]; value: T; onChange: (id: T) => void; label: string; dark?: boolean }) {
   return (
-    <div role="tablist" aria-label={label} className={`grid gap-1 rounded-[14px] p-1 ${dark ? 'bg-white/10' : 'bg-[#ebe8e0]'}`} style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
+    <div role="tablist" aria-label={label} className={`grid gap-1 rounded-[14px] p-1 ${dark ? 'bg-white/10' : 'bg-sand'}`} style={{ gridTemplateColumns: `repeat(${items.length}, minmax(0, 1fr))` }}>
       {items.map((it) => {
         const on = it.id === value;
         return (
@@ -130,7 +130,7 @@ export const Card = ({ children, className = '' }: { children: ReactNode; classN
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
-      className={`flex h-7 w-12 shrink-0 rounded-full p-[3px] transition-colors disabled:opacity-50 ${on ? 'justify-end bg-[#0f7a5c]' : 'justify-start bg-[#d6d1c4]'}`}>
+      className={`flex h-7 w-12 shrink-0 rounded-full p-[3px] transition-colors disabled:opacity-50 ${on ? 'justify-end bg-ok' : 'justify-start bg-[#d6d1c4]'}`}>
       <span className="block h-[22px] w-[22px] rounded-full bg-white" />
     </button>
   );

@@ -19,13 +19,13 @@ export default function HelpPage() {
       <BackAuto title="Aide aux vendeurs" />
       <div className="flex flex-col gap-2">
         {FAQ.map(([q, a]) => (
-          <details key={q} className="rounded-[18px] border border-line-soft bg-card">
-            <summary className="flex min-h-[54px] cursor-pointer list-none items-center px-4 text-[14.5px] font-extrabold">{q}</summary>
-            <p className="px-4 pb-4 text-[13.5px] font-semibold leading-relaxed text-muted">{a}</p>
+          <details key={q} className="rounded-[20px] border border-line-soft bg-card">
+            <summary className="flex min-h-[54px] cursor-pointer list-none items-center px-4 text-[15px] font-extrabold">{q}</summary>
+            <p className="px-4 pb-4 text-[14px] font-semibold leading-relaxed text-muted">{a}</p>
           </details>
         ))}
       </div>
-      {SUPPORT_WHATSAPP && <a href={`https://wa.me/${SUPPORT_WHATSAPP}`} target="_blank" rel="noreferrer" className="flex h-[52px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Écrire à Hailand sur WhatsApp</a>}
+      {SUPPORT_WHATSAPP && <a href={`https://wa.me/${SUPPORT_WHATSAPP}`} target="_blank" rel="noreferrer" className="flex h-[54px] items-center justify-center rounded-2xl bg-ink text-[15px] font-extrabold text-white">Écrire à Hailand sur WhatsApp</a>}
     </Screen>
   );
 }

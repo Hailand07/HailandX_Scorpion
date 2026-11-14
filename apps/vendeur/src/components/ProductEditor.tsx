@@ -1,11 +1,13 @@
 'use client';
+import { ActionBar, Btn } from '@/components/ui';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, HAILANDX_URL, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, errText, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
+import { ProductPublished } from './ProductPublished';
 import { Chargement } from '@hailandx/ui';
 
 interface Variant { key: number; id: string; label: string; stock: number }
@@ -146,21 +148,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
     setBusy(false);
   }
 
-  if (published) {
-    const url = typeof window !== 'undefined' ? `${HAILANDX_URL}/p/${published.slug}?b=${shop.slug}` : '';
-    return (
-      <Screen className="items-center justify-center gap-3.5 px-7 pb-20 text-center">
-        <span role="status" className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-lime"><Icon name="check" size={30} stroke={2.4} /></span>
-        <h1 className="font-display text-[22px] font-semibold">Produit en vente</h1>
-        <p className="text-[14.5px] font-semibold leading-relaxed text-muted">Il apparaît dans votre boutique. Partagez-le pour vos premières ventes.</p>
-        <button type="button" onClick={() => setSharing(true)} className="flex h-[50px] w-full items-center justify-center rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Partager le lien du produit</button>
-        <p className="w-full truncate rounded-xl bg-bg px-3 py-2 text-[12px] font-semibold text-muted">{url.replace(/^https?:\/\//, '')}</p>
-        {sharing && published.offerId && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: published.offerId, productSlug: published.slug, name: published.name, priceGnf: Math.round(priceN) }} onClose={() => setSharing(false)} />}
-        <button type="button" onClick={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} className="flex h-12 w-full items-center justify-center rounded-2xl border border-line text-[14px] font-extrabold">Ajouter un autre produit</button>
-        <Link href="/produits" className="flex h-11 items-center text-[14px] font-extrabold">Retour aux produits</Link>
-      </Screen>
-    );
-  }
+  if (published) return <ProductPublished shop={shop} published={published} priceGnf={Math.round(priceN)} onAnother={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} />;
   if (existing === undefined) return <Screen><BackHeader icon="close" href="/produits" title="Modifier le produit" label="Fermer" /><Chargement /></Screen>;
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
@@ -172,35 +160,35 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'}
         onBack={(e) => { if (!editing && !busy && (name.trim() || price.trim() || files.length > 0) && !window.confirm('Quitter sans publier ? Ce que vous avez saisi sera perdu.')) e.preventDefault(); }}
         right={editing && existing ? <span className="flex gap-1.5">
-          <Link href={`/produits/nouveau?depuis=${existing.id}`} className="flex h-10 items-center rounded-full border border-line px-3 text-[12.5px] font-extrabold">Dupliquer</Link>
-          {existing.active && existing.catalog_products && <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3 text-[12.5px] font-extrabold">Partager</button>}
+          <Link href={`/produits/nouveau?depuis=${existing.id}`} className="flex h-10 items-center rounded-full border border-line px-3 text-[13px] font-extrabold">Dupliquer</Link>
+          {existing.active && existing.catalog_products && <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3 text-[13px] font-extrabold">Partager</button>}
         </span> : copyFrom ? <span className="rounded-full bg-blue-soft px-3 py-1.5 text-[12px] font-extrabold text-blue-ink">Copie</span> : null} />
       {sharing && editing && existing?.catalog_products && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: existing.id, productSlug: existing.catalog_products.slug, name: existing.catalog_products.name, priceGnf: existing.price_gnf }} onClose={() => setSharing(false)} />}
       <Notice msg={msg} />
 
       <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
         {nPhotos < MAX_PHOTOS && (
-          <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[18px] bg-ink text-[11.5px] font-extrabold text-white">
+          <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
             <Icon name="camera" size={22} stroke={1.8} />Photo
             <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(e) => { const list = Array.from(e.target.files ?? []); setFiles((f) => [...f, ...list].slice(0, MAX_PHOTOS - kept.length)); e.target.value = ''; }} />
           </label>
         )}
         {kept.map((p) => <Thumb key={p} src={mediaUrl(p)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
         {previews.map((u, i) => <Thumb key={u} src={u} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
-        {nPhotos === 0 && <span className="self-center pl-1 text-[11.5px] font-bold leading-snug text-muted">Jusqu’à 5 photos réelles :<br />elles font vendre.</span>}
+        {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos réelles :<br />elles font vendre.</span>}
       </section>
 
       <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
         {editing ? (
-          <div className="flex flex-col gap-0.5"><span className="text-[13px] font-extrabold">Nom du produit</span><span className="text-[15px] font-bold">{existing?.catalog_products?.name}</span><span className="text-[11.5px] font-semibold text-muted">Le nom ne se change pas après la publication. Pour un autre nom, dupliquez le produit.</span></div>
+          <div className="flex flex-col gap-0.5"><span className="text-[13px] font-extrabold">Nom du produit</span><span className="text-[15px] font-bold">{existing?.catalog_products?.name}</span><span className="text-[12px] font-semibold text-muted">Le nom ne se change pas après la publication. Pour un autre nom, dupliquez le produit.</span></div>
         ) : (
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nom du produit
-            <input value={name} onChange={(e) => { setName(e.target.value); setLinked(null); }} autoComplete="off" maxLength={120} placeholder="Ex. Pagne wax 6 yards" className="h-[50px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
+            <input value={name} onChange={(e) => { setName(e.target.value); setLinked(null); }} autoComplete="off" maxLength={120} placeholder="Ex. Pagne wax 6 yards" className="h-[54px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />
           </label>
         )}
-        {linked && <p className="flex items-center justify-between gap-2 rounded-[14px] bg-ok-soft px-3 py-2.5 text-[12.5px] font-extrabold text-ok">Votre offre s’ajoute à la fiche existante.<button type="button" onClick={() => setLinked(null)} className="underline">Annuler</button></p>}
+        {linked && <p className="flex items-center justify-between gap-2 rounded-[14px] bg-ok-soft px-3 py-2.5 text-[13px] font-extrabold text-ok">Votre offre s’ajoute à la fiche existante.<button type="button" onClick={() => setLinked(null)} className="underline">Annuler</button></p>}
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix
-          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
+          <span className="flex h-[54px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
             <input value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" placeholder="185 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
             <span className="text-[13px] font-extrabold text-muted">GNF</span>
           </span>
@@ -220,19 +208,19 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
             {variants.length > 1 && <button type="button" aria-label={`Supprimer la variante ${i + 1}`} onClick={() => { if (v.id) setRemoved((r) => [...r, v.id]); setVariants((vs) => vs.filter((x) => x.key !== v.key)); }} className="flex h-11 w-8 items-center justify-center text-muted"><Icon name="close" size={16} stroke={2.2} /></button>}
           </div>
         ))}
-        <button type="button" onClick={() => { setVariants((vs) => [...vs, { key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); }} className="h-11 rounded-xl border border-dashed border-[#c9c4b6] text-[13px] font-extrabold">+ Ajouter une variante</button>
+        <button type="button" onClick={() => { setVariants((vs) => [...vs, { key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); }} className="h-11 rounded-xl border border-dashed border-line text-[13px] font-extrabold">+ Ajouter une variante</button>
       </section>
 
       {/* Tout le reste est facultatif : le produit se publie avec des photos, un nom, un prix et un stock (§51). */}
       <details open={editing} className="group flex flex-col rounded-[20px] border border-line-soft bg-card">
         <summary className="flex min-h-[56px] cursor-pointer list-none items-center justify-between gap-3 px-3.5">
-          <span className="flex flex-col"><span className="text-[14.5px] font-extrabold">Plus de détails</span><span className="text-[12px] font-semibold text-muted">Facultatif · fiche complète à {completeness} %</span></span>
+          <span className="flex flex-col"><span className="text-[15px] font-extrabold">Plus de détails</span><span className="text-[12px] font-semibold text-muted">Facultatif · fiche complète à {completeness} %</span></span>
           <span aria-hidden="true" className="text-[18px] font-extrabold text-muted transition-transform group-open:rotate-180">⌄</span>
         </summary>
         <div className="flex flex-col gap-3 border-t border-line-soft p-2.5">
       <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
-        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[11.5px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
-          <span className="flex h-[50px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
+        <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Prix avant promotion <span className="-mt-1 text-[12px] font-semibold text-muted">Facultatif : affiché barré, avec le pourcentage de baisse.</span>
+          <span className="flex h-[54px] items-center gap-2 rounded-[14px] border border-line px-3.5 focus-within:border-blue">
             <input value={compareAt} onChange={(e) => setCompareAt(e.target.value)} inputMode="numeric" placeholder="210 000" className="min-w-0 flex-1 bg-transparent text-[16px] font-bold outline-none" />
             <span className="text-[13px] font-extrabold text-muted">GNF</span>
           </span>
@@ -253,7 +241,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       {shared ? (
         <section className="flex flex-col gap-1.5 rounded-[20px] border border-line-soft bg-card p-3.5">
           <h2 className="text-[14px] font-extrabold">Fiche du produit</h2>
-          <p className="text-[12.5px] font-semibold leading-relaxed text-muted">Cette fiche est partagée avec un autre vendeur qui l’a créée : sa description et ses caractéristiques s’affichent pour tous. Ajoutez ce qui vous est propre dans « Le mot du vendeur ».</p>
+          <p className="text-[13px] font-semibold leading-relaxed text-muted">Cette fiche est partagée avec un autre vendeur qui l’a créée : sa description et ses caractéristiques s’affichent pour tous. Ajoutez ce qui vous est propre dans « Le mot du vendeur ».</p>
           {shared.description && <p className="line-clamp-4 whitespace-pre-line text-[13px] font-medium">{shared.description}</p>}
         </section>
       ) : (
@@ -269,7 +257,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
             <div className="flex flex-col gap-1.5">
               <span className="text-[13px] font-extrabold">Points forts <span className="font-semibold text-muted">· 3 à 5 phrases courtes</span></span>
               {points.map((pt, i) => (
-                <input key={i} value={pt} onChange={(e) => setPoints((ps) => ps.map((x, j) => (j === i ? e.target.value : x)))} maxLength={FICHE_LIMITS.point} aria-label={`Point fort ${i + 1}`} placeholder={['Ex. Tissu épais qui ne déteint pas', 'Ex. Livré avec chargeur rapide', 'Ex. Fabriqué à Conakry'][i] ?? 'Autre point fort'} className="h-11 rounded-xl bg-bg px-3 text-[14.5px] font-semibold outline-none focus:ring-2 focus:ring-blue" />
+                <input key={i} value={pt} onChange={(e) => setPoints((ps) => ps.map((x, j) => (j === i ? e.target.value : x)))} maxLength={FICHE_LIMITS.point} aria-label={`Point fort ${i + 1}`} placeholder={['Ex. Tissu épais qui ne déteint pas', 'Ex. Livré avec chargeur rapide', 'Ex. Fabriqué à Conakry'][i] ?? 'Autre point fort'} className="h-11 rounded-xl bg-bg px-3 text-[15px] font-semibold outline-none focus:ring-2 focus:ring-blue" />
               ))}
               {points.length < FICHE_LIMITS.points && <button type="button" onClick={() => setPoints((ps) => [...ps, ''])} className="h-10 self-start rounded-xl px-1 text-[13px] font-extrabold text-blue-ink">+ Ajouter un point fort</button>}
             </div>
@@ -278,14 +266,14 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
           <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
             <h2 className="text-[14px] font-extrabold">Caractéristiques</h2>
             {fiche.fields.map((f) => <FieldInput key={f.key} f={f} value={values[f.key] ?? ''} onChange={(v) => setValues((x) => ({ ...x, [f.key]: v }))} />)}
-            <p className="text-[11.5px] font-semibold text-muted">Laissez vide ce qui ne s’applique pas : seuls les champs remplis s’affichent.</p>
+            <p className="text-[12px] font-semibold text-muted">Laissez vide ce qui ne s’applique pas : seuls les champs remplis s’affichent.</p>
           </section>
         </>
       )}
 
       <section className="flex flex-col gap-2 rounded-[20px] border border-line-soft bg-card p-3.5">
         <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Le mot du vendeur <span className="font-semibold text-muted">· facultatif, propre à votre boutique</span>
-          <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={3} placeholder="Ex. Garantie boutique 1 mois, échange possible si la taille ne va pas, retrait en boutique possible." className="rounded-[14px] border border-line px-3.5 py-3 text-[14.5px] font-medium leading-relaxed outline-none focus:border-blue" />
+          <textarea value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} rows={3} placeholder="Ex. Garantie boutique 1 mois, échange possible si la taille ne va pas, retrait en boutique possible." className="rounded-[14px] border border-line px-3.5 py-3 text-[15px] font-medium leading-relaxed outline-none focus:border-blue" />
         </label>
       </section>
 
@@ -308,16 +296,14 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         </section>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-md bg-gradient-to-b from-transparent to-bg to-30% px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3">
-        <button type="button" disabled={busy} onClick={save} className="h-14 w-full rounded-[18px] bg-ink text-[16px] font-extrabold text-white disabled:opacity-60">{busy ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Publier le produit'}</button>
-      </div>
+      <ActionBar><Btn disabled={busy} onClick={save}>{busy ? 'Enregistrement…' : editing ? 'Enregistrer' : 'Publier le produit'}</Btn></ActionBar>
     </Screen>
   );
 }
 
 function Thumb({ src, onRemove }: { src: string | null; onRemove: () => void }) {
   return (
-    <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[18px] bg-sand">
+    <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[20px] bg-sand">
       {src && /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" className="h-full w-full object-cover" />}
       <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
     </span>
@@ -327,15 +313,15 @@ function Thumb({ src, onRemove }: { src: string | null; onRemove: () => void }) 
 /** Un champ de la fiche type : texte, choix (liste proposée, saisie libre possible), nombre avec unité, oui / non, texte long. */
 function FieldInput({ f, value, onChange }: { f: FicheField; value: string; onChange: (v: string) => void }) {
   const id = `fiche-${f.key}`;
-  const box = 'h-11 min-w-0 flex-1 rounded-xl bg-bg px-3 text-[14.5px] font-semibold outline-none focus:ring-2 focus:ring-blue';
+  const box = 'h-11 min-w-0 flex-1 rounded-xl bg-bg px-3 text-[15px] font-semibold outline-none focus:ring-2 focus:ring-blue';
   return (
-    <label htmlFor={id} className="flex flex-col gap-1.5 text-[12.5px] font-extrabold">{f.label}
+    <label htmlFor={id} className="flex flex-col gap-1.5 text-[13px] font-extrabold">{f.label}
       {f.kind === 'long' ? (
-        <textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} rows={2} maxLength={FICHE_LIMITS.longValue} placeholder={f.placeholder} className="rounded-xl bg-bg px-3 py-2.5 text-[14.5px] font-medium leading-relaxed outline-none focus:ring-2 focus:ring-blue" />
+        <textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} rows={2} maxLength={FICHE_LIMITS.longValue} placeholder={f.placeholder} className="rounded-xl bg-bg px-3 py-2.5 text-[15px] font-medium leading-relaxed outline-none focus:ring-2 focus:ring-blue" />
       ) : f.kind === 'oui_non' ? (
         <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={box}><option value="">Non précisé</option><option value="oui">Oui</option><option value="non">Non</option></select>
       ) : f.kind === 'nombre' ? (
-        <span className="flex items-center gap-2"><input id={id} value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" placeholder={f.placeholder} className={box} />{f.unit && <span className="w-14 shrink-0 text-[12.5px] font-extrabold text-muted">{f.unit}</span>}</span>
+        <span className="flex items-center gap-2"><input id={id} value={value} onChange={(e) => onChange(e.target.value)} inputMode="decimal" placeholder={f.placeholder} className={box} />{f.unit && <span className="w-14 shrink-0 text-[13px] font-extrabold text-muted">{f.unit}</span>}</span>
       ) : (
         <>
           <input id={id} value={value} onChange={(e) => onChange(e.target.value)} maxLength={FICHE_LIMITS.value} placeholder={f.placeholder ?? (f.options ? 'Choisir ou écrire' : '')} list={f.options ? `${id}-liste` : undefined} className={box} />

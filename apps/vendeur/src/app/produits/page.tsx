@@ -1,4 +1,5 @@
 'use client';
+import { ActionBar, Btn, BtnLink, EmptyState, PageTitle } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatGnf } from '@hailandx/commerce';
@@ -88,27 +89,22 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
     setRayon('tous'); await load();
   }
 
-  const chip = (on: boolean) => `h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-extrabold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
+  const chip = (on: boolean) => `h-9 shrink-0 rounded-full px-3.5 text-[13px] font-extrabold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   const current = sections.find((s) => s.id === rayon);
   return (
-    <Screen className="pb-28 pt-5">
+    <Screen className="pt-5">
       {/* Onglet de la barre du bas : un titre, pas de flèche de retour (comme Commandes). */}
-      <header className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-[26px] font-semibold tracking-tight">Produits</h1>
-        {offers && all.length > 0 ? (
-          <button type="button" onClick={() => { setSelecting((x) => !x); setPicked(new Set()); }} className="h-10 rounded-full border border-line bg-card px-3.5 text-[12.5px] font-extrabold">{selecting ? 'Terminer' : 'Sélectionner'}</button>
-        ) : null}
-      </header>
-      {offers && <p className="-mt-1 text-[12.5px] font-bold text-muted">{visible} visible{visible > 1 ? 's' : ''} sur {all.length}</p>}
-      <label className="flex h-[46px] items-center gap-2.5 rounded-[14px] border border-line bg-card px-3.5">
+      <PageTitle right={offers && all.length > 0 ? <Btn variant="secondary" size="sm" block={false} onClick={() => { setSelecting((x) => !x); setPicked(new Set()); }}>{selecting ? 'Terminer' : 'Sélectionner'}</Btn> : null}>Produits</PageTitle>
+      {offers && <p className="-mt-1 text-[13px] font-bold text-muted">{visible} visible{visible > 1 ? 's' : ''} sur {all.length}</p>}
+      <label className="flex h-[48px] items-center gap-2.5 rounded-[14px] border border-line bg-card px-3.5">
         <Icon name="search" size={17} stroke={2} className="text-muted" />
         <input value={q} onChange={(e) => setQ(e.target.value)} type="search" placeholder="Chercher dans mes produits" aria-label="Chercher dans mes produits" className="h-full min-w-0 flex-1 bg-transparent text-[16px] font-medium outline-none" />
       </label>
       <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none]" role="tablist" aria-label="Rayons">
         <button type="button" role="tab" aria-selected={rayon === 'tous'} onClick={() => setRayon('tous')} className={chip(rayon === 'tous')}>Tous</button>
         {sections.map((s) => <button key={s.id} type="button" role="tab" aria-selected={rayon === s.id} onClick={() => setRayon(s.id)} className={chip(rayon === s.id)}>{s.name}</button>)}
-        {ruptures > 0 && <button type="button" role="tab" aria-selected={rayon === 'rupture'} onClick={() => setRayon('rupture')} className={`${chip(rayon === 'rupture')} ${rayon === 'rupture' ? '' : 'text-[#c2410c]'}`}>Rupture · {ruptures}</button>}
-        <button type="button" onClick={() => setAdding((x) => !x)} className="h-9 shrink-0 rounded-full border border-dashed border-[#c9c4b6] px-3 text-[12.5px] font-extrabold text-muted">+ Rayon</button>
+        {ruptures > 0 && <button type="button" role="tab" aria-selected={rayon === 'rupture'} onClick={() => setRayon('rupture')} className={`${chip(rayon === 'rupture')} ${rayon === 'rupture' ? '' : 'text-warn'}`}>Rupture · {ruptures}</button>}
+        <button type="button" onClick={() => setAdding((x) => !x)} className="h-9 shrink-0 rounded-full border border-dashed border-line px-3 text-[13px] font-extrabold text-muted">+ Rayon</button>
       </div>
       {adding && (
         <form onSubmit={(e) => { e.preventDefault(); void addSection(); }} className="flex gap-2">
@@ -116,34 +112,31 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
           <button type="submit" className="h-12 rounded-[14px] bg-ink px-4 text-[14px] font-extrabold text-white">Ajouter</button>
         </form>
       )}
-      {current && <button type="button" onClick={() => removeSection(current)} className="self-start text-[12.5px] font-bold text-muted underline">Supprimer le rayon « {current.name} »</button>}
+      {current && <button type="button" onClick={() => removeSection(current)} className="self-start text-[13px] font-bold text-muted underline">Supprimer le rayon « {current.name} »</button>}
       <Notice msg={msg} />
 
       {offers === null && <Chargement />}
       {offers && all.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-[22px] border border-dashed border-line px-5 py-8 text-center">
-          <p className="text-[15px] font-extrabold">Aucun produit pour l’instant</p>
-          <p className="text-[13px] font-semibold text-muted">Une photo réelle, un prix, un stock : vos clients achètent en confiance.</p>
-        </div>
+        <EmptyState icon="tag" title="Aucun produit pour l’instant" text="Une photo réelle, un prix, un stock : c’est tout ce qu’il faut pour vendre." />
       )}
-      {offers && all.length > 0 && list.length === 0 && <p className="mt-4 text-center text-[13.5px] font-semibold text-muted">Aucun produit ici.</p>}
+      {offers && all.length > 0 && list.length === 0 && <EmptyState icon="search" title="Aucun produit ici" text="Changez de rayon ou de recherche." />}
       <div className="flex flex-col gap-2">
         {list.map((o) => {
           const stock = stockOf(o);
           const photo = mediaUrl(o.photo_paths?.[0]);
           const name = o.catalog_products?.name ?? 'Produit';
           return (
-            <div key={o.id} className={`flex items-center gap-3 rounded-[18px] border bg-card py-2.5 pl-2.5 pr-3 ${selecting && picked.has(o.id) ? 'border-blue' : 'border-line-soft'} ${o.active ? '' : 'opacity-55'}`}>
+            <div key={o.id} className={`flex items-center gap-3 rounded-[20px] border bg-card py-2.5 pl-2.5 pr-3 ${selecting && picked.has(o.id) ? 'border-blue' : 'border-line-soft'} ${o.active ? '' : 'opacity-55'}`}>
               {selecting && (
-                <button type="button" role="checkbox" aria-checked={picked.has(o.id)} aria-label={`Sélectionner ${name}`} onClick={() => pick(o.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${picked.has(o.id) ? 'bg-blue text-white' : 'border-2 border-[#c9c4b6]'}`}>
+                <button type="button" role="checkbox" aria-checked={picked.has(o.id)} aria-label={`Sélectionner ${name}`} onClick={() => pick(o.id)} className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${picked.has(o.id) ? 'bg-blue text-white' : 'border-2 border-line'}`}>
                   {picked.has(o.id) && <Icon name="check" size={15} stroke={3} />}
                 </button>
               )}
               <Link href={selecting ? '#' : `/produits/${o.id}`} onClick={(e) => { if (selecting) { e.preventDefault(); pick(o.id); } }} className="flex min-w-0 flex-1 items-center gap-3">
-                {photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photo} alt="" className="h-[52px] w-[52px] shrink-0 rounded-[14px] object-cover" /> : <span className="h-[52px] w-[52px] shrink-0 rounded-[14px]" style={{ background: colorOf(name) }} />}
+                {photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={photo} alt="" className="h-[54px] w-[52px] shrink-0 rounded-[14px] object-cover" /> : <span className="h-[54px] w-[52px] shrink-0 rounded-[14px]" style={{ background: colorOf(name) }} />}
                 <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                   <span className="truncate text-[14px] font-extrabold">{name}</span>
-                  <span className="text-[12.5px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-[#c2410c]' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
+                  <span className="text-[13px] font-bold"><span className="font-display font-semibold">{formatGnf(o.price_gnf)}</span>{o.compare_at_gnf ? <> <span className="font-semibold text-muted line-through">{formatGnf(o.compare_at_gnf)}</span></> : null} · <span className={stock === 0 ? 'font-extrabold text-warn' : stock < 5 ? 'text-[#9a6b00]' : 'text-muted'}>{stock === 0 ? 'Rupture' : `${stock} en stock`}</span></span>
                 </span>
               </Link>
               {!selecting && o.active && o.catalog_products && (
@@ -160,17 +153,15 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
       {sharing && <ShareSheet target={sharing} onClose={() => setSharing(null)} />}
       {selecting ? (
         <div className="fixed inset-x-3 bottom-[96px] z-30 mx-auto flex max-w-[calc(28rem-1.5rem)] flex-col gap-2 rounded-[20px] bg-ink p-2.5 text-white shadow-[0_10px_30px_rgba(18,20,28,0.25)]">
-          <span className="px-1.5 text-[12.5px] font-extrabold">{picked.size} produit{picked.size > 1 ? 's' : ''} sélectionné{picked.size > 1 ? 's' : ''}</span>
+          <span className="px-1.5 text-[13px] font-extrabold">{picked.size} produit{picked.size > 1 ? 's' : ''} sélectionné{picked.size > 1 ? 's' : ''}</span>
           <div className="grid grid-cols-5 gap-1.5">
             {([['masquer', 'Masquer'], ['afficher', 'Afficher'], ['promo10', 'Promo −10 %'], ['promo20', 'Promo −20 %'], ['stop', 'Fin promo']] as const).map(([k, l]) => (
-              <button key={k} type="button" disabled={picked.size === 0} onClick={() => void bulk(k)} className="flex h-[52px] items-center justify-center rounded-xl bg-white/10 px-1 text-center text-[11.5px] font-extrabold leading-tight disabled:opacity-40">{l}</button>
+              <button key={k} type="button" disabled={picked.size === 0} onClick={() => void bulk(k)} className="flex h-[54px] items-center justify-center rounded-xl bg-white/10 px-1 text-center text-[12px] font-extrabold leading-tight disabled:opacity-40">{l}</button>
             ))}
           </div>
         </div>
       ) : (
-      <Link href="/produits/nouveau" className="fixed inset-x-5 bottom-[104px] z-30 mx-auto flex h-[54px] max-w-[calc(28rem-2.5rem)] items-center justify-center gap-2 rounded-[18px] bg-ink text-[15px] font-extrabold text-white shadow-[0_8px_24px_rgba(18,20,28,0.22)]">
-        <Icon name="plus" size={18} stroke={2.4} />Ajouter un produit
-      </Link>
+      <ActionBar nav><BtnLink href="/produits/nouveau"><Icon name="plus" size={18} stroke={2.4} />Ajouter un produit</BtnLink></ActionBar>
       )}
     </Screen>
   );

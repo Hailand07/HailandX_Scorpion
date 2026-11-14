@@ -45,13 +45,13 @@ export function PayoutCard({ shopId }: { shopId: string }) {
     <section aria-label="Versements" className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-4">
       <h2 className="font-display text-[16px] font-semibold">Versements</h2>
       <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col rounded-[14px] bg-ok-soft px-3 py-2.5"><span className="text-[11.5px] font-bold text-ok">Disponible</span><span className="font-display text-[17px] font-semibold">{s ? formatGnf(s.payable_gnf) : '…'}</span></div>
-        <div className="flex flex-col rounded-[14px] bg-sand px-3 py-2.5"><span className="text-[11.5px] font-bold text-muted">En attente (48 h)</span><span className="font-display text-[17px] font-semibold">{s ? formatGnf(s.waiting_gnf) : '…'}</span></div>
+        <div className="flex flex-col rounded-[14px] bg-ok-soft px-3 py-2.5"><span className="text-[12px] font-bold text-ok">Disponible</span><span className="font-display text-[18px] font-semibold">{s ? formatGnf(s.payable_gnf) : '…'}</span></div>
+        <div className="flex flex-col rounded-[14px] bg-sand px-3 py-2.5"><span className="text-[12px] font-bold text-muted">En attente (48 h)</span><span className="font-display text-[18px] font-semibold">{s ? formatGnf(s.waiting_gnf) : '…'}</span></div>
       </div>
       <p className="text-[12px] font-semibold leading-snug text-muted">Une vente devient disponible 48 h après la remise du colis (le temps d’un éventuel litige). Hailand verse chaque semaine et paie les frais d’envoi.</p>
       {s?.method && !edit && (
         <div className="flex items-center gap-3 rounded-[14px] border border-line px-3 py-2.5">
-          <span className="flex min-w-0 flex-1 flex-col"><span className="text-[13.5px] font-extrabold">{payoutMethodLabel(s.method)} · {maskAccount(s.method, s.account_number)}</span><span className="truncate text-[12px] font-semibold text-muted">{s.holder_name}{pendingChange ? ` · utilisé à partir du ${when(s.usable_from!)}` : ''}</span></span>
+          <span className="flex min-w-0 flex-1 flex-col"><span className="text-[14px] font-extrabold">{payoutMethodLabel(s.method)} · {maskAccount(s.method, s.account_number)}</span><span className="truncate text-[12px] font-semibold text-muted">{s.holder_name}{pendingChange ? ` · utilisé à partir du ${when(s.usable_from!)}` : ''}</span></span>
           <button type="button" onClick={() => { setEdit(true); setMethod(s.method ?? 'orange_money'); setHolder(s.holder_name ?? ''); }} className="h-10 shrink-0 rounded-xl border border-line px-3 text-[13px] font-bold">Changer</button>
         </div>
       )}
@@ -72,9 +72,9 @@ export function PayoutCard({ shopId }: { shopId: string }) {
           </div>
         </div>
       )}
-      {msg && <p role="status" className="text-[12.5px] font-bold">{msg}</p>}
+      {msg && <p role="status" className="text-[13px] font-bold">{msg}</p>}
       {list.length > 0 && (
-        <ul className="flex flex-col gap-1 border-t border-[#f0ede6] pt-2">
+        <ul className="flex flex-col gap-1 border-t border-line-soft pt-2">
           {list.map((p) => <li key={p.id} className="flex justify-between gap-3 text-[13px] font-semibold"><span>{when(p.created_at)} · {payoutMethodLabel(p.method)} {maskAccount(p.method, p.account_number)}</span><span className="font-extrabold">{formatGnf(p.amount_gnf)}</span></li>)}
         </ul>
       )}

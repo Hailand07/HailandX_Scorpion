@@ -1,6 +1,5 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, LienHailand, mediaUrl, Notice, Screen, uploadPhoto } from '@hailandx/kit';
 import { AdresseBoutique } from '@/components/AdresseBoutique';
@@ -56,7 +55,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
   const initials = shop.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   const input = 'h-12 w-full rounded-[14px] border border-line bg-card px-3.5 text-[16px] font-semibold outline-none focus:border-blue';
   const actions = (onSave: () => void) => (
-    <div className="flex gap-2"><button type="button" disabled={busy} onClick={onSave} className="h-11 flex-1 rounded-xl bg-ink text-[13.5px] font-extrabold text-white disabled:opacity-50">Enregistrer</button><button type="button" onClick={() => setOpen(null)} className="h-11 rounded-xl border border-line px-4 text-[13.5px] font-bold">Annuler</button></div>
+    <div className="flex gap-2"><button type="button" disabled={busy} onClick={onSave} className="h-11 flex-1 rounded-xl bg-ink text-[14px] font-extrabold text-white disabled:opacity-50">Enregistrer</button><button type="button" onClick={() => setOpen(null)} className="h-11 rounded-xl border border-line px-4 text-[14px] font-bold">Annuler</button></div>
   );
 
   return (
@@ -64,7 +63,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
       <BackHeader href="/plus" title="Réglages de la boutique" label="Retour" />
       <Notice msg={msg} />
 
-      <section aria-label="Vitrine" className="overflow-hidden rounded-[22px] border border-line-soft bg-card">
+      <section aria-label="Vitrine" className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
         <div className="relative h-[104px] bg-[#f1cfae]">
           {cover && /* eslint-disable-next-line @next/next/no-img-element */ <img src={cover} alt="" className="h-full w-full object-cover" />}
           <label className="absolute right-2.5 top-2.5 flex h-[34px] cursor-pointer items-center rounded-xl bg-white/[0.92] px-3 text-[12px] font-extrabold">Changer le bandeau<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => image('cover', e.target.files?.[0])} /></label>
@@ -73,7 +72,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
           </span>
         </div>
         <div className="flex justify-end px-4 pb-1 pt-2.5">
-          <label className="flex h-9 cursor-pointer items-center text-[12.5px] font-extrabold text-blue">Changer le logo<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => image('logo', e.target.files?.[0])} /></label>
+          <label className="flex h-9 cursor-pointer items-center text-[13px] font-extrabold text-blue">Changer le logo<input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" disabled={busy} onChange={(e) => image('logo', e.target.files?.[0])} /></label>
         </div>
         <Row label="Nom" value={shop.name} onClick={() => edit('name', shop.name)} />
         {open === 'name' && <Panel><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={60} aria-label="Nom de la boutique" className={input} /><p className="text-[12px] font-semibold text-muted">L’adresse de votre boutique (/b/{shop.slug}) ne change pas.</p>{actions(() => value.trim().length >= 2 ? void save({ name: value.trim() }, 'Nom enregistré.') : setMsg({ tone: 'err', text: 'Au moins 2 lettres.' }))}</Panel>}
@@ -97,7 +96,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
           {decl?.level === 3
             ? <svg width="28" height="28" viewBox="0 0 24 24" fill="#3346f0" aria-hidden="true"><path d="M12 2l2.4 2.1 3.2-.3.9 3.1 2.8 1.6-1 3 1 3-2.8 1.6-.9 3.1-3.2-.3L12 22l-2.4-2.1-3.2.3-.9-3.1L2.7 15.5l1-3-1-3 2.8-1.6.9-3.1 3.2.3z" /><path d="m8.5 12 2.5 2.5 4.5-5" stroke="#ffffff" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" /></svg>
             : <Icon name="pin" size={26} className="text-muted" />}
-          <span className="flex min-w-0 flex-1 flex-col"><span className="text-[14.5px] font-extrabold">{decl?.level === 3 ? 'Certifiée par Hailand' : decl ? 'Pas encore certifiée' : 'Aucune adresse'}</span><span className="truncate text-[12px] font-semibold text-muted">{decl ? `${declLabel(decl)} · niveau ${decl.level}` : 'Rattachez une adresse depuis l’onglet Vendre'}</span></span>
+          <span className="flex min-w-0 flex-1 flex-col"><span className="text-[15px] font-extrabold">{decl?.level === 3 ? 'Certifiée par Hailand' : decl ? 'Pas encore certifiée' : 'Aucune adresse'}</span><span className="truncate text-[12px] font-semibold text-muted">{decl ? `${declLabel(decl)} · niveau ${decl.level}` : 'Rattachez une adresse depuis l’onglet Vendre'}</span></span>
           {decls.length > 1 && <button type="button" onClick={() => edit('address', '')} className="h-10 shrink-0 px-1 text-[13px] font-extrabold text-blue">Changer</button>}
         </div>
         {open === 'address' && (
@@ -105,22 +104,22 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
             {decls.filter((x) => x.id !== decl?.id).map((x) => <button key={x.id} type="button" disabled={busy} onClick={() => changeAddress(x.id)} className="flex min-h-12 items-center justify-between rounded-[14px] border border-line bg-card px-3.5 text-[14px] font-bold"><span className="truncate">{declLabel(x)}</span><span className="text-[12px] text-muted">niveau {x.level}</span></button>)}
           </div>
         )}
-        <button type="button" onClick={() => setLocating(true)} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-line bg-card text-[13.5px] font-extrabold"><Icon name="pin" size={17} />Vous déménagez ? Repérer le nouveau bâtiment</button>
+        <button type="button" onClick={() => setLocating(true)} className="flex h-12 items-center justify-center gap-2 rounded-[14px] border border-line bg-card text-[14px] font-extrabold"><Icon name="pin" size={17} />Vous déménagez ? Repérer le nouveau bâtiment</button>
         <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">Puis demandez sa certification. Changer d’adresse referme la vente jusqu’à la nouvelle certification.</p>
       </section>
 
-      <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[52px] items-center justify-center gap-2 rounded-2xl border border-line bg-card text-[14.5px] font-extrabold"><Icon name="eye" size={18} />Voir ma boutique sur HailandX</LienHailand>
+      <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" className="flex h-[54px] items-center justify-center gap-2 rounded-2xl border border-line bg-card text-[15px] font-extrabold"><Icon name="eye" size={18} />Voir ma boutique sur HailandX</LienHailand>
     </Screen>
   );
 }
 
 function Row({ label, value, onClick, muted, first }: { label: string; value: string; onClick: () => void; muted?: boolean; first?: boolean }) {
   return (
-    <button type="button" onClick={onClick} className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-2 text-left ${first ? '' : 'border-t border-[#f0ede6]'}`}>
+    <button type="button" onClick={onClick} className={`flex min-h-[58px] w-full items-center gap-3 px-4 py-2 text-left ${first ? '' : 'border-t border-line-soft'}`}>
       <span className="flex min-w-0 flex-1 flex-col"><span className="text-[12px] font-bold text-muted">{label}</span><span className={`truncate text-[15px] font-extrabold ${muted ? 'text-blue-ink' : ''}`}>{value}</span></span>
-      <Icon name="chevron" size={16} stroke={2} className="text-[#9a9db0]" />
+      <Icon name="chevron" size={16} stroke={2} className="text-faint" />
     </button>
   );
 }
 
-const Panel = ({ children }: { children: React.ReactNode }) => <div className="flex flex-col gap-2.5 border-t border-[#f0ede6] bg-bg px-4 py-3">{children}</div>;
+const Panel = ({ children }: { children: React.ReactNode }) => <div className="flex flex-col gap-2.5 border-t border-line-soft bg-bg px-4 py-3">{children}</div>;
