@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { formatGnf } from '@hailandx/commerce';
-import { BackHeader, browserClient, colorOf, errText, Icon, mediaUrl, Notice, Screen, Switch } from '@hailandx/kit';
+import { browserClient, colorOf, errText, Icon, mediaUrl, Notice, Screen, Switch } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShareSheet, type ShareTarget } from '@/components/ShareSheet';
 import { Chargement } from '@hailandx/ui';
@@ -91,10 +91,14 @@ function Products({ shopId, shopSlug, shopName }: { shopId: string; shopSlug: st
   const chip = (on: boolean) => `h-9 shrink-0 rounded-full px-3.5 text-[12.5px] font-extrabold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   const current = sections.find((s) => s.id === rayon);
   return (
-    <Screen className="pb-28">
-      <BackHeader href="/" title="Produits" label="Retour au tableau de bord" right={offers && all.length > 0 ? (
-        <button type="button" onClick={() => { setSelecting((x) => !x); setPicked(new Set()); }} className="h-10 rounded-full border border-line bg-card px-3.5 text-[12.5px] font-extrabold">{selecting ? 'Terminer' : 'Sélectionner'}</button>
-      ) : null} />
+    <Screen className="pb-28 pt-5">
+      {/* Onglet de la barre du bas : un titre, pas de flèche de retour (comme Commandes). */}
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="font-display text-[26px] font-semibold tracking-tight">Produits</h1>
+        {offers && all.length > 0 ? (
+          <button type="button" onClick={() => { setSelecting((x) => !x); setPicked(new Set()); }} className="h-10 rounded-full border border-line bg-card px-3.5 text-[12.5px] font-extrabold">{selecting ? 'Terminer' : 'Sélectionner'}</button>
+        ) : null}
+      </header>
       {offers && <p className="-mt-1 text-[12.5px] font-bold text-muted">{visible} visible{visible > 1 ? 's' : ''} sur {all.length}</p>}
       <label className="flex h-[46px] items-center gap-2.5 rounded-[14px] border border-line bg-card px-3.5">
         <Icon name="search" size={17} stroke={2} className="text-muted" />

@@ -12,6 +12,8 @@ export default function PlusPage() {
   const router = useRouter();
   const { state, session, shop } = useMyShop();
   const [unread, setUnread] = useState(0);
+  /** Déconnexion en deux temps : un toucher par erreur ne ferme pas la session. */
+  const [leaving, setLeaving] = useState(false);
   useEffect(() => { if (state === 'visiteur') router.replace('/connexion?next=/plus'); }, [state, router]);
   useEffect(() => { const sb = browserClient(); if (sb && session) void unreadNotifications(sb, 'vendeur').then(setUnread); }, [session]);
   if (state !== 'pret' || !session) return <Screen className="pt-6"><Chargement /></Screen>;
@@ -54,7 +56,15 @@ export default function PlusPage() {
       </section>
 
       <div className="flex flex-col items-center gap-1.5">
-        <button type="button" onClick={async () => { await signOutHailand(browserClient()); window.location.replace('/'); }} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>
+        {leaving ? (
+          <div role="alertdialog" aria-label="Confirmer la déconnexion" className="flex w-full flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-4">
+            <p className="text-[14px] font-bold leading-snug">Se déconnecter de HailandX Vendeur ?<span className="block text-[12.5px] font-semibold text-muted">Votre boutique reste ouverte. Vous ne verrez plus les nouvelles commandes sur ce téléphone tant que vous n’êtes pas reconnecté.</span></p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setLeaving(false)} className="h-12 rounded-2xl border border-line text-[14.5px] font-extrabold">Rester</button>
+              <button type="button" onClick={async () => { await signOutHailand(browserClient()); window.location.replace('/'); }} className="h-12 rounded-2xl bg-ink text-[14.5px] font-extrabold text-white">Me déconnecter</button>
+            </div>
+          </div>
+        ) : <button type="button" onClick={() => setLeaving(true)} className="h-[52px] w-full rounded-2xl border border-line bg-card text-[15px] font-extrabold">Se déconnecter</button>}
         <Link href="/compte/supprimer" className="flex h-11 items-center text-[13px] font-bold text-[#a3321f]">Supprimer mon compte</Link>
       </div>
     </Screen>
