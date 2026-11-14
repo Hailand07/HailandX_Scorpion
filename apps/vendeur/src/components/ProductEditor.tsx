@@ -8,7 +8,7 @@ import { BackHeader, browserClient, errText, Icon, mediaUrl, Notice, Screen, Swi
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { ProductPublished } from './ProductPublished';
-import { Chargement } from '@hailandx/ui';
+import { Chargement, FitImage, Lightbox } from '@hailandx/ui';
 
 interface Variant { key: number; id: string; label: string; stock: number }
 interface Section { id: string; name: string }
@@ -52,6 +52,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [published, setPublished] = useState<{ slug: string; name: string; offerId?: string } | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [viewing, setViewing] = useState<number | null>(null);
   const [nextKey, setNextKey] = useState(1);
 
   useEffect(() => {
@@ -181,8 +182,9 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
             </label>
           </>
         )}
-        {kept.map((p) => <Thumb key={p} src={mediaUrl(p)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
-        {previews.map((u, i) => <Thumb key={u} src={u} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
+        {kept.map((p, i) => <Thumb key={p} src={mediaUrl(p)} onOpen={() => setViewing(i)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
+        {previews.map((u, i) => <Thumb key={u} src={u} onOpen={() => setViewing(kept.length + i)} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
+        {viewing !== null && <Lightbox photos={[...kept.map((p) => mediaUrl(p) ?? ''), ...previews].filter(Boolean)} start={viewing} label={name || 'Produit'} onClose={() => setViewing(null)} />}
         {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos :<br />elles font vendre.</span>}
       </section>
 
@@ -242,7 +244,8 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       {!editing && !linked && (
         <section className="flex flex-col gap-2.5 rounded-[20px] border border-line-soft bg-card p-3.5">
           <h2 className="text-[14px] font-extrabold">Catégorie</h2>
-          <div className="flex flex-wrap gap-2">{cats.map((c) => <button key={c.id} type="button" aria-pressed={cat === c.id} onClick={() => setCat(c.id)} className={pill(cat === c.id)}>{c.name}</button>)}</div>
+          {/* Les catégories de la boutique d'abord (§54), puis les autres. */}
+          <div className="flex flex-wrap gap-2">{[...cats].sort((x, y) => Number(!(shop.category_ids ?? []).includes(x.id)) - Number(!(shop.category_ids ?? []).includes(y.id))).map((c) => <button key={c.id} type="button" aria-pressed={cat === c.id} onClick={() => setCat(c.id)} className={pill(cat === c.id)}>{c.name}</button>)}</div>
         </section>
       )}
 
@@ -309,10 +312,10 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   );
 }
 
-function Thumb({ src, onRemove }: { src: string | null; onRemove: () => void }) {
+function Thumb({ src, onRemove, onOpen }: { src: string | null; onRemove: () => void; onOpen: () => void }) {
   return (
     <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[20px] bg-sand">
-      {src && /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" className="h-full w-full object-cover" />}
+      {src && <FitImage src={src} alt="Photo du produit" onOpen={onOpen} className="h-full w-full" />}
       <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
     </span>
   );

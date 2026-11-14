@@ -31,8 +31,13 @@ export const Price: React.FC<{ children: React.ReactNode; className?: string }> 
 /** Photo d'un produit ou d'une boutique ; sans image, un emplacement coloré. */
 export const PhotoSlot: React.FC<{ color: string; className?: string; label?: string; src?: string | null }> = ({ color, className = '', label, src }) =>
   src ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img src={src} alt={label ?? ''} loading="lazy" decoding="async" className={`w-full object-cover ${className}`} style={{ background: color }} />
+    // Photo entière dans le cadre (jamais rognée, §54) ; le reste du cadre est rempli par la même photo floutée.
+    <span className={`relative block w-full overflow-hidden ${className}`} style={{ background: color }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" aria-hidden="true" loading="lazy" decoding="async" className="absolute inset-0 h-full w-full scale-110 object-cover opacity-60 blur-xl" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt={label ?? ''} loading="lazy" decoding="async" className="relative h-full w-full object-contain" />
+    </span>
   ) : (
     <span className={`flex items-center justify-center ${className}`} style={{ background: color }} role={label ? 'img' : undefined} aria-label={label}>
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(18,20,28,0.32)" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
