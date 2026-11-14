@@ -14,7 +14,8 @@ export interface MyDecl { id: string; declared_label: string | null; hailand_cod
 /** Demande de certification de la boutique, vue de la console : à vérifier par l'équipe, transmise à HailandMap ou refusée (avec motif). */
 export interface MyCert { declaration_id: string; status: 'a_verifier' | 'transmise' | 'refusee'; console_note: string | null }
 
-export const declLabel = (d: Pick<MyDecl, 'declared_label' | 'hailand_code'>) => d.declared_label || d.hailand_code || 'Mon adresse';
+/** Le code Hailand d'abord : le libellé enregistré (« Travail ») ne dit rien au vendeur. */
+export const declLabel = (d: Pick<MyDecl, 'declared_label' | 'hailand_code'>) => d.hailand_code || d.declared_label || 'Mon adresse';
 
 /**
  * Boutique du compte connecté et ses adresses (avec leur niveau réel, 3 = certifié par Hailand).

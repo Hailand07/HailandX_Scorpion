@@ -63,10 +63,10 @@ export function Screen({ children, className = '' }: { children: ReactNode; clas
 }
 
 /** En-tête d'une page secondaire : retour, titre, élément à droite. */
-export function BackHeader({ href, title, label = 'Retour', right, icon = 'back' }: { href: string; title: string; label?: string; right?: ReactNode; icon?: 'back' | 'close' }) {
+export function BackHeader({ href, title, label = 'Retour', right, icon = 'back', onBack }: { href: string; title: string; label?: string; right?: ReactNode; icon?: 'back' | 'close'; /** Appelé avant de partir : `preventDefault()` annule le départ (saisie non enregistrée). */ onBack?: (e: React.MouseEvent) => void }) {
   return (
     <header className="-ml-3 flex items-center gap-1">
-      <Link href={href} aria-label={label} className="flex h-11 w-11 shrink-0 items-center justify-center"><Icon name={icon} size={22} stroke={2} /></Link>
+      <Link href={href} aria-label={label} onClick={onBack} className="flex h-11 w-11 shrink-0 items-center justify-center"><Icon name={icon} size={22} stroke={2} /></Link>
       <h1 className="min-w-0 flex-1 truncate font-display text-[20px] font-semibold tracking-tight">{title}</h1>
       {right}
     </header>

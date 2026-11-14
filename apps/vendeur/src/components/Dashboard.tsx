@@ -118,7 +118,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
             <span className="font-display text-[30px] font-semibold tracking-tight">{stats ? formatGnf(stats.revenue, false) : '…'} <span className="text-[14px] text-white/65">GNF</span></span>
             <span className="text-[12.5px] font-bold text-white/75">{stats ? `${stats.parcels} commande${stats.parcels > 1 ? 's' : ''} · dont ${formatGnf(stats.delivered)} encaissés` : ' '}</span>
           </span>
-          {stats?.trendPct != null && <span className="whitespace-nowrap rounded-full bg-lime/15 px-2.5 py-1 text-[12px] font-extrabold text-lime">{stats.trendPct > 0 ? '+' : ''}{stats.trendPct} % {period === 'jour' ? 'vs hier' : 'vs avant'}</span>}
+          {stats?.trendPct != null && stats.revenue > 0 && <span className="whitespace-nowrap rounded-full bg-lime/15 px-2.5 py-1 text-[12px] font-extrabold text-lime">{stats.trendPct > 0 ? '+' : ''}{stats.trendPct} % {period === 'jour' ? 'vs hier' : 'vs avant'}</span>}
         </div>
         <div role="img" aria-label="Ventes des 7 derniers jours" className="grid h-[54px] grid-cols-7 items-end gap-1.5">
           {last7.map((x, i) => <span key={x.day} className={`block rounded-md ${i === last7.length - 1 ? 'bg-lime' : 'bg-white/20'}`} style={{ height: `${heights[i]}%` }} />)}

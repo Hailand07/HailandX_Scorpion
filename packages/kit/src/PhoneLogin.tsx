@@ -8,6 +8,7 @@ import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
 import { APP_COURANTE, browserClient } from './supabase';
 import { Icon } from './Screen';
 import { passageEchoue } from './passage';
+import { groupPhone } from './phone';
 import { estNouveau, lignesResume, origineTexte, telMasque, type CompteResume } from './compte';
 
 /**
@@ -47,8 +48,17 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
   const [compte, setCompte] = useState<{ nom: string; tel: string; origine: string; resume: CompteResume | null } | null>(null);
   const [echec, setEchec] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
+  const stepRef = useRef<Step>('numero');
+  stepRef.current = step;
 
   useEffect(() => { setEchec(passageEchoue()); }, []);
+  // Déjà connecté (retour arrière, lien enregistré) : on ne redemande pas le numéro, on va là où la personne voulait aller.
+  useEffect(() => {
+    const sb = browserClient();
+    if (!sb) return;
+    void sb.auth.getSession().then(({ data }) => { const u = data.session?.user; if (u && !u.is_anonymous && stepRef.current === 'numero') router.replace(next); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { if (cooldown <= 0) return; const id = setTimeout(() => setCooldown((c) => c - 1), 1000); return () => clearTimeout(id); }, [cooldown]);
   useEffect(() => { if (step !== 'code') return; const id = setTimeout(() => codeRef.current?.focus(), 80); return () => clearTimeout(id); }, [step]);
 
@@ -66,14 +76,15 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
     setE164(n); setCode(''); setCooldown(45); setStep('code');
   }
 
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
+  async function verify(e?: React.FormEvent, typed?: string) {
+    e?.preventDefault();
     setError(null);
     const sb = browserClient();
-    if (!sb || !e164) return;
+    const token = (typed ?? code).trim();
+    if (!sb || !e164 || busy || token.length !== 6) return;
     setBusy(true);
-    const { data, error: err } = await sb.auth.verifyOtp({ phone: e164, token: code.trim(), type: 'sms' });
-    if (err || !data.user) { setBusy(false); return setError('Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.'); }
+    const { data, error: err } = await sb.auth.verifyOtp({ phone: e164, token, type: 'sms' });
+    if (err || !data.user) { setBusy(false); setCode(''); setTimeout(() => codeRef.current?.focus(), 50); return setError('Code incorrect ou expiré. Vérifiez-le ou demandez-en un nouveau.'); }
     const u = data.user;
     const meta = (u.user_metadata ?? {}) as { full_name?: string; first_name?: string; last_name?: string; origine?: string };
     const { data: resume } = await sb.rpc('fn_compte_resume');
@@ -106,7 +117,13 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-6 px-5 pb-10 pt-8">
-      {homeHref ? <Link href={homeHref} aria-label="Accueil">{brand ?? <Wordmark />}</Link> : <span>{brand ?? <Wordmark />}</span>}
+      <div className="flex items-center gap-2">
+        {/* Retour : du code vers le numéro ; du numéro vers l'accueil de l'application (quand elle en a un). */}
+        {step === 'code'
+          ? <button type="button" onClick={() => { setStep('numero'); setCode(''); setError(null); }} aria-label="Retour au numéro" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></button>
+          : step === 'numero' && homeHref ? <Link href={homeHref} aria-label="Retour" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></Link> : null}
+        {homeHref ? <Link href={homeHref} aria-label="Accueil">{brand ?? <Wordmark />}</Link> : <span>{brand ?? <Wordmark />}</span>}
+      </div>
 
       {step === 'numero' && (
         <form onSubmit={sendCode} className="flex flex-1 flex-col gap-5">
@@ -120,7 +137,7 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
             Numéro de téléphone
             <span className={`flex h-14 items-center gap-2 rounded-2xl border px-4 text-[16px] font-semibold ${t.field}`}>
               <span className={t.muted}>🇬🇳 +224</span>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel-national" placeholder="6xx xx xx xx" className="h-full min-w-0 flex-1 bg-transparent outline-none" />
+              <input value={phone} onChange={(e) => { setError(null); setPhone(groupPhone(e.target.value)); }} autoFocus inputMode="tel" autoComplete="tel-national" placeholder="6xx xx xx xx" className="h-full min-w-0 flex-1 bg-transparent outline-none" />
             </span>
           </label>
           <div className="flex flex-col gap-2">
@@ -143,7 +160,7 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
             <h1 className="font-display text-[26px] font-semibold tracking-tight">Entrez le code reçu</h1>
             <p className={`text-[14px] font-medium ${t.muted}`}>Envoyé par SMS au <b className="font-extrabold">{formatGnPhone(e164)}</b>.</p>
           </div>
-          <input ref={codeRef} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" aria-label="Code à 6 chiffres" placeholder="••••••"
+          <input ref={codeRef} value={code} onChange={(e) => { const v = e.target.value.replace(/\D/g, '').slice(0, 6); setCode(v); setError(null); if (v.length === 6) void verify(undefined, v); }} inputMode="numeric" autoComplete="one-time-code" aria-label="Code à 6 chiffres" placeholder="••••••"
             className={`${input} text-center font-display text-[24px] tracking-[0.4em]`} />
           <p className={`text-[13px] font-semibold ${t.muted}`}>
             {cooldown > 0 ? <>Renvoyer le code dans 0:{String(cooldown).padStart(2, '0')}</> : <button type="button" onClick={() => void sendCode()} disabled={busy} className={`font-extrabold ${t.link}`}>Renvoyer le code</button>}

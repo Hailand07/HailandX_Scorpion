@@ -90,6 +90,8 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
     const rows = variants.map((v) => ({ ...v, label: v.label.trim() || (variants.length === 1 ? 'Standard' : '') }));
     try {
       if (!editing && name.trim().length < 2) throw new Error('Donnez un nom au produit.');
+      // Sans photo, un lien partagé ne donne pas envie : on prévient, sans bloquer (appareil photo refusé, réseau faible).
+      if (!editing && kept.length + files.length === 0 && typeof window !== 'undefined' && Number.isFinite(priceN) && priceN >= 500 && !window.confirm('Publier sans photo ? Un produit sans photo se vend très mal. Touchez « Annuler » pour en ajouter une.')) return;
       if (!Number.isFinite(priceN) || priceN < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
       if (compareN && compareN <= priceN) throw new Error('Le prix barré doit être plus élevé que le prix de vente (ou laissez-le vide).');
       if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
@@ -168,6 +170,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   return (
     <Screen className="gap-3 pb-32">
       <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'}
+        onBack={(e) => { if (!editing && !busy && (name.trim() || price.trim() || files.length > 0) && !window.confirm('Quitter sans publier ? Ce que vous avez saisi sera perdu.')) e.preventDefault(); }}
         right={editing && existing ? <span className="flex gap-1.5">
           <Link href={`/produits/nouveau?depuis=${existing.id}`} className="flex h-10 items-center rounded-full border border-line px-3 text-[12.5px] font-extrabold">Dupliquer</Link>
           {existing.active && existing.catalog_products && <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3 text-[12.5px] font-extrabold">Partager</button>}
@@ -189,7 +192,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
 
       <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
         {editing ? (
-          <div className="flex flex-col gap-0.5"><span className="text-[13px] font-extrabold">Nom du produit</span><span className="text-[15px] font-bold">{existing?.catalog_products?.name}</span><span className="text-[11.5px] font-semibold text-muted">Le nom vient de la fiche commune du produit.</span></div>
+          <div className="flex flex-col gap-0.5"><span className="text-[13px] font-extrabold">Nom du produit</span><span className="text-[15px] font-bold">{existing?.catalog_products?.name}</span><span className="text-[11.5px] font-semibold text-muted">Le nom ne se change pas après la publication. Pour un autre nom, dupliquez le produit.</span></div>
         ) : (
           <label className="flex flex-col gap-1.5 text-[13px] font-extrabold">Nom du produit
             <input value={name} onChange={(e) => { setName(e.target.value); setLinked(null); }} autoComplete="off" maxLength={120} placeholder="Ex. Pagne wax 6 yards" className="h-[50px] rounded-[14px] border border-line px-3.5 text-[16px] font-bold outline-none focus:border-blue" />

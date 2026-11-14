@@ -23,7 +23,7 @@ function Money({ shopId }: { shopId: string }) {
     sb.from('ledger_entries').select('id,kind,amount_gnf,created_at,parcel_id').eq('account', 'shop').eq('account_id', shopId).order('id', { ascending: false }).limit(200).then(({ data }) => setEntries((data as Entry[]) ?? []));
     sb.from('parcels').select('subtotal_gnf, orders!inner(payment_status)').eq('shop_id', shopId).not('status', 'in', '(remis,annule)').eq('orders.payment_status', 'bloque')
       .then(({ data }) => { const xs = (data as { subtotal_gnf: number }[]) ?? []; setPending({ n: xs.length, sum: xs.reduce((k, x) => k + x.subtotal_gnf, 0) }); });
-    sb.from('settings').select('value').eq('key', 'commission_bps').maybeSingle().then(({ data }) => setCommission(data ? Number((data as { value: string }).value) / 100 : null));
+    sb.from('settings').select('value').eq('key', 'commission_bps').maybeSingle().then(({ data }) => { const n = data ? Number((data as { value: string }).value) / 100 : NaN; setCommission(Number.isFinite(n) ? n : null); });
   }, [shopId]);
   const balance = (entries ?? []).reduce((n, e) => n + e.amount_gnf, 0);
   const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
