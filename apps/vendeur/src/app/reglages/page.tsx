@@ -1,4 +1,5 @@
 'use client';
+import { CategoryPicker, catsSummary, type Cat } from '@/components/CategoryPicker';
 import { useEffect, useState } from 'react';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
 import { BackHeader, browserClient, errText, GroupTitle, HAILANDX_URL, Icon, LienHailand, mediaUrl, Notice, Screen, uploadPhoto } from '@hailandx/kit';
@@ -6,7 +7,6 @@ import { AdresseBoutique } from '@/components/AdresseBoutique';
 import { declLabel } from '@/lib/useMyShop';
 import { SellerGate, type SellerCtx } from '@/components/SellerGate';
 
-interface Cat { id: string; name: string }
 type Field = 'name' | 'tagline' | 'category' | 'whatsapp' | 'address' | null;
 
 /** Réglages de la boutique (v2) : vitrine (bandeau, logo, nom, présentation, catégorie), contact WhatsApp, adresse. */
@@ -17,6 +17,8 @@ export default function SettingsPage() {
 function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
   const sb = browserClient();
   const [cats, setCats] = useState<Cat[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+  const shopCats = shop.category_ids?.length ? shop.category_ids : shop.category_id ? [shop.category_id] : [];
   const [open, setOpen] = useState<Field>(null);
   const [value, setValue] = useState('');
   const [busy, setBusy] = useState(false);
@@ -78,8 +80,8 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
         {open === 'name' && <Panel><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={60} aria-label="Nom de la boutique" className={input} /><p className="text-[12px] font-semibold text-muted">L’adresse de votre boutique (/b/{shop.slug}) ne change pas.</p>{actions(() => value.trim().length >= 2 ? void save({ name: value.trim() }, 'Nom enregistré.') : setMsg({ tone: 'err', text: 'Au moins 2 lettres.' }))}</Panel>}
         <Row label="Présentation" value={shop.tagline || 'Ajouter une phrase'} muted={!shop.tagline} onClick={() => edit('tagline', shop.tagline ?? '')} />
         {open === 'tagline' && <Panel><input value={value} onChange={(e) => setValue(e.target.value)} maxLength={90} placeholder="Ex. Pagnes wax et bazin, choisis à Madina" aria-label="Présentation" className={input} />{actions(() => void save({ tagline: value.trim() || null }, 'Présentation enregistrée.'))}</Panel>}
-        <Row label="Catégorie" value={cats.find((c) => c.id === shop.category_id)?.name ?? 'Choisir'} muted={!shop.category_id} onClick={() => edit('category', shop.category_id ?? '')} />
-        {open === 'category' && <Panel><div className="flex flex-wrap gap-2">{cats.map((c) => <button key={c.id} type="button" disabled={busy} onClick={() => void save({ category_id: c.id }, 'Catégorie enregistrée.')} className={`h-10 rounded-full px-3.5 text-[13px] font-bold ${shop.category_id === c.id ? 'bg-ink text-white' : 'border border-line'}`}>{c.name}</button>)}</div></Panel>}
+        <Row label={(shop.category_ids?.length ?? 0) > 1 ? 'Catégories' : 'Catégorie'} value={catsSummary(cats, shopCats) || 'Choisir'} muted={!shopCats.length} onClick={() => { setPicked(shopCats); edit('category', ''); }} />
+        {open === 'category' && <Panel><CategoryPicker cats={cats} value={picked} onChange={setPicked} disabled={busy} />{actions(() => picked.length ? void save({ category_id: picked[0], category_ids: picked }, picked.length > 1 ? 'Catégories enregistrées.' : 'Catégorie enregistrée.') : setMsg({ tone: 'err', text: 'Choisissez au moins une catégorie.' }))}</Panel>}
       </section>
 
       <section aria-label="Contact" className="flex flex-col gap-2">

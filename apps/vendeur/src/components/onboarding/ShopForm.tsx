@@ -1,19 +1,20 @@
 'use client';
+import { CategoryPicker, type Cat } from '@/components/CategoryPicker';
 import { useEffect, useMemo, useState } from 'react';
 import { slugify } from '@hailandx/commerce';
 import { Icon } from '@hailandx/kit';
 import { declLabel, type MyDecl } from '@/lib/useMyShop';
 import { Open } from './parts';
 
-export interface Cat { id: string; name: string }
-export interface ShopDraft { name: string; cat: string | null; logo: File | null }
+export type { Cat };
+export interface ShopDraft { name: string; cats: string[]; logo: File | null }
 /** Un nom de boutique utilisable : trois lettres au moins, et une adresse de page (slug) d'au moins trois caractères. */
 export const nameTooShort = (name: string) => name.trim().length < 3 || slugify(name).length < 3;
 
 /** Étape 2 de « Ouvrir ma boutique » : nom, ce qu'on vend, adresse (s'il y en a plusieurs), logo facultatif. */
 export function ShopForm({ cats, decls, addr, setAddr, busy, onCreate }: { cats: Cat[]; decls: MyDecl[]; addr: string | null; setAddr: (id: string) => void; busy: boolean; onCreate: (d: ShopDraft) => void }) {
   const [name, setName] = useState('');
-  const [cat, setCat] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
   const [logo, setLogo] = useState<File | null>(null);
   const logoUrl = useMemo(() => (logo ? URL.createObjectURL(logo) : null), [logo]);
   useEffect(() => () => { if (logoUrl) URL.revokeObjectURL(logoUrl); }, [logoUrl]);
@@ -25,7 +26,7 @@ export function ShopForm({ cats, decls, addr, setAddr, busy, onCreate }: { cats:
     </label>
     <fieldset className="flex flex-col gap-2">
       <legend className="mb-2 text-[13px] font-extrabold">Ce que vous vendez</legend>
-      <div className="flex flex-wrap gap-2">{cats.map((c) => <button key={c.id} type="button" aria-pressed={cat === c.id} onClick={() => setCat(cat === c.id ? null : c.id)} className={`h-10 rounded-full px-3.5 text-[13px] font-bold ${cat === c.id ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{c.name}</button>)}</div>
+      <CategoryPicker cats={cats} value={picked} onChange={setPicked} />
     </fieldset>
     {decls.length > 1 && (
       <fieldset className="flex flex-col gap-2">
@@ -45,7 +46,7 @@ export function ShopForm({ cats, decls, addr, setAddr, busy, onCreate }: { cats:
       <span className="flex flex-col"><span className="text-[14px] font-extrabold">Logo</span><span className="text-[12px] font-semibold text-muted">Facultatif, modifiable plus tard</span></span>
       <input type="file" accept="image/*" className="sr-only" onChange={(e) => setLogo(e.target.files?.[0] ?? null)} />
     </label>
-    <button type="button" disabled={short || busy} onClick={() => onCreate({ name, cat, logo })} className="h-[54px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:bg-sand disabled:text-faint">{busy ? 'Création…' : 'Créer ma boutique'}</button>
+    <button type="button" disabled={short || busy} onClick={() => onCreate({ name, cats: picked, logo })} className="h-[54px] rounded-2xl bg-ink text-[15px] font-extrabold text-white disabled:bg-sand disabled:text-faint">{busy ? 'Création…' : 'Créer ma boutique'}</button>
     </Open>
   );
 }

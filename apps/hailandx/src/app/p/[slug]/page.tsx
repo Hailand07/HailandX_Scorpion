@@ -3,10 +3,11 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge, PhotoSlot, Price, VerifiedMark } from '@hailandx/ui';
-import { ago, brandOf, discountPercent, formatGnf, onVacation, keyFacts, rankOffers, readAttributes, specRows, type Offer } from '@hailandx/commerce';
+import { ago, brandOf, discountPercent, formatGnf, onVacation, keyFacts, readAttributes, specRows } from '@hailandx/commerce';
 import { badgesOf } from '@/data/sample';
-import { getCatalog, trustFor, type Catalog, type ProductView } from '@/lib/catalog';
-import { serverClient } from '@hailandx/kit';
+import { getCatalog, trustFor, type ProductView } from '@/lib/catalog';
+import { pickOffers } from '@/lib/pickOffer';
+import { HAILANDX_URL, serverClient } from '@hailandx/kit';
 import { AskQuestion } from '@/components/AskQuestion';
 import { BuyBar } from '@/components/BuyBar';
 import { CartButton } from '@/components/CartButton';
@@ -33,16 +34,6 @@ async function extras(productId: string | undefined, shopSlug: string): Promise<
 
 type Params = { params: Promise<{ slug: string }>; searchParams: Promise<{ b?: string }> };
 
-/**
- * Offre affichée : celle de la boutique `b` du lien reçu. Sans `b` (ancien lien), la mieux classée (confiance 45 %, prix 40 %, délai 15 %).
- * Phase de lancement (HAILANDX.md §49) : la page ne montre que cette boutique, jamais les offres concurrentes.
- */
-function pickOffers(cat: Catalog, slug: string, b?: string) {
-  const all = cat.products.filter((x) => x.slug === slug);
-  const asOffer = (x: ProductView): Offer => ({ id: x.shopSlug, shopId: x.shopSlug, priceGnf: x.priceGnf, shopTrust: trustFor(cat.shops.find((s) => s.slug === x.shopSlug)!), etaMinutes: x.etaMinutes, inStock: x.inStock !== false });
-  const ranked = rankOffers(all.map(asOffer)).map((o) => all.find((x) => x.shopSlug === o.shopId)!);
-  return { selected: (b && ranked.find((x) => x.shopSlug === b)) || ranked[0] };
-}
 
 /**
  * Aperçu riche (titre, description, image) lu par WhatsApp, TikTok et Facebook quand un vendeur partage ce lien :
@@ -58,7 +49,10 @@ export async function generateMetadata({ params, searchParams }: Params): Promis
   const title = `${p.name} — ${formatGnf(p.priceGnf)}`;
   const intro = (p.description ?? '').replace(/\s+/g, ' ').trim().slice(0, 140);
   const description = `${intro ? intro + ' · ' : ''}Vendu par ${shop.name}, vendeur certifié Hailand. Livré à votre porte en ≈ ${p.etaMinutes} min.`;
-  return { title, description, openGraph: { title, description, type: 'website', siteName: 'HailandX', locale: 'fr_GN', ...(p.photoUrl ? { images: [p.photoUrl] } : {}) }, twitter: { card: 'summary_large_image', title, description, ...(p.photoUrl ? { images: [p.photoUrl] } : {}) } };
+  // Aperçu du lien (§54) : une carte 1200 × 630 générée par HailandX (photo entière, nom, prix, boutique), en JPEG léger.
+  const page = `${HAILANDX_URL}/p/${p.slug}?b=${shop.slug}`;
+  const image = { url: `${HAILANDX_URL}/p/${p.slug}/apercu?b=${shop.slug}`, width: 1200, height: 630, type: 'image/jpeg', alt: `${p.name} — ${formatGnf(p.priceGnf)}` };
+  return { title, description, alternates: { canonical: page }, openGraph: { title, description, url: page, type: 'website', siteName: 'HailandX', locale: 'fr_GN', images: [image] }, twitter: { card: 'summary_large_image', title, description, images: [image] } };
 }
 
 /**

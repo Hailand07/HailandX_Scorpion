@@ -1,4 +1,5 @@
 'use client';
+import { catsSummary } from './CategoryPicker';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -42,10 +43,10 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
     setBusy(false);
   }
 
-  const createShop = ({ name, cat, logo }: ShopDraft) => run(async () => {
+  const createShop = ({ name, cats: picked, logo }: ShopDraft) => run(async () => {
     if (nameTooShort(name)) throw new Error('Donnez un nom de boutique d’au moins 3 lettres.');
     if (!addr) throw new Error('Choisissez l’adresse de votre boutique.');
-    const { data, error } = await sb!.from('shops').insert({ slug: slugify(name), name: name.trim(), category_id: cat, owner_id: uid, declaration_id: addr, status: 'preparation' }).select('id').single();
+    const { data, error } = await sb!.from('shops').insert({ slug: slugify(name), name: name.trim(), category_id: picked[0] ?? null, ...(picked.length > 1 ? { category_ids: picked } : {}), owner_id: uid, declaration_id: addr, status: 'preparation' }).select('id').single();
     if (error?.code === '23505') throw new Error('Ce nom de boutique est déjà pris, essayez-en un autre.');
     if (error) throw new Error(errText(error));
     if (logo) {
@@ -95,7 +96,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
       {/* Étape 2 — boutique */}
       {step < 2 && <Locked n={2} title="Votre boutique" />}
       {step === 2 && <ShopForm cats={cats} decls={decls} addr={addr} setAddr={setAddr} busy={busy} onCreate={createShop} />}
-      {step > 2 && shop && <Done title={shop.name} sub={`${cats.find((c) => c.id === shop.category_id)?.name ?? 'Boutique'} · boutique créée`} href="/reglages" />}
+      {step > 2 && shop && <Done title={shop.name} sub={`${catsSummary(cats, shop.category_ids?.length ? shop.category_ids : shop.category_id ? [shop.category_id] : []) || 'Boutique'} · boutique créée`} href="/reglages" />}
 
       {/* Étape 3 — certification */}
       {step < 3 && <Locked n={3} title="La certification" />}

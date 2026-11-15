@@ -3,7 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { browserClient, useSession } from '@hailandx/kit';
 
 export interface MyShop {
-  id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null; logo_path: string | null; cover_path: string | null; whatsapp: string | null;
+  id: string; slug: string; name: string; tagline: string | null; status: string; declaration_id: string | null; category_id: string | null;
+  /** Toutes les catégories de la boutique (§54), la principale en premier. Vide avant la migration 2026-11-12. */
+  category_ids?: string[]; logo_path: string | null; cover_path: string | null; whatsapp: string | null;
   /** Boutique en ligne (HAILANDX.md §37) : horaires par jour, congés, politique d'échange. */
   hours: Record<string, [string, string] | null> | null; vacation_until: string | null; vacation_note: string | null; policy: string | null;
   /** Rôle du compte connecté : le propriétaire voit tout ; un employé ne voit ni l'argent, ni les réglages, ni l'équipe. */
@@ -21,6 +23,14 @@ export const declLabel = (d: Pick<MyDecl, 'declared_label' | 'hailand_code'>) =>
  * Boutique du compte connecté et ses adresses (avec leur niveau réel, 3 = certifié par Hailand).
  * `state` : 'chargement', 'visiteur' (pas connecté) ou 'pret'.
  */
+const SHOP_COLS = 'id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp,hours,vacation_until,vacation_note,policy';
+/** Boutique dont le compte est membre (propriétaire d'abord). Avec `category_ids` quand la colonne existe (migration 2026-11-12). */
+async function shopOf(sb: NonNullable<ReturnType<typeof browserClient>>, uid: string) {
+  const q = (cols: string) => sb.from('shop_members').select(`role,shops(${cols})`).eq('user_id', uid).order('role', { ascending: false }).limit(1).maybeSingle();
+  const r = await q(`${SHOP_COLS},category_ids`);
+  return r.error && /category_ids/.test(r.error.message) ? q(SHOP_COLS) : r;
+}
+
 export function useMyShop() {
   const session = useSession();
   const uid = session?.user.id;
@@ -34,7 +44,7 @@ export function useMyShop() {
     if (!sb || !uid) return;
     const [s, d] = await Promise.all([
       // Boutique dont le compte est membre (propriétaire d'abord, sinon employé).
-      sb.from('shop_members').select('role,shops(id,slug,name,tagline,status,declaration_id,category_id,logo_path,cover_path,whatsapp,hours,vacation_until,vacation_note,policy)').eq('user_id', uid).order('role', { ascending: false }).limit(1).maybeSingle(),
+      shopOf(sb, uid),
       sb.from('declarations').select('id,declared_label,hailand_code,detected_level,certification_status').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
     const list = (d.data as Omit<MyDecl, 'level'>[]) ?? [];

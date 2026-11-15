@@ -4,3 +4,4 @@ export * from './marks';
 export * from './AppMark';
 export * from './Ouverture';
 export * from './Chargement';
+export * from './Lightbox';
