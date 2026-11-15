@@ -30,7 +30,6 @@ insert into public.categories (id, name, position) values
 on conflict (id) do nothing;
 
 alter table public.shops add column if not exists category_ids text[] not null default '{}';
-alter table public.shops drop constraint if exists shops_category_ids_max;
 alter table public.shops add constraint shops_category_ids_max check (cardinality(category_ids) <= 60);
 update public.shops set category_ids = array[category_id] where category_id is not null and category_ids = '{}';
 
@@ -51,6 +50,5 @@ begin
   return new;
 end $$;
 revoke all on function public.shops_categories_before() from public, anon, authenticated;
-drop trigger if exists shops_categories on public.shops;
 create trigger shops_categories before insert or update of category_id, category_ids on public.shops
   for each row execute function public.shops_categories_before();
