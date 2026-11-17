@@ -590,6 +590,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | §56 (essai du fondateur, 7 captures) : **page de commande vide en production depuis le 05/11** (la requête demandait `cancel_courier_gnf`/`cancel_provider_gnf`, non lisibles par le client → 403 sur toute la requête) corrigée ; page renommée « Aperçu » avec chaque article (photo, quantité × prix unitaire, total, sans doublon) et « Annuler cette commande » ; bouton « Mes commandes » toujours vers la liste ; vignettes des articles sur chaque carte de la liste ; WhatsApp à la place du panier en bas de la fiche ; logo de la vitrine plus caché par la couverture. 408 tests. |
 | 2026-11-17 | Migration `2026-11-17_montants_annulation_lisibles.sql` **appliquée en production** (accord du fondateur) : le client peut lire `cancel_courier_gnf` / `cancel_provider_gnf` de ses colis (vérifié : `authenticated` oui, `anon` non). |
 | 2026-11-17 | §57 (retour du fondateur sur §56) : cartes de « Mes commandes » sans photos (noms des articles seulement) ; « M'envoyer sur WhatsApp » retiré du bloc « Retrouver cette commande » (reste « Copier le lien ») ; « Annuler cette commande » devient un lien discret tout en bas de l'Aperçu. |
+| 2026-11-17 | §58 : page de commande — chaque adresse en carte « quartier · commune » + code Hailand (lus via `quartiers(nom)`, `communes(nom)` ; 8/8 adresses actives en ont) au lieu de « Autre — niveau 2 » ; le numéro où le livreur appelle le client (ex-« Téléphone du livreur », champ modifiable) est affiché, non modifiable ; « Mes adresses » au même format. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1341,4 +1342,12 @@ Retour du fondateur après essai de §56 :
 - ✅ Cartes de « Mes commandes » : **plus de photos** (jugées inutiles et peu élégantes) ; le contenu reste résumé par les noms des articles (« Souris ×2 · iPhone 7 »). Photos, prix et détail sont dans l'Aperçu.
 - ✅ Bloc « Retrouver cette commande plus tard » : le bouton « M'envoyer sur WhatsApp » est retiré ; l'explication et « Copier le lien » suffisent.
 - ✅ « Annuler cette commande » : lien discret (texte souligné, gris) tout en bas de l'Aperçu, sous le bloc du lien. La confirmation et le devis d'annulation (§56) sont inchangés.
+
+## 58. Adresse et numéro à la commande (2026-11-17) — ✅ code, ⚠️ à essayer sur téléphone
+
+Retour du fondateur (capture « Adresse et paiement ») :
+- ✅ **« Livraison à »** n'affiche plus « Autre — niveau 2 » (nom donné + niveau interne) mais, pour chaque bâtiment enregistré, une **carte** : le **quartier et la commune** (rattachement administratif de la déclaration, `quartiers(nom)`, `communes(nom)`, lus par `myAddresses`), le **code Hailand**, puis le nom donné (Domicile, Chez Maman, adresse temporaire…) et les précisions (étage, porte, repère). Plusieurs adresses : on touche la carte voulue. Le niveau n'est plus montré au client.
+- ✅ **Numéro** : le champ s'appelait « Téléphone du livreur » mais c'est le numéro **du client**, où le livreur de la Flotte l'appelle (`orders` via `fn_place_order.p_phone`). Il est désormais **affiché, non modifiable** (« Le livreur vous appelle au … », numéro du compte). La saisie ne reste que si le compte n'a pas de numéro.
+- ✅ « Mes adresses » (`/adresse`) suit le même format. Libellés de paiement (« essai équipe ») sur une ligne.
+- `lib/addresses.ts` : `addrPlace`, `addrDetails` (+1 test). Aucune migration.
 

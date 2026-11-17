@@ -14,3 +14,13 @@ describe('adresses temporaires (§53)', () => {
     expect(addrName({ declared_label: 'Autre', hailand_code: 'GN-1', temporary_until: null }, 'Chez Maman')).toBe('Chez Maman');
   });
 });
+
+describe('addrPlace / addrDetails', () => {
+  it('montre le quartier et la commune, ou rien', async () => {
+    const { addrPlace, addrDetails } = await import('./addresses');
+    expect(addrPlace({ quartier_nom: 'Kipé', commune_nom: 'Ratoma' })).toBe('Kipé · Ratoma');
+    expect(addrPlace({ quartier_nom: null, commune_nom: 'Ratoma' })).toBe('Ratoma');
+    expect(addrPlace({ quartier_nom: null, commune_nom: null })).toBe('');
+    expect(addrDetails({ location_floor: '2', location_door: null, declared_landmark: 'face à la pharmacie' })).toBe('Étage 2 · face à la pharmacie');
+  });
+});

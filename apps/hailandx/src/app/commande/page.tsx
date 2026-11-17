@@ -10,7 +10,7 @@ import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { OrderSteps } from '@/components/OrderSteps';
 import { AdresseClient } from '@/components/AdresseClient';
 import { LienAdresse } from '@/components/LienAdresse';
-import { addrName, myAddresses, type Addr } from '@/lib/addresses';
+import { addrDetails, addrName, addrPlace, myAddresses, type Addr } from '@/lib/addresses';
 import { currentSource } from '@/lib/source';
 import { explainOrderError } from '@/lib/orderError';
 
@@ -32,6 +32,7 @@ function Checkout() {
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [decl, setDecl] = useState('');
   const [phone, setPhone] = useState('');
+  const accountPhone = Boolean(session?.user.phone);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -164,29 +165,53 @@ function Checkout() {
       <form onSubmit={place} className="flex flex-col gap-4">
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Livraison à</h2>
+          {/* Une carte par bâtiment enregistré (§58) : le quartier et la commune, le code Hailand, puis le nom donné et les précisions. */}
           {!ready ? <Chargement enLigne texte="Chargement de vos adresses" /> : decls.length > 0 && (
-            <select value={decl} onChange={(e) => setDecl(e.target.value)} className={input} aria-label="Adresse de livraison">
-              {decls.map((d) => <option key={d.id} value={d.id}>{addrName(d, names[d.id])} — niveau {levels[d.id]}</option>)}
-            </select>
+            <div role="radiogroup" aria-label="Adresse de livraison" className="flex flex-col gap-2">
+              {decls.map((d) => {
+                const on = d.id === decl;
+                const place = addrPlace(d);
+                const more = [addrName(d, names[d.id]), addrDetails(d)].filter(Boolean).join(' · ');
+                return (
+                  <button key={d.id} type="button" role="radio" aria-checked={on} onClick={() => setDecl(d.id)}
+                    className={`flex items-start gap-3 rounded-2xl px-3.5 py-3 text-left ${on ? 'border-2 border-ink bg-bg' : 'border border-line'}`}>
+                    <span aria-hidden="true" className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${on ? 'border-blue' : 'border-line'}`}>{on && <span className="h-2.5 w-2.5 rounded-full bg-blue" />}</span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate text-[15px] font-extrabold">{place || 'Quartier en cours d’identification'}</span>
+                      {d.hailand_code && <span className="font-display text-[13px] font-semibold tracking-[0.04em] text-blue-ink">{d.hailand_code}</span>}
+                      {more && <span className="truncate text-[12.5px] font-semibold text-muted">{more}</span>}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
           {ready && (decls.length === 0 || choosing) && <ChezVous first={!decls.some((d) => !d.temporary_until)} onHome={() => setAdding('domicile')} onHere={() => setAdding('ici')} onLink={() => setLinking(true)} />}
           {ready && decls.length > 0 && !choosing && <button type="button" onClick={() => setChoosing(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Livrer à une autre adresse</button>}
-        </section>
-        <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
-          <h2 className="text-[13px] font-extrabold text-muted">Téléphone du livreur</h2>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" className={input} aria-label="Téléphone" />
+          {/* Le numéro où le livreur de la Flotte joindra le client : celui du compte, affiché, pas modifiable (§58). Saisie seulement si le compte n'en a pas. */}
+          <div className="mt-1 flex items-center gap-3 border-t border-line-soft pt-3">
+            <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sand"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" /></svg></span>
+            {accountPhone ? (
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[12px] font-semibold text-muted">Le livreur vous appelle au</span>
+                <span className="text-[15px] font-extrabold">{phone}</span>
+              </span>
+            ) : (
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="Votre numéro, pour le livreur" className={input} aria-label="Votre numéro, pour le livreur" />
+            )}
+          </div>
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
           <h2 className="text-[13px] font-extrabold text-muted">Paiement</h2>
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'livraison' ? 'border-2 border-ink' : 'border border-line'}`}><input type="radio" name="pay" checked={pay === 'livraison'} onChange={() => setPay('livraison')} /> Espèces à la livraison</label>
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${omAvailable.ok ? (pay === 'orange_money' ? 'border-2 border-ink' : 'border border-line') : 'border border-line text-muted'}`}>
             <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> <span className="flex flex-col">Mobile Money ou carte<span className="text-[11.5px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Visa…</span></span>
-            <span className="ml-auto text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
           </label>
           {team && (
           <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'hailandpay' ? 'border-2 border-ink' : 'border border-line'}`}>
             <input type="radio" name="pay" disabled={!wallet} checked={pay === 'hailandpay'} onChange={() => setPay('hailandpay')} /> <span>Hailand<span className="text-blue">Pay</span></span>
-            <span className="ml-auto text-[11.5px]">{wallet ? `${formatSyli(wallet.balance)} · TEST` : '…'}</span>
+            <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px]">{wallet ? `${formatSyli(wallet.balance)} · TEST` : '…'}</span>
           </label>
           )}
           {pay === 'hailandpay' && wallet && (wallet.balance >= toPay
