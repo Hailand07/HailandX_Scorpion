@@ -62,6 +62,7 @@ export default function AccountPage() {
       <section aria-label="Application" className="flex flex-col gap-2">
         <GroupTitle>Application</GroupTitle>
         <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
+          <ListRow href="/compte/securite" icon="shield" label="Mot de passe et e-mail" />
           <ListRow href="/notifications" icon="bell" label="Notifications" value={counts?.unread ? <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-extrabold text-blue">{counts.unread} nouvelle{counts.unread > 1 ? 's' : ''}</span> : null} />
           <ListRow href="/aide" icon="help" label="Aide et contact" last />
         </div>

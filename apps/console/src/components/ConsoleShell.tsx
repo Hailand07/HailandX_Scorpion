@@ -69,9 +69,11 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
     })();
   }, [sb, session, refresh]);
   useEffect(() => { if (access !== 'ok') return; const t = setInterval(refresh, 60_000); return () => clearInterval(t); }, [access, refresh]);
-  useEffect(() => { if (session === null && path !== '/connexion') router.replace(`/connexion?next=${encodeURIComponent(path)}`); }, [session, path, router]);
+  // La connexion et « mot de passe oublié » (§59) restent ouvertes sans session.
+  const ouvert = path === '/connexion' || path === '/mot-de-passe';
+  useEffect(() => { if (session === null && !ouvert) router.replace(`/connexion?next=${encodeURIComponent(path)}`); }, [session, path, router]);
 
-  if (path === '/connexion') return <>{children}</>;
+  if (ouvert) return <>{children}</>;
   if (!sb) return <Center title="Base non configurée" text="Les variables publiques Supabase manquent sur ce déploiement." />;
   if (session === undefined || session === null || access === 'chargement') return <Chargement />;
   if (access === 'refuse') {
