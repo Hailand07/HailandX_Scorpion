@@ -585,6 +585,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-14 | Migration `2026-11-11_adresse_temporaire.sql` **appliquée en production** (accord du fondateur ; colonne vérifiée, aucune adresse existante modifiée). Règle « adresse toujours repérée sur place » étendue à NavigationX. |
 | 2026-11-14 | §54 : photos de produit montrées en entier (cadre gardé, fond flou de la même photo) et plein écran au toucher (`FitImage`, `Lightbox` dans `packages/ui`) ; aperçu des liens partagés généré par HailandX (`/p/[slug]/apercu`, carte JPEG 1200 × 630 : photo, nom, prix, boutique) ; plusieurs catégories par boutique (`CategoryPicker`, `shops.category_ids`) et 21 catégories de plus (migration `2026-11-12_categories_multiples.sql` ⏳). 404 tests. |
 | 2026-11-15 | Migration `2026-11-12_categories_multiples.sql` **appliquée en production** (accord du fondateur) : 31 catégories, liste de catégories remplie pour les 4 boutiques existantes. |
+| 2026-11-17 | Carte satellite « Mapbox 403 » sur HailandX (capture du fondateur, 16/11) alors que NavigationX marche avec le même jeton : le jeton est limité à certaines adresses web (« URL restrictions » du compte Mapbox) et l'adresse de HailandX n'y figure pas. Réglage à faire par le fondateur sur account.mapbox.com (ajouter les adresses de HailandX, Vendeur, Flotte, Console). Le bandeau d'erreur nomme désormais l'adresse exacte à ajouter. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 

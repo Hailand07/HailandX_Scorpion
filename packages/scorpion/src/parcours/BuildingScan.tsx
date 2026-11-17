@@ -232,7 +232,8 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       const err = (e as { error?: { status?: number; message?: string } }).error;
       const st = err?.status;
       setSatError((cur) => cur ?? (st === 401 ? 'Mapbox 401 : jeton absent ou invalide'
-        : st === 403 ? 'Mapbox 403 : jeton refusé pour cette adresse web (restrictions d’URL du jeton)'
+        // 403 : le jeton est valable mais limité à certaines adresses web (réglage du compte Mapbox) : on nomme l'adresse à ajouter.
+        : st === 403 ? `Mapbox 403 : jeton refusé pour ${typeof window !== 'undefined' ? window.location.origin : 'cette adresse web'}. Ajoutez cette adresse aux « URL restrictions » du jeton sur account.mapbox.com`
         : st ? `Mapbox ${st} : ${err?.message ?? 'erreur'}` : `Mapbox : ${err?.message ?? 'erreur inconnue'}`));
       if (!map.loaded()) fallback();
     });
