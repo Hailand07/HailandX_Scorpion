@@ -593,6 +593,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | §58 : page de commande — chaque adresse en carte « quartier · commune » + code Hailand (lus via `quartiers(nom)`, `communes(nom)` ; 8/8 adresses actives en ont) au lieu de « Autre — niveau 2 » ; le numéro où le livreur appelle le client (ex-« Téléphone du livreur ») est affiché clairement, numéro du compte par défaut, modifiable par « Modifier » ; « Mes adresses » au même format. |
 | 2026-11-17 | §59 : **connexion par numéro + mot de passe** (création de compte avec prénom, nom, mot de passe robuste, e-mail facultatif) dans HailandX, Vendeur, Flotte et Console, en attendant la vérification par WhatsApp ; « Mot de passe oublié » par code reçu sur l'e-mail ; « Mot de passe et e-mail » dans le compte (client et vendeur) ; code SMS gardé derrière un lien. Kit : `CompteMotDePasse`, `MotDePasseOublie`, `SecuriteCompte`, `motDePasse.ts` (4 tests). ⏳ Réglages Supabase à faire par le fondateur (voir §59). |
 | 2026-11-17 | §59 : réglages Supabase appliqués par l'API d'administration : téléphone activé sans « Confirm phone », mots de passe 8 caractères avec lettres et chiffres (vérifié : refus `weak_password`). Modèle « Reset password » bloqué par Supabase sans SMTP personnalisé (offre gratuite) ; SMTP non touché. |
+| 2026-11-17 | §59 : SMTP Brevo branché par le fondateur ; modèle « Reset password » remplacé (code `{{ .Token }}`, sujet « Votre code Hailand ») par l'API d'administration, relu et vérifié. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1353,7 +1354,7 @@ Retour du fondateur (capture « Adresse et paiement ») :
 - ✅ « Mes adresses » (`/adresse`) suit le même format. Libellés de paiement (« essai équipe ») sur une ligne.
 - `lib/addresses.ts` : `addrPlace`, `addrDetails` (+1 test). Aucune migration.
 
-## 59. Connexion par numéro + mot de passe, en attendant WhatsApp (2026-11-17) — ✅ code ; ✅ réglages téléphone et mot de passe ; ⏳ SMTP + modèle d'e-mail
+## 59. Connexion par numéro + mot de passe, en attendant WhatsApp (2026-11-17) — ✅ code ; ✅ réglages Supabase (téléphone, mot de passe, SMTP, modèle d'e-mail)
 
 **Décision du fondateur** : la vérification du numéro passera par **WhatsApp** (code envoyé par la plateforme WhatsApp de Meta, via le crochet « Send SMS » de Supabase ; SMS en secours plus tard). Tant que Meta n'a pas validé le compte, clients et vendeurs se connectent avec **leur numéro et un mot de passe robuste** ; la récupération d'un mot de passe oublié passe par une **adresse e-mail**.
 
@@ -1365,7 +1366,9 @@ Retour du fondateur (capture « Adresse et paiement ») :
 
 **État des réglages Supabase (2026-11-17, faits par l'API d'administration avec un jeton du fondateur)** :
 - ✅ constaté 1 et 2 : `external_phone_enabled = true`, `sms_autoconfirm = true` (« Confirm phone » désactivé), `password_min_length = 8`, `password_required_characters` = lettres + chiffres. Vérifié par `/auth/v1/settings` (`phone_autoconfirm: true`) et par trois inscriptions refusées avant création (`abcdefgh`, `abc1`, `12345678` → `weak_password`) ; aucun compte créé.
-- ⏳ 3 et 4 : **bloqués ensemble**. Supabase refuse de modifier les modèles d'e-mail sur l'offre gratuite tant que l'envoi intégré est utilisé (`entitlement_required`, `auth.email_templates`). Il faut d'abord brancher le SMTP (étape 3), puis mettre `{{ .Token }}` dans « Reset password » (étape 4). Tant que ce n'est pas fait, « Mot de passe oublié » envoie un **lien** et non un code : la page `/mot-de-passe` ne peut pas aboutir.
+- ✅ constaté 3 : SMTP personnalisé branché par le fondateur (Brevo, `smtp-relay.brevo.com:587`, expéditeur « Hailand »). Rappel : sans lui, Supabase refuse de modifier les modèles d'e-mail sur l'offre gratuite (`entitlement_required`).
+- ✅ constaté 4 : modèle « Reset password » en français, sujet « Votre code Hailand », corps « Votre code Hailand : {{ .Token }} » (plus de lien). Relu après enregistrement ; seules les clés du modèle de récupération ont changé.
+- ⚠️ Envoi réel d'un e-mail de code : pas encore testé de bout en bout.
 - ⚠️ Création réelle d'un compte numéro + mot de passe : pas encore testée (crée un compte en production, accord du fondateur requis).
 
 Rappel des réglages prévus :
