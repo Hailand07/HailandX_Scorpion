@@ -126,8 +126,9 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             <div className="flex justify-between text-[15px] font-extrabold"><span>Total {parcels.length && parcels.every((x) => x.status === 'annule') ? '— commande annulée' : order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
             {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
-          {parcels.some((x) => CANCELLABLE.includes(x.status)) && <CancelOrder parcels={parcels.filter((x) => CANCELLABLE.includes(x.status)).map((x) => ({ id: x.id, status: x.status }))} onDone={async (text) => { setMsg(text); await load(); }} />}
           {parcels.some((x) => !['remis', 'annule'].includes(x.status)) && <GarderSuivi orderId={id} />}
+          {/* Discret, tout en bas (§57) : l'action reste trouvable sans attirer l'œil. */}
+          {parcels.some((x) => CANCELLABLE.includes(x.status)) && <CancelOrder parcels={parcels.filter((x) => CANCELLABLE.includes(x.status)).map((x) => ({ id: x.id, status: x.status }))} onDone={async (text) => { setMsg(text); await load(); }} />}
         </>
       )}
     </main>
@@ -161,7 +162,7 @@ function CancelOrder({ parcels, onDone }: { parcels: { id: string; status: Parce
     const refund = ask?.quotes.filter((q) => q.prepaid).reduce((k, q) => k + q.refund_gnf, 0) ?? 0;
     onDone(errors.length ? errors[0]! : refund > 0 ? `Commande annulée. ${formatGnf(refund)} vous sont rendus.` : 'Commande annulée.');
   }
-  if (!ask) return <button type="button" disabled={busy} onClick={open} className="h-12 rounded-2xl border border-[#e8b4ab] text-[14px] font-extrabold text-[#8a2a1c] disabled:opacity-50">Annuler cette commande</button>;
+  if (!ask) return <button type="button" disabled={busy} onClick={open} className="mx-auto h-11 px-4 text-[13px] font-bold text-muted underline underline-offset-4 disabled:opacity-50">Annuler cette commande</button>;
   const courier = ask.quotes.reduce((k, q) => k + q.courier_gnf, 0);
   const provider = ask.quotes.reduce((k, q) => k + q.provider_gnf, 0);
   const prepaid = ask.quotes.some((q) => q.prepaid);
