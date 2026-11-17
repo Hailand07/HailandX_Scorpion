@@ -1,10 +1,10 @@
 'use client';
 import { hasDraft } from '@hailandx/scorpion/brouillon';
-import { addrName, myAddresses, type Addr } from '@/lib/addresses';
+import { addrDetails, addrName, addrPlace, myAddresses, type Addr } from '@/lib/addresses';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Badge, Wordmark } from '@hailandx/ui';
+import { Wordmark } from '@hailandx/ui';
 import { browserClient, Icon, useSession } from '@hailandx/kit';
 import { AdresseClient } from '@/components/AdresseClient';
 
@@ -20,7 +20,6 @@ function Page() {
   const session = useSession();
   const sb = browserClient();
   const [list, setList] = useState<Decl[] | null>(null);
-  const [levels, setLevels] = useState<Record<string, number>>({});
   const [adding, setAdding] = useState(false);
   useEffect(() => { if (hasDraft('client-compte')) setAdding(true); }, []);
   const router = useRouter();
@@ -29,9 +28,6 @@ function Page() {
     if (!sb || !session) return;
     const rows: Decl[] = await myAddresses(sb, session.user.id);
     setList(rows);
-    const lv: Record<string, number> = {};
-    await Promise.all(rows.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); if (typeof r.data === 'number') lv[d.id] = r.data; }));
-    setLevels(lv);
   }, [sb, session]);
   useEffect(() => { void load(); }, [load]);
 
@@ -48,9 +44,11 @@ function Page() {
       {session && list && list.length > 0 && (
         <section className="flex flex-col gap-2" aria-label="Mes adresses">
           {list.map((d) => (
-            <div key={d.id} className="flex items-center justify-between gap-3 rounded-2xl border border-line-soft bg-card px-4 py-3">
-              <span className="flex flex-col"><span className="text-[14px] font-extrabold">{addrName(d)}</span><span className="text-[12px] font-semibold text-muted">{d.hailand_code}{levels[d.id] ? ` · niveau ${levels[d.id]}` : ''}{d.declared_landmark ? ` · ${d.declared_landmark}` : ''}</span></span>
-              <Badge tone="sand">{[d.location_floor && `Étage ${d.location_floor}`, d.location_door && `Porte ${d.location_door}`].filter(Boolean).join(' · ') || 'Enregistrée'}</Badge>
+            <div key={d.id} className="flex flex-col gap-0.5 rounded-2xl border border-line-soft bg-card px-4 py-3">
+              {/* Comme à la commande (§58) : quartier et commune, code Hailand, puis le nom et les précisions. */}
+              <span className="text-[15px] font-extrabold">{addrPlace(d) || 'Quartier en cours d’identification'}</span>
+              {d.hailand_code && <span className="font-display text-[13px] font-semibold tracking-[0.04em] text-blue-ink">{d.hailand_code}</span>}
+              <span className="text-[12.5px] font-semibold text-muted">{[addrName(d), addrDetails(d)].filter(Boolean).join(' · ')}</span>
             </div>
           ))}
         </section>
