@@ -3,12 +3,15 @@ import { GarderSuivi } from '@/components/GarderSuivi';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Badge, QrScanner, Chargement } from '@hailandx/ui';
-import { BackHeader, browserClient, DisputeThread, ProofPhoto, useSession } from '@hailandx/kit';
+import { BackHeader, browserClient, DisputeThread, mediaUrl, ProofPhoto, useSession } from '@hailandx/kit';
+import { groupLines } from '@/lib/orderLines';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
-interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; discount_gnf: number; promo_code: string | null; cancel_reason: string | null; cancelled_by: string | null; cancel_courier_gnf: number; cancel_provider_gnf: number; shops: { name: string; slug: string; whatsapp: string | null } | null; order_items: { id: string; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number }[] }
+interface Parcel { id: string; status: ParcelStatus; subtotal_gnf: number; delivery_fee_gnf: number; discount_gnf: number; promo_code: string | null; cancel_reason: string | null; cancelled_by: string | null; cancel_courier_gnf: number; cancel_provider_gnf: number; shops: { name: string; slug: string; whatsapp: string | null } | null; order_items: { id: string; offer_id: string | null; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number; offers: { photo_paths: string[] | null } | null }[] }
+
+const CANCELLABLE: ParcelStatus[] = ['attente_vendeur', 'prepare', 'mission_proposee', 'accepte', 'retire'];
 
 const STEPS = [
   { key: 'confirmee', label: 'Confirmée', help: 'Le vendeur prépare votre colis.' },
@@ -34,8 +37,15 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
     const o = await sb.from('orders').select('id,total_gnf,subtotal_gnf,delivery_fee_gnf,payment_method,payment_status,created_at').eq('id', id).maybeSingle();
     if (!o.data) { setMissing(true); return; }
     setOrder(o.data as Order);
-    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,discount_gnf,promo_code,cancel_reason,cancelled_by,cancel_courier_gnf,cancel_provider_gnf,shops(name,slug,whatsapp),order_items(id,name_snapshot,variant_label,quantity,price_gnf_snapshot)').eq('order_id', id).order('created_at');
-    const list = (p.data as unknown as Parcel[]) ?? [];
+    // Les montants retenus d'une annulation tardive (cancel_courier_gnf, cancel_provider_gnf) ne sont pas lisibles par le client :
+    // les demander ici faisait refuser TOUTE la requête (403) et la page restait vide (§56). Ils sont lus à part, sans bloquer.
+    const p = await sb.from('parcels').select('id,status,subtotal_gnf,delivery_fee_gnf,discount_gnf,promo_code,cancel_reason,cancelled_by,shops(name,slug,whatsapp),order_items(id,offer_id,name_snapshot,variant_label,quantity,price_gnf_snapshot,offers(photo_paths))').eq('order_id', id).order('created_at');
+    const kept = new Map<string, { cancel_courier_gnf: number; cancel_provider_gnf: number }>();
+    if (((p.data as { status: string }[] | null) ?? []).some((x) => x.status === 'annule')) {
+      const k = await sb.from('parcels').select('id,cancel_courier_gnf,cancel_provider_gnf').eq('order_id', id);
+      for (const r of (k.data as ({ id: string; cancel_courier_gnf: number; cancel_provider_gnf: number }[] | null)) ?? []) kept.set(r.id, r);
+    }
+    const list = ((p.data as unknown as Parcel[]) ?? []).map((x) => ({ ...x, cancel_courier_gnf: kept.get(x.id)?.cancel_courier_gnf ?? 0, cancel_provider_gnf: kept.get(x.id)?.cancel_provider_gnf ?? 0 }));
     setParcels(list);
     const c: Record<string, string> = {};
     await Promise.all(list.filter((x) => x.status !== 'annule' && x.status !== 'remis').map(async (x) => { const r = await sb.rpc('fn_my_handover_code', { p_parcel: x.id }); if (typeof r.data === 'string') c[x.id] = r.data; }));
@@ -54,7 +64,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-10 pt-4">
-      <BackHeader href="/commandes" title="Suivi de commande" label="Retour à mes commandes" />
+      <BackHeader href="/commandes" title="Aperçu de la commande" label="Retour à mes commandes" />
       {msg && <p role="status" className="rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">{msg}</p>}
       {/* Commande entièrement annulée (ex. impayée après 72 h) : plus rien à payer */}
       {order && order.payment_method === 'orange_money' && (order.payment_status !== 'en_attente' || parcels.some((x) => x.status !== 'annule')) && <PaymentBox order={order} onDone={() => load()} />}
@@ -73,9 +83,22 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 {idx >= 0 && <p className="text-[13px] font-medium text-muted">{STEPS[idx]!.help}</p>}
                 {['accepte', 'retire'].includes(p.status) && <TrackingMap parcelId={p.id} />}
                 {['remis', 'litige'].includes(p.status) && <ProofPhoto parcelId={p.id} />}
-                <ul className="flex flex-col gap-1 text-[13.5px] font-semibold">{p.order_items.map((i) => <li key={i.id} className="flex justify-between gap-3"><span className="truncate">{i.quantity} × {i.name_snapshot}{i.variant_label ? ` · ${i.variant_label}` : ""}</span><span>{formatGnf(i.quantity * i.price_gnf_snapshot)}</span></li>)}</ul>
+                {/* Chaque article une seule fois (§56) : photo, quantité × prix unitaire, total de la ligne. */}
+                <ul className="flex flex-col divide-y divide-line-soft">
+                  {groupLines(p.order_items.map((i) => ({ ...i, photo: mediaUrl(i.offers?.photo_paths?.[0]) }))).map((l) => (
+                    <li key={l.key} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
+                      {l.photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={l.photo} alt="" className="h-14 w-14 shrink-0 rounded-xl bg-sand object-cover" /> : <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-sand text-[16px] font-extrabold text-muted">{l.name.slice(0, 1).toUpperCase()}</span>}
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="truncate text-[14px] font-extrabold">{l.name}</span>
+                        {l.variant && <span className="truncate text-[12px] font-semibold text-muted">{l.variant}</span>}
+                        <span className="text-[12.5px] font-semibold text-muted">{l.quantity} × {formatGnf(l.unitGnf)}</span>
+                      </span>
+                      <span className="shrink-0 text-[14px] font-extrabold">{formatGnf(l.totalGnf)}</span>
+                    </li>
+                  ))}
+                </ul>
                 {p.discount_gnf > 0 && <div className="flex justify-between text-[12.5px] font-bold text-ok"><span>Code promo {p.promo_code}</span><span>− {formatGnf(p.discount_gnf)}</span></div>}
-                <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>
+                {parcels.length > 1 && <div className="flex justify-between text-[12.5px] font-semibold text-muted"><span>Livraison de ce colis</span><span>{formatGnf(p.delivery_fee_gnf)}</span></div>}
                 {p.shops?.whatsapp && !['remis', 'annule'].includes(p.status) && (
                   <a href={`https://wa.me/${p.shops.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Bonjour ${p.shops.name}, j’ai passé une commande sur HailandX.`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center rounded-2xl border border-line text-[13.5px] font-extrabold">Écrire au vendeur sur WhatsApp</a>
                 )}
@@ -87,7 +110,8 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   </div>
                 )}
                 {p.status === 'retire' && <button type="button" onClick={() => setScanFor(p.id)} className="h-12 rounded-2xl bg-ink text-[14px] font-extrabold text-white">Livreur arrivé : scanner le colis</button>}
-                {['attente_vendeur', 'prepare', 'mission_proposee', 'accepte', 'retire'].includes(p.status) && <CancelParcel parcel={p.id} status={p.status} onDone={async (text) => { setMsg(text); await load(); }} />}
+                {/* Plusieurs colis encore annulables : chacun peut être annulé seul ; sinon un seul bouton pour toute la commande (en bas). */}
+                {CANCELLABLE.includes(p.status) && parcels.filter((x) => CANCELLABLE.includes(x.status)).length > 1 && <CancelParcel parcel={p.id} status={p.status} onDone={async (text) => { setMsg(text); await load(); }} />}
                 {p.status === 'annule' && p.cancelled_by === 'acheteur' && p.cancel_courier_gnf + p.cancel_provider_gnf > 0 && order.payment_method !== 'livraison' && (
                   <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé après le départ du livreur : {formatGnf(p.cancel_courier_gnf)} pour son déplacement{p.cancel_provider_gnf > 0 ? ` et ${formatGnf(p.cancel_provider_gnf)} de frais de paiement` : ''} ont été retenus ; le reste vous est rendu.</p>
                 )}
@@ -99,13 +123,70 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
           <div className="flex flex-col gap-1 rounded-2xl bg-sand px-4 py-3 text-[13.5px] font-semibold">
             <div className="flex justify-between"><span className="text-muted">Articles{parcels.some((x) => x.discount_gnf > 0) ? ' (après réduction)' : ''}</span><span>{formatGnf(order.subtotal_gnf)}</span></div>
             <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{formatGnf(order.delivery_fee_gnf)}</span></div>
-            <div className="flex justify-between text-[15px] font-extrabold"><span>Total {order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
+            <div className="flex justify-between text-[15px] font-extrabold"><span>Total {parcels.length && parcels.every((x) => x.status === 'annule') ? '— commande annulée' : order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
             {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
+          {parcels.some((x) => CANCELLABLE.includes(x.status)) && <CancelOrder parcels={parcels.filter((x) => CANCELLABLE.includes(x.status)).map((x) => ({ id: x.id, status: x.status }))} onDone={async (text) => { setMsg(text); await load(); }} />}
           {parcels.some((x) => !['remis', 'annule'].includes(x.status)) && <GarderSuivi orderId={id} />}
         </>
       )}
     </main>
+  );
+}
+
+/**
+ * « Annuler cette commande » (§56) : annule tous les colis encore annulables. Avant le départ du livreur, rien n'est retenu ;
+ * après, on additionne d'abord ce que chaque colis coûterait (fn_parcel_cancel_quote, §45) et le client confirme en connaissance de cause.
+ * La politique de remboursement détaillée viendra plus tard ; les règles de §45 s'appliquent en attendant.
+ */
+function CancelOrder({ parcels, onDone }: { parcels: { id: string; status: ParcelStatus }[]; onDone: (msg: string) => void }) {
+  const sb = browserClient();
+  const [ask, setAsk] = useState<null | { quotes: CancelQuote[] }>(null);
+  const [busy, setBusy] = useState(false);
+  const late = parcels.filter((p) => p.status === 'accepte' || p.status === 'retire');
+  async function open() {
+    if (!late.length) return setAsk({ quotes: [] });
+    setBusy(true);
+    const rows = await Promise.all(late.map((p) => sb!.rpc('fn_parcel_cancel_quote', { p_parcel: p.id })));
+    setBusy(false);
+    const err = rows.find((r) => r.error)?.error;
+    if (err) return onDone(err.message.replace(/^.*?:\s*/, ''));
+    setAsk({ quotes: rows.map((r) => ((r.data as CancelQuote[] | null) ?? [])[0]).filter((q): q is CancelQuote => Boolean(q)) });
+  }
+  async function go() {
+    setBusy(true);
+    const errors: string[] = [];
+    for (const p of parcels) { const { error } = await sb!.rpc('fn_parcel_cancel', { p_parcel: p.id }); if (error) errors.push(error.message.replace(/^.*?:\s*/, '')); }
+    setBusy(false); setAsk(null);
+    const refund = ask?.quotes.filter((q) => q.prepaid).reduce((k, q) => k + q.refund_gnf, 0) ?? 0;
+    onDone(errors.length ? errors[0]! : refund > 0 ? `Commande annulée. ${formatGnf(refund)} vous sont rendus.` : 'Commande annulée.');
+  }
+  if (!ask) return <button type="button" disabled={busy} onClick={open} className="h-12 rounded-2xl border border-[#e8b4ab] text-[14px] font-extrabold text-[#8a2a1c] disabled:opacity-50">Annuler cette commande</button>;
+  const courier = ask.quotes.reduce((k, q) => k + q.courier_gnf, 0);
+  const provider = ask.quotes.reduce((k, q) => k + q.provider_gnf, 0);
+  const prepaid = ask.quotes.some((q) => q.prepaid);
+  const refund = ask.quotes.filter((q) => q.prepaid).reduce((k, q) => k + q.refund_gnf, 0);
+  const until = ask.quotes.map((q) => q.cash_suspended_until).find(Boolean);
+  return (
+    <div role="alertdialog" aria-label="Annuler la commande" className="flex flex-col gap-2.5 rounded-2xl border-2 border-ink p-3.5">
+      <p className="text-[14px] font-extrabold">Annuler toute la commande ?</p>
+      {!ask.quotes.length ? (
+        <p className="text-[13px] font-semibold text-muted">Le livreur n’est pas encore parti : l’annulation est gratuite{prepaid ? ' et vous êtes remboursé en entier' : ''}.</p>
+      ) : (
+        <>
+          <ul className="flex flex-col gap-1 text-[13px] font-semibold">
+            <li className="flex justify-between gap-3"><span>Déplacement du livreur, déjà parti</span><span>{formatGnf(courier)}</span></li>
+            {provider > 0 && <li className="flex justify-between gap-3"><span>Frais du paiement en ligne (non récupérables)</span><span>{formatGnf(provider)}</span></li>}
+            {prepaid && <li className="flex justify-between gap-3 text-[14px] font-extrabold"><span>Vous seriez remboursé de</span><span>{formatGnf(refund)}</span></li>}
+          </ul>
+          <p className="text-[12.5px] font-medium text-muted">{prepaid ? 'Seul ce que l’annulation coûte au livreur et à Hailand est retenu, rien de plus.' : `Vous n’avez rien payé, mais le déplacement du livreur est payé par Hailand : le paiement à la livraison ne vous sera plus proposé${until ? ` jusqu’au ${new Date(until).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}` : ' pendant quelque temps'}.`}</p>
+        </>
+      )}
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={go} className="h-11 flex-1 rounded-2xl bg-ink text-[13.5px] font-extrabold text-white disabled:opacity-50">Oui, annuler</button>
+        <button type="button" disabled={busy} onClick={() => setAsk(null)} className="h-11 flex-1 rounded-2xl border border-line text-[13.5px] font-bold">Garder la commande</button>
+      </div>
+    </div>
   );
 }
 

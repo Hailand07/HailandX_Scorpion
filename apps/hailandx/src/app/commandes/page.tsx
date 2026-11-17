@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { BUYER_STEPS, formatGnf, isOrderActive, orderStep, type ParcelStatus, STEP_HEADLINE } from '@hailandx/commerce';
 import { browserClient, mediaUrl, Screen, Segmented, useSession } from '@hailandx/kit';
 import { Chargement } from '@hailandx/ui';
+import { groupLines } from '@/lib/orderLines';
 
-interface Item { name_snapshot: string; quantity: number; offers: { photo_paths: string[] | null; catalog_products: { slug: string } | null } | null }
+interface Item { offer_id: string | null; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number; offers: { photo_paths: string[] | null; catalog_products: { slug: string } | null } | null }
 interface Parcel { id: string; status: ParcelStatus; delivered_at: string | null; shops: { name: string; slug: string } | null; order_items: Item[] }
 interface Order { id: string; total_gnf: number; created_at: string; parcels: Parcel[] }
 
@@ -24,7 +25,7 @@ export default function OrdersPage() {
     const sb = browserClient(); const uid = session?.user.id;
     if (!sb || !uid) return;
     const [o, r] = await Promise.all([
-      sb.from('orders').select('id,total_gnf,created_at,parcels(id,status,delivered_at,shops(name,slug),order_items(name_snapshot,quantity,offers(photo_paths,catalog_products(slug))))').eq('buyer_id', uid).order('created_at', { ascending: false }).limit(50),
+      sb.from('orders').select('id,total_gnf,created_at,parcels(id,status,delivered_at,shops(name,slug),order_items(offer_id,name_snapshot,variant_label,quantity,price_gnf_snapshot,offers(photo_paths,catalog_products(slug))))').eq('buyer_id', uid).order('created_at', { ascending: false }).limit(50),
       sb.from('reviews').select('parcel_id').eq('buyer_id', uid),
     ]);
     const list = (o.data as unknown as Order[]) ?? [];
@@ -67,6 +68,7 @@ export default function OrdersPage() {
                 const step = orderStep(o.parcels.map((p) => p.status));
                 const shops = [...new Set(o.parcels.map((p) => p.shops?.name).filter(Boolean))].join(', ');
                 const n = o.parcels.flatMap((p) => p.order_items).reduce((k, i) => k + i.quantity, 0);
+                const lines = groupLines(o.parcels.flatMap((p) => p.order_items).map((i) => ({ ...i, photo: mediaUrl(i.offers?.photo_paths?.[0]) })));
                 const liveCodes = o.parcels.filter((p) => codes[p.id]).map((p) => ({ shop: p.shops?.name ?? 'Colis', code: codes[p.id]! }));
                 return (
                   <Link key={o.id} href={`/commandes/${o.id}`} className="flex flex-col gap-3.5 rounded-[22px] bg-ink p-4 text-white">
@@ -77,6 +79,8 @@ export default function OrdersPage() {
                       </span>
                       <span className="shrink-0 rounded-full bg-lime px-2.5 py-1.5 text-[12px] font-extrabold text-ink">{day(o.created_at)}</span>
                     </div>
+                    {/* Contenu en bref (§56) : la photo de chaque article et son nom ; les prix et le détail sont dans l'Aperçu. */}
+                    <Contents lines={lines} />
                     {!step.litige && (
                       <>
                         <div className="grid grid-cols-4 gap-1" aria-hidden="true">{BUYER_STEPS.map((s, i) => <span key={s} className={`h-[5px] rounded-full ${i <= step.index ? 'bg-lime' : 'bg-white/20'}`} />)}</div>
@@ -92,7 +96,7 @@ export default function OrdersPage() {
                             : liveCodes.map((c) => <span key={c.shop} className="truncate text-[13px] font-bold">{c.shop} : <b className="font-display tracking-[0.12em]">{c.code}</b></span>)}
                         </span>
                       ) : <span className="text-[12.5px] font-bold text-white/80">{formatGnf(o.total_gnf)}</span>}
-                      <span className="flex h-10 shrink-0 items-center rounded-xl bg-white px-3.5 text-[13px] font-extrabold text-ink">Suivre</span>
+                      <span className="flex h-10 shrink-0 items-center rounded-xl bg-white px-3.5 text-[13px] font-extrabold text-ink">Aperçu</span>
                     </div>
                   </Link>
                 );
@@ -105,8 +109,8 @@ export default function OrdersPage() {
             <>
               {done.length === 0 && <Empty text="Aucune commande terminée pour l’instant." />}
               {done.map((o) => {
-                const items = o.parcels.flatMap((p) => p.order_items);
-                const first = items[0];
+                const items = groupLines(o.parcels.flatMap((p) => p.order_items));
+                const first = o.parcels.flatMap((p) => p.order_items)[0];
                 const firstParcel = o.parcels.find((p) => p.order_items.length) ?? o.parcels[0];
                 const delivered = o.parcels.filter((p) => p.status === 'remis');
                 const when = delivered.length ? `remise le ${day(delivered.map((p) => p.delivered_at ?? o.created_at).sort().at(-1)!)}` : 'annulée';
@@ -135,6 +139,27 @@ export default function OrdersPage() {
         </>
       )}
     </Screen>
+  );
+}
+
+/** Vignettes des articles d'une commande (4 au plus, puis « +N »), avec la quantité, et leurs noms sur une ligne. */
+function Contents({ lines }: { lines: { key: string; name: string; quantity: number; photo: string | null }[] }) {
+  if (!lines.length) return null;
+  const shown = lines.slice(0, 4);
+  const more = lines.length - shown.length;
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex shrink-0 gap-1.5">
+        {shown.map((l) => (
+          <span key={l.key} className="relative h-12 w-12 overflow-hidden rounded-xl bg-white/10">
+            {l.photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={l.photo} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-[15px] font-extrabold text-white/60">{l.name.slice(0, 1).toUpperCase()}</span>}
+            {l.quantity > 1 && <span className="absolute bottom-0.5 right-0.5 rounded-md bg-black/70 px-1 text-[10.5px] font-extrabold">×{l.quantity}</span>}
+          </span>
+        ))}
+        {more > 0 && <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-[13px] font-extrabold">+{more}</span>}
+      </span>
+      <span className="line-clamp-2 min-w-0 text-[13px] font-semibold leading-snug text-white/85">{lines.map((l) => l.name).join(' · ')}</span>
+    </div>
   );
 }
 
