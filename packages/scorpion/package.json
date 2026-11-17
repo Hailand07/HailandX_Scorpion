@@ -11,7 +11,8 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./parcours": "./src/parcours/index.ts"
+    "./parcours": "./src/parcours/index.ts",
+    "./brouillon": "./src/parcoursDraft.ts"
   },
   "peerDependencies": {
     "react": "^19.0.0",

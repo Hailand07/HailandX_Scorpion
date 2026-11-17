@@ -1,4 +1,5 @@
 'use client';
+import { hasDraft } from '@hailandx/scorpion/brouillon';
 import { CategoryPicker, catsSummary, type Cat } from '@/components/CategoryPicker';
 import { useEffect, useState } from 'react';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
@@ -24,6 +25,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [locating, setLocating] = useState(false);
+  useEffect(() => { if (hasDraft('boutique-reglages')) setLocating(true); }, []);
   useEffect(() => { sb?.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? [])); }, [sb]);
 
   const edit = (f: Field, v: string) => { setOpen(open === f ? null : f); setValue(v); setMsg(null); };
@@ -51,7 +53,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
     void save({ declaration_id: id }, 'Adresse changée. Demandez sa certification depuis l’onglet Vendre.');
   }
 
-  if (locating) return <AdresseBoutique kicker="NOUVELLE ADRESSE DE LA BOUTIQUE" onDone={(id) => { setLocating(false); changeAddress(id); }} onClose={() => setLocating(false)} />;
+  if (locating) return <AdresseBoutique draftKey="boutique-reglages" kicker="NOUVELLE ADRESSE DE LA BOUTIQUE" onDone={(id) => { setLocating(false); changeAddress(id); }} onClose={() => setLocating(false)} />;
 
   const logo = mediaUrl(shop.logo_path); const cover = mediaUrl(shop.cover_path);
   const initials = shop.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();

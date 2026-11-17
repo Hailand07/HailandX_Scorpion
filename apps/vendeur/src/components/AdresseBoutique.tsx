@@ -1,6 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
-import { browserClient, uploadPhoto } from '@hailandx/kit';
+import { browserClient, mediaUrl, uploadPhoto } from '@hailandx/kit';
 
 /** Parcours d'adresse sur place (§49 étape 4), chargé seulement dans le navigateur (carte Mapbox). */
 const Parcours = dynamic(() => import('@hailandx/scorpion/parcours').then((m) => m.AdresseSurPlace), { ssr: false });
@@ -10,7 +10,7 @@ const TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN ?? '';
  * Adresse de la boutique repérée ici même (maquette v9 « VendeurAdresse ») : même parcours que les clients de HailandX,
  * recopié de NavigationX ; écrit `declarations`. La certification (niveau 3) reste demandée ensuite à l'équipe Hailand.
  */
-export function AdresseBoutique({ kicker, onDone, onClose }: { kicker: string; onDone: (declarationId: string) => void; onClose: () => void }) {
+export function AdresseBoutique({ kicker, onDone, onClose, draftKey }: { kicker: string; onDone: (declarationId: string) => void; onClose: () => void; /** Brouillon repris après un rechargement (§55). */ draftKey: string }) {
   const sb = browserClient();
   if (!sb) return null;
   return (
@@ -19,6 +19,8 @@ export function AdresseBoutique({ kicker, onDone, onClose }: { kicker: string; o
       token={TOKEN}
       uploadPhoto={async (file) => { const uid = (await sb.auth.getSession()).data.session?.user.id; if (!uid) throw new Error('connexion requise'); return uploadPhoto(sb, uid, file); }}
       usage="boutique"
+      draftKey={draftKey}
+      photoUrl={mediaUrl}
       guide={{
         kicker,
         title: 'Où est votre boutique ?',

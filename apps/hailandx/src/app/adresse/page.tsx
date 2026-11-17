@@ -1,4 +1,5 @@
 'use client';
+import { hasDraft } from '@hailandx/scorpion/brouillon';
 import { addrName, myAddresses, type Addr } from '@/lib/addresses';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -21,6 +22,7 @@ function Page() {
   const [list, setList] = useState<Decl[] | null>(null);
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [adding, setAdding] = useState(false);
+  useEffect(() => { if (hasDraft('client-compte')) setAdding(true); }, []);
   const router = useRouter();
 
   const load = useCallback(async () => {
@@ -33,7 +35,7 @@ function Page() {
   }, [sb, session]);
   useEffect(() => { void load(); }, [load]);
 
-  if (adding) return <AdresseClient cta={next === '/adresse' ? 'Voir mes adresses' : 'Continuer'} onDone={() => { setAdding(false); if (next === '/adresse') void load(); else router.replace(next); }} onClose={() => setAdding(false)} />;
+  if (adding) return <AdresseClient draftKey="client-compte" cta={next === '/adresse' ? 'Voir mes adresses' : 'Continuer'} onDone={() => { setAdding(false); if (next === '/adresse') void load(); else router.replace(next); }} onClose={() => setAdding(false)} />;
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col gap-4 px-5 pb-6 pt-6">
