@@ -268,7 +268,8 @@ export default async function ProductLinkPage({ params, searchParams }: Params) 
         </section>
       )}
 
-      <BuyBar available={p.inStock !== false && !onVacation(shop.vacationUntil)} closedLabel={onVacation(shop.vacationUntil) ? `Boutique en congé jusqu’au ${new Date(shop.vacationUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : undefined} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null} />
+      <BuyBar available={p.inStock !== false && !onVacation(shop.vacationUntil)} closedLabel={onVacation(shop.vacationUntil) ? `Boutique en congé jusqu’au ${new Date(shop.vacationUntil!).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : undefined} variants={p.variants ?? []} line={p.offerId ? { offerId: p.offerId, variantId: p.variantId ?? null, slug: p.slug, name: p.name, priceGnf: p.priceGnf, shopSlug: shop.slug, shopName: shop.name, photoUrl: p.photoUrl ?? null } : null}
+        whatsapp={shop.whatsapp ? { shop: shop.name, href: `https://wa.me/${shop.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${shop.name}, je suis intéressé par « ${p.name} » (${formatGnf(p.priceGnf)}) vu sur HailandX.`)}` } : null} />
     </main>
   );
 }
