@@ -589,6 +589,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | §55 (essai du fondateur, 5 captures) : vue satellite — feuille réduite avec la flèche « afficher les détails » et les actions secondaires en pastilles ; voile sombre hors du cercle et alerte à chaque toucher hors du cercle ; reprise du parcours d'adresse après l'appareil photo (brouillon `@hailandx/scorpion/brouillon`, 2 tests). 406 tests. |
 | 2026-11-17 | §56 (essai du fondateur, 7 captures) : **page de commande vide en production depuis le 05/11** (la requête demandait `cancel_courier_gnf`/`cancel_provider_gnf`, non lisibles par le client → 403 sur toute la requête) corrigée ; page renommée « Aperçu » avec chaque article (photo, quantité × prix unitaire, total, sans doublon) et « Annuler cette commande » ; bouton « Mes commandes » toujours vers la liste ; vignettes des articles sur chaque carte de la liste ; WhatsApp à la place du panier en bas de la fiche ; logo de la vitrine plus caché par la couverture. 408 tests. |
 | 2026-11-17 | Migration `2026-11-17_montants_annulation_lisibles.sql` **appliquée en production** (accord du fondateur) : le client peut lire `cancel_courier_gnf` / `cancel_provider_gnf` de ses colis (vérifié : `authenticated` oui, `anon` non). |
+| 2026-11-17 | §57 (retour du fondateur sur §56) : cartes de « Mes commandes » sans photos (noms des articles seulement) ; « M'envoyer sur WhatsApp » retiré du bloc « Retrouver cette commande » (reste « Copier le lien ») ; « Annuler cette commande » devient un lien discret tout en bas de l'Aperçu. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1333,4 +1334,11 @@ Retours du fondateur (7 captures du 17/11) sur l'app client :
 - ✅ **Aperçu** (`/commandes/[id]`, ex-« Suivi de commande ») : chaque article **une seule fois** (`lib/orderLines.ts`, `groupLines`, 2 tests : même offre + même variante + même prix = une ligne, quantités additionnées) avec photo, « quantité × prix unitaire » et total de la ligne ; puis Articles, Livraison, Total. La livraison n'est répétée par colis que s'il y en a plusieurs.
 - ✅ **« Annuler cette commande »** : annule tous les colis encore annulables (`fn_parcel_cancel`). Avant le départ du livreur : gratuit, confirmation simple. Après : les devis `fn_parcel_cancel_quote` (§45) sont additionnés et montrés avant de confirmer. Avec plusieurs colis annulables, chacun garde aussi son « Annuler ce colis ». La politique de remboursement détaillée viendra plus tard (décision du fondateur) ; les règles de §45 s'appliquent en attendant.
 - Une migration (droit de lecture ci-dessus) ; aucune donnée modifiée.
+
+## 57. Retouches de l'Aperçu et de la liste des commandes (2026-11-17) — ✅ code
+
+Retour du fondateur après essai de §56 :
+- ✅ Cartes de « Mes commandes » : **plus de photos** (jugées inutiles et peu élégantes) ; le contenu reste résumé par les noms des articles (« Souris ×2 · iPhone 7 »). Photos, prix et détail sont dans l'Aperçu.
+- ✅ Bloc « Retrouver cette commande plus tard » : le bouton « M'envoyer sur WhatsApp » est retiré ; l'explication et « Copier le lien » suffisent.
+- ✅ « Annuler cette commande » : lien discret (texte souligné, gris) tout en bas de l'Aperçu, sous le bloc du lien. La confirmation et le devis d'annulation (§56) sont inchangés.
 

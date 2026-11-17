@@ -79,8 +79,8 @@ export default function OrdersPage() {
                       </span>
                       <span className="shrink-0 rounded-full bg-lime px-2.5 py-1.5 text-[12px] font-extrabold text-ink">{day(o.created_at)}</span>
                     </div>
-                    {/* Contenu en bref (§56) : la photo de chaque article et son nom ; les prix et le détail sont dans l'Aperçu. */}
-                    <Contents lines={lines} />
+                    {/* Contenu en bref : les noms des articles, sans photo (§57) ; photos, prix et détail sont dans l'Aperçu. */}
+                    <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-white/85">{lines.map((l) => (l.quantity > 1 ? `${l.name} ×${l.quantity}` : l.name)).join(' · ')}</span>
                     {!step.litige && (
                       <>
                         <div className="grid grid-cols-4 gap-1" aria-hidden="true">{BUYER_STEPS.map((s, i) => <span key={s} className={`h-[5px] rounded-full ${i <= step.index ? 'bg-lime' : 'bg-white/20'}`} />)}</div>
@@ -139,27 +139,6 @@ export default function OrdersPage() {
         </>
       )}
     </Screen>
-  );
-}
-
-/** Vignettes des articles d'une commande (4 au plus, puis « +N »), avec la quantité, et leurs noms sur une ligne. */
-function Contents({ lines }: { lines: { key: string; name: string; quantity: number; photo: string | null }[] }) {
-  if (!lines.length) return null;
-  const shown = lines.slice(0, 4);
-  const more = lines.length - shown.length;
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex shrink-0 gap-1.5">
-        {shown.map((l) => (
-          <span key={l.key} className="relative h-12 w-12 overflow-hidden rounded-xl bg-white/10">
-            {l.photo ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={l.photo} alt="" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center text-[15px] font-extrabold text-white/60">{l.name.slice(0, 1).toUpperCase()}</span>}
-            {l.quantity > 1 && <span className="absolute bottom-0.5 right-0.5 rounded-md bg-black/70 px-1 text-[10.5px] font-extrabold">×{l.quantity}</span>}
-          </span>
-        ))}
-        {more > 0 && <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/10 text-[13px] font-extrabold">+{more}</span>}
-      </span>
-      <span className="line-clamp-2 min-w-0 text-[13px] font-semibold leading-snug text-white/85">{lines.map((l) => l.name).join(' · ')}</span>
-    </div>
   );
 }
 
