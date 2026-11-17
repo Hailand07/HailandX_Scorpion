@@ -3,17 +3,19 @@ import { useEffect, useRef, useState } from 'react';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
 import type { Session } from '@supabase/supabase-js';
 import { APP_COURANTE, browserClient } from './supabase';
+import { CompteMotDePasse } from './CompteMotDePasse';
 
 /** Compte prêt pour commander : connecté ET nommé (le livreur doit savoir qui demander). */
 export const aUnNom = (s: Session | null | undefined): boolean => Boolean((s?.user.user_metadata as { full_name?: string } | undefined)?.full_name?.trim());
 
 /**
  * Connexion « Compte Hailand » dans la page, sans la quitter (maquette v9 « Panier », HAILANDX.md §49) :
- * numéro → code SMS → prénom et nom seulement si le compte n'en a pas. Même compte que `PhoneLogin`.
+ * numéro + mot de passe (§59 ; ou création du compte), le code SMS restant accessible par un lien ; prénom et nom seulement si le
+ * compte n'en a pas. Même compte que `PhoneLogin`.
  * L'écran qui l'affiche la garde tant que `aUnNom(session)` est faux, puis passe à la suite.
  */
-export function PhoneLoginInline({ title = 'Votre numéro', hint = 'Pour suivre le colis et recevoir votre code de remise. Pas de mot de passe.' }: { title?: string; hint?: string }) {
-  const [step, setStep] = useState<'numero' | 'code' | 'nom'>('numero');
+export function PhoneLoginInline({ title = 'Votre compte Hailand', hint = 'Pour suivre le colis et recevoir votre code de remise. Un seul compte pour toutes les applications Hailand.' }: { title?: string; hint?: string }) {
+  const [step, setStep] = useState<'compte' | 'numero' | 'code' | 'nom'>('compte');
   const [phone, setPhone] = useState('');
   const [e164, setE164] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -75,6 +77,12 @@ export function PhoneLoginInline({ title = 'Votre numéro', hint = 'Pour suivre 
         <h2 className="text-[15px] font-extrabold">{step === 'nom' ? 'Votre nom, une seule fois' : title}</h2>
         <p className="text-[12.5px] font-semibold leading-snug text-muted">{step === 'nom' ? 'Pour que le livreur sache qui demander. Les autres applications Hailand ne le redemanderont pas.' : hint}</p>
       </div>
+      {step === 'compte' && (
+        <CompteMotDePasse compact resetHref={`/mot-de-passe?next=${encodeURIComponent(typeof window === 'undefined' ? '/' : location.pathname + location.search)}`}
+          onCode={() => { setStep('numero'); setError(null); }}
+          // Connecté : l'écran parent passe à la suite dès que le compte a un nom ; sinon on le demande ici.
+          onDone={() => { void browserClient()?.auth.getSession().then(({ data }) => { if (data.session && !aUnNom(data.session)) setStep('nom'); }); }} />
+      )}
       {step === 'numero' && (
         <form onSubmit={sendCode} className="flex flex-col gap-2.5">
           <label className="flex flex-col gap-1.5 text-[12.5px] font-extrabold">Téléphone
@@ -84,6 +92,7 @@ export function PhoneLoginInline({ title = 'Votre numéro', hint = 'Pour suivre 
             </span>
           </label>
           <button type="submit" disabled={busy || !phone.trim()} className={cta}>{busy ? 'Envoi…' : 'Recevoir le code par SMS'}</button>
+          <button type="button" onClick={() => { setStep('compte'); setError(null); }} className="self-center text-[12.5px] font-bold text-muted underline underline-offset-4">Utiliser plutôt un mot de passe</button>
         </form>
       )}
       {step === 'code' && e164 && (
@@ -94,6 +103,7 @@ export function PhoneLoginInline({ title = 'Votre numéro', hint = 'Pour suivre 
           <p className="text-[12.5px] font-semibold text-muted">
             {cooldown > 0 ? <>Renvoyer dans 0:{String(cooldown).padStart(2, '0')}</> : <button type="button" onClick={() => void sendCode()} disabled={busy} className="font-extrabold text-blue-ink">Renvoyer le code</button>}
             {' · '}<button type="button" onClick={() => { setStep('numero'); setError(null); }} className="font-extrabold text-blue-ink">Changer de numéro</button>
+            {' · '}<button type="button" onClick={() => { setStep('compte'); setError(null); }} className="font-extrabold text-blue-ink">Mot de passe</button>
           </p>
           <button type="submit" disabled={busy || code.length !== 6} className={cta}>{busy ? 'Vérification…' : 'Valider'}</button>
         </form>

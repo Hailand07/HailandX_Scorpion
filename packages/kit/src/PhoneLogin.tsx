@@ -9,6 +9,8 @@ import { APP_COURANTE, browserClient } from './supabase';
 import { Icon } from './Screen';
 import { passageEchoue } from './passage';
 import { groupPhone } from './phone';
+import { CompteMotDePasse } from './CompteMotDePasse';
+import { TONS, type Tone } from './tons';
 import { estNouveau, lignesResume, origineTexte, telMasque, type CompteResume } from './compte';
 
 /**
@@ -17,26 +19,17 @@ import { estNouveau, lignesResume, origineTexte, telMasque, type CompteResume } 
  * (prénom et nom demandés une seule fois, pour toutes les applications). On ne dit qu'APRÈS le code si un numéro est inscrit :
  * personne ne peut deviner qui a un compte.
  */
-type Tone = 'clair' | 'nuit';
-const T = {
-  clair: {
-    muted: 'text-muted', field: 'border-line bg-card', cta: 'bg-ink text-white', link: 'text-blue-ink', card: 'border-line-soft bg-card',
-    chip: 'border-line bg-card', soft: 'bg-ok-soft text-ok', err: 'bg-[#fde8e4] text-[#8a2a1c]', info: 'bg-blue-soft text-blue-ink',
-  },
-  nuit: {
-    muted: 'text-night-muted', field: 'border-night-line bg-night-card', cta: 'bg-lime text-ink', link: 'text-lime', card: 'border-night-line bg-night-card',
-    chip: 'border-night-line bg-night-card', soft: 'bg-[#16301f] text-lime', err: 'bg-[#3a1a1a] text-[#ffb4a8]', info: 'bg-night-card text-lime',
-  },
-} as const;
+const T = TONS;
 
-type Step = 'numero' | 'code' | 'existant' | 'nom';
+// « compte » (numéro + mot de passe, §59) d'abord ; le code par SMS (« numero » → « code ») reste accessible par un lien.
+type Step = 'compte' | 'numero' | 'code' | 'existant' | 'nom';
 
 function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; brand?: ReactNode; tone: Tone; homeHref: string | null }) {
   const t = T[tone];
   const router = useRouter();
   const nextParam = useSearchParams().get('next');
   const next = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : defaultNext;
-  const [step, setStep] = useState<Step>('numero');
+  const [step, setStep] = useState<Step>('compte');
   const [phone, setPhone] = useState('');
   const [e164, setE164] = useState<string | null>(null);
   const [code, setCode] = useState('');
@@ -48,7 +41,7 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
   const [compte, setCompte] = useState<{ nom: string; tel: string; origine: string; resume: CompteResume | null } | null>(null);
   const [echec, setEchec] = useState(false);
   const codeRef = useRef<HTMLInputElement>(null);
-  const stepRef = useRef<Step>('numero');
+  const stepRef = useRef<Step>('compte');
   stepRef.current = step;
 
   useEffect(() => { setEchec(passageEchoue()); }, []);
@@ -56,7 +49,7 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
   useEffect(() => {
     const sb = browserClient();
     if (!sb) return;
-    void sb.auth.getSession().then(({ data }) => { const u = data.session?.user; if (u && !u.is_anonymous && stepRef.current === 'numero') router.replace(next); });
+    void sb.auth.getSession().then(({ data }) => { const u = data.session?.user; if (u && !u.is_anonymous && (stepRef.current === 'compte' || stepRef.current === 'numero')) router.replace(next); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { if (cooldown <= 0) return; const id = setTimeout(() => setCooldown((c) => c - 1), 1000); return () => clearTimeout(id); }, [cooldown]);
@@ -121,23 +114,37 @@ function Form({ defaultNext, brand, tone, homeHref }: { defaultNext: string; bra
         {/* Retour : du code vers le numéro ; du numéro vers l'accueil de l'application (quand elle en a un). */}
         {step === 'code'
           ? <button type="button" onClick={() => { setStep('numero'); setCode(''); setError(null); }} aria-label="Retour au numéro" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></button>
-          : step === 'numero' && homeHref ? <Link href={homeHref} aria-label="Retour" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></Link> : null}
+          : step === 'numero' ? <button type="button" onClick={() => { setStep('compte'); setError(null); }} aria-label="Retour au mot de passe" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></button>
+          : step === 'compte' && homeHref ? <Link href={homeHref} aria-label="Retour" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center rounded-full"><Icon name="back" size={22} stroke={2} /></Link> : null}
         {homeHref ? <Link href={homeHref} aria-label="Accueil">{brand ?? <Wordmark />}</Link> : <span>{brand ?? <Wordmark />}</span>}
       </div>
+
+      {step === 'compte' && (
+        <div className="flex flex-1 flex-col gap-5">
+          {echec && <p role="status" className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${t.info}`}>Le passage depuis l’autre application a expiré. Connectez-vous : c’est le même compte, vous retrouverez tout.</p>}
+          <div className="flex flex-col gap-1.5">
+            <span className={`text-[12px] font-extrabold uppercase tracking-[0.08em] ${t.muted}`}>Compte Hailand</span>
+            <h1 className="font-display text-[26px] font-semibold tracking-tight">Votre numéro et un mot de passe</h1>
+            <p className={`text-[14px] font-medium leading-relaxed ${t.muted}`}>Un seul compte pour NavigationX, HailandX et HailandX Vendeur : vous retrouvez tout.</p>
+          </div>
+          <CompteMotDePasse tone={tone} resetHref={`/mot-de-passe?next=${encodeURIComponent(next)}`} onDone={() => router.replace(next)} onCode={() => { setStep('numero'); setError(null); }} />
+          <p className={`mt-auto text-center text-[12px] font-medium ${t.muted}`}>En continuant, vous acceptez les conditions d’utilisation de Hailand.</p>
+        </div>
+      )}
 
       {step === 'numero' && (
         <form onSubmit={sendCode} className="flex flex-1 flex-col gap-5">
           {echec && <p role="status" className={`rounded-2xl px-4 py-3 text-[13.5px] font-semibold ${t.info}`}>Le passage depuis l’autre application a expiré. Entrez votre numéro : c’est le même compte, vous retrouverez tout.</p>}
           <div className="flex flex-col gap-1.5">
             <span className={`text-[12px] font-extrabold uppercase tracking-[0.08em] ${t.muted}`}>Compte Hailand</span>
-            <h1 className="font-display text-[26px] font-semibold tracking-tight">Votre numéro suffit</h1>
-            <p className={`text-[14px] font-medium leading-relaxed ${t.muted}`}>Un code par SMS, sans mot de passe. Si vous avez déjà utilisé NavigationX ou HailandX, c’est le même compte : vous retrouvez tout.</p>
+            <h1 className="font-display text-[26px] font-semibold tracking-tight">Connexion par code</h1>
+            <p className={`text-[14px] font-medium leading-relaxed ${t.muted}`}>Un code par SMS, sans mot de passe. Même compte Hailand partout.</p>
           </div>
           <label className="flex flex-col gap-1.5 text-[13px] font-bold">
             Numéro de téléphone
             <span className={`flex h-14 items-center gap-2 rounded-2xl border px-4 text-[16px] font-semibold ${t.field}`}>
               <span className={t.muted}>🇬🇳 +224</span>
-              <input value={phone} onChange={(e) => { setError(null); setPhone(groupPhone(e.target.value)); }} autoFocus inputMode="tel" autoComplete="tel-national" placeholder="6xx xx xx xx" className="h-full min-w-0 flex-1 bg-transparent outline-none" />
+              <input value={phone} onChange={(e) => { setError(null); setPhone(groupPhone(e.target.value)); }} inputMode="tel" autoComplete="tel-national" placeholder="6xx xx xx xx" className="h-full min-w-0 flex-1 bg-transparent outline-none" />
             </span>
           </label>
           <div className="flex flex-col gap-2">

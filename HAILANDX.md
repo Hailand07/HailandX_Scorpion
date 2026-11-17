@@ -591,6 +591,8 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | Migration `2026-11-17_montants_annulation_lisibles.sql` **appliquée en production** (accord du fondateur) : le client peut lire `cancel_courier_gnf` / `cancel_provider_gnf` de ses colis (vérifié : `authenticated` oui, `anon` non). |
 | 2026-11-17 | §57 (retour du fondateur sur §56) : cartes de « Mes commandes » sans photos (noms des articles seulement) ; « M'envoyer sur WhatsApp » retiré du bloc « Retrouver cette commande » (reste « Copier le lien ») ; « Annuler cette commande » devient un lien discret tout en bas de l'Aperçu. |
 | 2026-11-17 | §58 : page de commande — chaque adresse en carte « quartier · commune » + code Hailand (lus via `quartiers(nom)`, `communes(nom)` ; 8/8 adresses actives en ont) au lieu de « Autre — niveau 2 » ; le numéro où le livreur appelle le client (ex-« Téléphone du livreur ») est affiché clairement, numéro du compte par défaut, modifiable par « Modifier » ; « Mes adresses » au même format. |
+| 2026-11-17 | §59 : **connexion par numéro + mot de passe** (création de compte avec prénom, nom, mot de passe robuste, e-mail facultatif) dans HailandX, Vendeur, Flotte et Console, en attendant la vérification par WhatsApp ; « Mot de passe oublié » par code reçu sur l'e-mail ; « Mot de passe et e-mail » dans le compte (client et vendeur) ; code SMS gardé derrière un lien. Kit : `CompteMotDePasse`, `MotDePasseOublie`, `SecuriteCompte`, `motDePasse.ts` (4 tests). ⏳ Réglages Supabase à faire par le fondateur (voir §59). |
+| 2026-11-17 | §59 : réglages Supabase appliqués par l'API d'administration : téléphone activé sans « Confirm phone », mots de passe 8 caractères avec lettres et chiffres (vérifié : refus `weak_password`). Modèle « Reset password » bloqué par Supabase sans SMTP personnalisé (offre gratuite) ; SMTP non touché. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1350,4 +1352,31 @@ Retour du fondateur (capture « Adresse et paiement ») :
 - ✅ **Numéro** : le champ s'appelait « Téléphone du livreur » mais c'est le numéro **du client**, où le livreur de la Flotte l'appelle (`orders` via `fn_place_order.p_phone`). Il s'affiche désormais clairement (« Le livreur vous appelle au … », numéro du compte par défaut) avec un lien **« Modifier »** : le client peut donner un autre numéro pour cette commande (décision du fondateur). Sans numéro sur le compte, le champ de saisie s'affiche directement. ✅ Cas prévu par le fondateur (autre puce, proche qui réceptionne) : c'est bien le numéro saisi ici que reçoit le livreur — `orders.buyer_phone`, transmis à la Flotte (`'phone', o.buyer_phone` dans les fonctions de mission) — et non le numéro de connexion.
 - ✅ « Mes adresses » (`/adresse`) suit le même format. Libellés de paiement (« essai équipe ») sur une ligne.
 - `lib/addresses.ts` : `addrPlace`, `addrDetails` (+1 test). Aucune migration.
+
+## 59. Connexion par numéro + mot de passe, en attendant WhatsApp (2026-11-17) — ✅ code ; ✅ réglages téléphone et mot de passe ; ⏳ SMTP + modèle d'e-mail
+
+**Décision du fondateur** : la vérification du numéro passera par **WhatsApp** (code envoyé par la plateforme WhatsApp de Meta, via le crochet « Send SMS » de Supabase ; SMS en secours plus tard). Tant que Meta n'a pas validé le compte, clients et vendeurs se connectent avec **leur numéro et un mot de passe robuste** ; la récupération d'un mot de passe oublié passe par une **adresse e-mail**.
+
+**Ce qui est codé (kit commun, donc HailandX, HailandX Vendeur, Flotte et Console)** :
+- `CompteMotDePasse` : deux onglets, « J'ai un compte » (numéro + mot de passe, `signInWithPassword`) et « Créer un compte » (prénom, nom, numéro, mot de passe, e-mail facultatif ; `signUp` avec le nom et l'application d'origine). Le lien « Recevoir plutôt un code par SMS » garde l'ancien parcours (numéros de test de l'équipe ; deviendra WhatsApp). Utilisé par `PhoneLogin` (pages `/connexion`) et `PhoneLoginInline` (panier et commande de HailandX).
+- Mot de passe (`motDePasse.ts`, 4 tests) : au moins 8 caractères, lettres **et** chiffres, ni le numéro de téléphone, ni un mot de passe courant ; jauge de robustesse ; erreurs de Supabase traduites. ⚠️ Ces règles côté écran ne suffisent pas : la même règle doit être posée dans Supabase (ci-dessous).
+- `MotDePasseOublie` (pages `/mot-de-passe` des 4 applications, ouvertes sans session) : e-mail → **code reçu par e-mail** (marche même si l'e-mail est lu sur un autre appareil) → nouveau mot de passe (`resetPasswordForEmail`, `verifyOtp` type `recovery`, `updateUser`). La page ne dit jamais si une adresse a un compte.
+- `SecuriteCompte` : « Mot de passe et e-mail » dans Mon compte (HailandX `/compte/securite`, Vendeur `/securite` depuis « Plus ») — ajouter ou changer l'e-mail de récupération (confirmation par e-mail), créer ou changer le mot de passe (utile aux comptes ouverts avec un code SMS).
+
+**État des réglages Supabase (2026-11-17, faits par l'API d'administration avec un jeton du fondateur)** :
+- ✅ constaté 1 et 2 : `external_phone_enabled = true`, `sms_autoconfirm = true` (« Confirm phone » désactivé), `password_min_length = 8`, `password_required_characters` = lettres + chiffres. Vérifié par `/auth/v1/settings` (`phone_autoconfirm: true`) et par trois inscriptions refusées avant création (`abcdefgh`, `abc1`, `12345678` → `weak_password`) ; aucun compte créé.
+- ⏳ 3 et 4 : **bloqués ensemble**. Supabase refuse de modifier les modèles d'e-mail sur l'offre gratuite tant que l'envoi intégré est utilisé (`entitlement_required`, `auth.email_templates`). Il faut d'abord brancher le SMTP (étape 3), puis mettre `{{ .Token }}` dans « Reset password » (étape 4). Tant que ce n'est pas fait, « Mot de passe oublié » envoie un **lien** et non un code : la page `/mot-de-passe` ne peut pas aboutir.
+- ⚠️ Création réelle d'un compte numéro + mot de passe : pas encore testée (crée un compte en production, accord du fondateur requis).
+
+Rappel des réglages prévus :
+1. Authentication → Sign In / Providers → **Phone** : activer ; **désactiver « Confirm phone »** (sinon Supabase exige un SMS à l'inscription).
+2. Authentication → Sign In / Providers → **Email** (section mots de passe) : longueur minimale **8**, exigence **lettres et chiffres**.
+3. **Envoi des e-mails (SMTP personnalisé)** : l'envoi intégré de Supabase n'écrit qu'aux membres de l'équipe et en très petit nombre ; brancher un service gratuit (ex. Brevo : 300 e-mails par jour, expéditeur vérifié sans nom de domaine) dans Authentication → Emails → SMTP Settings.
+4. Authentication → Emails → modèle **« Reset password »** : mettre le code `{{ .Token }}` dans le message (« Votre code Hailand : {{ .Token }} »).
+
+**Limites connues** :
+- ⚠️ Le numéro n'est **pas vérifié** pendant cette période : quelqu'un peut ouvrir un compte avec un numéro qui n'est pas le sien. Risque accepté temporairement par le fondateur ; la vérification WhatsApp le refermera (à prévoir : vérifier les comptes ouverts entre-temps).
+- ⚠️ **NavigationX** (dépôt Lynx) ne connaît encore que le code par SMS : un compte créé avec mot de passe ne s'y connecte pas encore. À reprendre dans NavigationX.
+- Sans e-mail sur le compte, un mot de passe oublié ne se récupère que par l'équipe.
+- Connexion Google : gratuite chez Supabase et Google, mais le compte Google ne donne pas de numéro de téléphone (identité de l'écosystème) ; non mise en place.
 
