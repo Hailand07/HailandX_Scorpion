@@ -32,7 +32,9 @@ function Checkout() {
   const [levels, setLevels] = useState<Record<string, number>>({});
   const [decl, setDecl] = useState('');
   const [phone, setPhone] = useState('');
-  const accountPhone = Boolean(session?.user.phone);
+  // Numéro du compte proposé par défaut ; le client peut en donner un autre pour cette commande (§58).
+  const [editPhone, setEditPhone] = useState(false);
+  const showPhoneInput = editPhone || !session?.user.phone;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -188,16 +190,22 @@ function Checkout() {
           )}
           {ready && (decls.length === 0 || choosing) && <ChezVous first={!decls.some((d) => !d.temporary_until)} onHome={() => setAdding('domicile')} onHere={() => setAdding('ici')} onLink={() => setLinking(true)} />}
           {ready && decls.length > 0 && !choosing && <button type="button" onClick={() => setChoosing(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Livrer à une autre adresse</button>}
-          {/* Le numéro où le livreur de la Flotte joindra le client : celui du compte, affiché, pas modifiable (§58). Saisie seulement si le compte n'en a pas. */}
+          {/* Le numéro où le livreur de la Flotte joindra le client : celui du compte par défaut, modifiable pour cette commande (§58). */}
           <div className="mt-1 flex items-center gap-3 border-t border-line-soft pt-3">
             <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sand"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" /></svg></span>
-            {accountPhone ? (
-              <span className="flex min-w-0 flex-col">
-                <span className="text-[12px] font-semibold text-muted">Le livreur vous appelle au</span>
-                <span className="text-[15px] font-extrabold">{phone}</span>
-              </span>
+            {showPhoneInput ? (
+              <label className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="text-[12px] font-semibold text-muted">Numéro où le livreur vous appelle</span>
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} autoFocus={editPhone} inputMode="tel" autoComplete="tel" placeholder="+224 6.. .. .. .." className={input} />
+              </label>
             ) : (
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="tel" placeholder="Votre numéro, pour le livreur" className={input} aria-label="Votre numéro, pour le livreur" />
+              <>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[12px] font-semibold text-muted">Le livreur vous appelle au</span>
+                  <span className="text-[15px] font-extrabold">{phone}</span>
+                </span>
+                <button type="button" onClick={() => setEditPhone(true)} className="shrink-0 px-1 text-[13px] font-bold text-blue-ink">Modifier</button>
+              </>
             )}
           </div>
         </section>
