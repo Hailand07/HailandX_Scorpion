@@ -9,6 +9,7 @@ import { RegistrationGuide } from './RegistrationGuide';
 import { GpsAcquisitionView } from './GpsAcquisitionView';
 import { BuildingScan, type PickedBuilding } from './BuildingScan';
 import { useGpsAcquisition } from './useGpsAcquisition';
+import { clearDraft, readDraft, writeDraft } from '../parcoursDraft';
 import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel, type LocatedBy, type SubmitInput, TEMPORARY_DAYS, temporaryUntil } from './declarations';
 import { Ico, LevelBadge } from './ui';
 
@@ -41,6 +42,13 @@ export interface AdresseSurPlaceProps {
    * mais l'adresse n'est pas son domicile : pas de nom (Domicile / Travail), proposée 30 jours, signalée comme temporaire.
    */
   temporary?: boolean;
+  /**
+   * Clé du brouillon (§55) : l'étape « infos » est gardée sur le téléphone et reprise si la page se recharge ou si le parcours
+   * est remonté (appareil photo). Absent : pas de reprise.
+   */
+  draftKey?: string;
+  /** Adresse publique d'une photo du stockage, pour montrer la photo du portail reprise d'un brouillon. */
+  photoUrl?: (path: string) => string | null;
   /** Faux : pas de « Je ne suis pas sur place » (le lien de localisation s'utilise sur place). Vrai par défaut. */
   allowRemote?: boolean;
 }
@@ -61,22 +69,25 @@ const chip = (on: boolean) => `flex h-11 items-center gap-1.5 rounded-full borde
  * facultatives → adresse prête. Écrit une ligne de `declarations` (niveau 1 ou 2, ou rattachement à un bâtiment certifié) ;
  * ne certifie jamais rien et n'écrit jamais dans `buildings`.
  */
-export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true, temporary = false }) => {
+export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usage, guide, done, onDone, onClose, uploadPhoto, submit: customSubmit, allowRemote = true, temporary = false, draftKey, photoUrl }) => {
+  // Brouillon repris (une seule lecture, au montage) : on revient directement à l'étape « infos ».
+  const [draft] = useState(() => (draftKey ? readDraft(draftKey) : null));
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
-  const [step, setStep] = useState<Step>('guide');
+  const [step, setStep] = useState<Step>(draft ? 'info' : 'guide');
   const [attempt, setAttempt] = useState(0);
   // Tentatives GPS terminées (on les garde toutes : la meilleure est retenue, deux qui s'accordent se confirment).
   const [attempts, setAttempts] = useState<GpsSummary[]>([]);
   const [cause, setCause] = useState<RetryCause | null>(null);
   // Désignation libre : sur place mais GPS écarté (`hors_cercle`), ou pas sur place (`a_distance`, clients seulement).
-  const [locatedBy, setLocatedBy] = useState<LocatedBy>('gps');
+  const [locatedBy, setLocatedBy] = useState<LocatedBy>(draft?.locatedBy ?? 'gps');
   const [freeStart, setFreeStart] = useState<[number, number]>(CONAKRY);
   /**
    * Photo du portail : envoyée DÈS qu'elle est choisie (pas à l'enregistrement), pour que le résultat se voie tout de suite :
    * envoi en cours, envoyée, ou échec avec la raison et un « Réessayer ». Avant, un échec passait inaperçu.
    */
-  const [gate, setGate] = useState<{ file: File; url: string; status: 'envoi' | 'ok' | 'erreur'; path?: string; error?: string } | null>(null);
+  const [gate, setGate] = useState<{ file?: File; url: string | null; status: 'envoi' | 'ok' | 'erreur'; path?: string; error?: string } | null>(
+    draft?.gatePath ? { url: photoUrl?.(draft.gatePath) ?? null, status: 'ok', path: draft.gatePath } : null);
   const sendGate = useCallback((file: File, url: string) => {
     if (!uploadPhoto) return;
     setGate({ file, url, status: 'envoi' });
@@ -85,23 +96,31 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
       .catch((e: unknown) => setGate((g) => (g && g.url === url ? { ...g, status: 'erreur', error: e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée.' } : g)));
   }, [uploadPhoto]);
   const pickGate = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) sendGate(f, URL.createObjectURL(f)); };
-  useEffect(() => () => { if (gate) URL.revokeObjectURL(gate.url); }, [gate]);
-  const [gps, setGps] = useState<{ lngLat: [number, number]; accuracy: number } | null>(null);
-  const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(null);
-  const [osmId, setOsmId] = useState<string | null>(null);
-  const [tapPoint, setTapPoint] = useState<[number, number] | null>(null);
-  const [certifiedId, setCertifiedId] = useState<string | null>(null);
-  const [admin, setAdmin] = useState<AdminAddress>({});
-  const [level, setLevel] = useState<DeclaredLevel>(1);
+  useEffect(() => () => { if (gate?.url?.startsWith('blob:')) URL.revokeObjectURL(gate.url); }, [gate]);
+  const [gps, setGps] = useState<{ lngLat: [number, number]; accuracy: number } | null>(draft?.gps ?? null);
+  const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(draft?.polygon ?? null);
+  const [osmId, setOsmId] = useState<string | null>(draft?.osmId ?? null);
+  const [tapPoint, setTapPoint] = useState<[number, number] | null>(draft?.tapPoint ?? null);
+  const [certifiedId, setCertifiedId] = useState<string | null>(draft?.certifiedId ?? null);
+  const [admin, setAdmin] = useState<AdminAddress>((draft?.admin as AdminAddress | undefined) ?? {});
+  const [level, setLevel] = useState<DeclaredLevel>(draft?.level ?? 1);
   // La base n'admet que Domicile, Travail ou Autre (contrainte de `declarations.declared_label`) : une boutique est un lieu de travail.
-  const [label, setLabel] = useState(usage === 'boutique' ? 'Travail' : temporary ? 'Autre' : 'Domicile');
-  const [buildingType, setBuildingType] = useState(usage === 'boutique' ? 'C' : 'R');
-  const [floor, setFloor] = useState('');
-  const [door, setDoor] = useState('');
-  const [landmark, setLandmark] = useState('');
+  const [label, setLabel] = useState(draft?.label ?? (usage === 'boutique' ? 'Travail' : temporary ? 'Autre' : 'Domicile'));
+  const [buildingType, setBuildingType] = useState(draft?.buildingType ?? (usage === 'boutique' ? 'C' : 'R'));
+  const [floor, setFloor] = useState(draft?.floor ?? '');
+  const [door, setDoor] = useState(draft?.door ?? '');
+  const [landmark, setLandmark] = useState(draft?.landmark ?? '');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [record, setRecord] = useState<DeclarationRecord | null>(null);
+  // Étape « infos » : tout ce qui a été repéré et saisi est gardé sur le téléphone, avant d'ouvrir l'appareil photo.
+  useEffect(() => {
+    if (!draftKey || step !== 'info' || !gps) return;
+    writeDraft(draftKey, { gps, polygon, osmId, tapPoint, certifiedId, admin: admin as Record<string, unknown>, level, locatedBy, label, buildingType, floor, door, landmark,
+      gatePath: gate?.status === 'ok' ? gate.path ?? null : null, extra: { temporary } });
+  }, [draftKey, step, gps, polygon, osmId, tapPoint, certifiedId, admin, level, locatedBy, label, buildingType, floor, door, landmark, gate, temporary]);
+  /** Fermer le parcours efface le brouillon : on ne reprend que ce qui a été interrompu malgré soi. */
+  const close = () => { if (draftKey) clearDraft(draftKey); onClose(); };
 
   const acq = useGpsAcquisition(step === 'acquire', attempt);
   const reset = () => { setPolygon(null); setOsmId(null); setTapPoint(null); setCertifiedId(null); setAdmin({}); };
@@ -171,6 +190,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
         certifiedBuildingId: certifiedId,
         declared: withDetails ? { label, buildingType, floor: floor.trim(), door: door.trim(), landmark: landmark.trim() } : { label },
       });
+      if (draftKey) clearDraft(draftKey);
       setRecord(rec); if (rec.admin.commune_nom || rec.admin.quartier_nom) setAdmin(rec.admin); setStep('done');
     } catch (e) {
       setSaveError(e instanceof DeclarationError || (customSubmit && e instanceof Error) ? e.message : 'L’enregistrement a échoué. Réessayez dans un instant.');
@@ -185,21 +205,21 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
       // Pas sur place : réservé aux adresses de livraison (une boutique se repère toujours sur place, avant la visite de l'agent).
       ...(usage === 'client' && allowRemote ? [{ label: 'Je ne suis pas sur place', onClick: () => startFree('a_distance') }] : []),
     ];
-    return <RegistrationGuide {...guide} guidance={guidanceFor(n, cause)} attempt={n} alternatives={alternatives} onStart={() => setStep('acquire')} onClose={onClose} />;
+    return <RegistrationGuide {...guide} guidance={guidanceFor(n, cause)} attempt={n} alternatives={alternatives} onStart={() => setStep('acquire')} onClose={close} />;
   }
-  if (step === 'acquire') return <GpsAcquisitionView acq={acq} attempt={n} onContinue={startDetection} onRetry={(why) => { const sm = acq.summary; if (sm) setAttempts((l) => [...l, sm]); retry(why); }} onClose={onClose} />;
+  if (step === 'acquire') return <GpsAcquisitionView acq={acq} attempt={n} onContinue={startDetection} onRetry={(why) => { const sm = acq.summary; if (sm) setAttempts((l) => [...l, sm]); retry(why); }} onClose={close} />;
   if (step === 'detect' && gps) {
     return <BuildingScan sb={sb} token={token} position={gps.lngLat} accuracy={gps.accuracy} adminLine={adminLine(admin)} homes={homes}
-      onDetected={applyDetection} onConfirm={() => setStep('info')} onPicked={applyPicked} onRetry={() => retry('choix')} onOutside={() => retry('hors_cercle')} onClose={onClose} onUseExisting={onDone} />;
+      onDetected={applyDetection} onConfirm={() => setStep('info')} onPicked={applyPicked} onRetry={() => retry('choix')} onOutside={() => retry('hors_cercle')} onClose={close} onUseExisting={onDone} />;
   }
   if (step === 'free') {
     return <BuildingScan key={`${locatedBy}-${freeStart[0]}-${freeStart[1]}`} sb={sb} token={token} position={freeStart} accuracy={0} adminLine="" homes={homes} free={locatedBy === 'a_distance' ? 'a_distance' : 'hors_cercle'}
-      onDetected={() => {}} onConfirm={() => {}} onPicked={applyPicked} onRetry={() => retry('choix')} onClose={onClose} onUseExisting={onDone} />;
+      onDetected={() => {}} onConfirm={() => {}} onPicked={applyPicked} onRetry={() => retry('choix')} onClose={close} onUseExisting={onDone} />;
   }
 
   const head = (n: number) => (
     <div className="flex items-center gap-3.5 px-5 pt-5">
-      <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-[0_2px_8px_rgba(0,0,0,0.08)]"><Ico name="x" /></button>
+      <button type="button" onClick={close} aria-label="Fermer" className="flex h-11 w-11 items-center justify-center rounded-full bg-card shadow-[0_2px_8px_rgba(0,0,0,0.08)]"><Ico name="x" /></button>
       <div className="flex flex-1 gap-1.5" aria-hidden="true">{[1, 2, 3, 4, 5].map((i) => <div key={i} className={`h-[5px] flex-1 rounded-full ${i <= n ? 'bg-blue' : 'bg-line'}`} />)}</div>
       <span className="text-[12.5px] font-bold text-muted">Adresse · {n} sur 5</span>
     </div>
@@ -236,7 +256,7 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
             <div className="mt-4 flex flex-col gap-2.5 rounded-2xl border border-line bg-card p-3">
               <div className="flex items-center gap-3.5">
                 <span className="relative flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-soft text-blue-ink">
-                  {gate ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.url} alt="Photo de l’entrée" className={`h-full w-full object-cover ${gate.status === 'envoi' ? 'opacity-50' : ''}`} /> : <Ico name="camera" size={26} />}
+                  {gate?.url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.url} alt="Photo de l’entrée" className={`h-full w-full object-cover ${gate.status === 'envoi' ? 'opacity-50' : ''}`} /> : <Ico name="camera" size={26} />}
                   {gate?.status === 'ok' && <span className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded-full bg-ok text-white"><Ico name="check" size={14} stroke={3} /></span>}
                 </span>
                 <span className="flex min-w-0 flex-col gap-0.5">
@@ -251,8 +271,8 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
                   <Ico name="camera" size={17} />{gate ? 'Reprendre' : 'Prendre la photo'}
                   <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={pickGate} />
                 </label>
-                {gate?.status === 'erreur'
-                  ? <button type="button" onClick={() => sendGate(gate.file, gate.url)} className="flex h-11 items-center justify-center rounded-xl border border-line text-[13px] font-extrabold">Réessayer l’envoi</button>
+                {gate?.status === 'erreur' && gate.file
+                  ? <button type="button" onClick={() => gate.file && sendGate(gate.file, gate.url ?? '')} className="flex h-11 items-center justify-center rounded-xl border border-line text-[13px] font-extrabold">Réessayer l’envoi</button>
                   : <label className="flex h-11 cursor-pointer items-center justify-center rounded-xl border border-line text-[13px] font-extrabold">Galerie<input type="file" accept="image/*" className="sr-only" onChange={pickGate} /></label>}
               </div>
             </div>

@@ -1,4 +1,5 @@
 'use client';
+import { hasDraft } from '@hailandx/scorpion/brouillon';
 import { catsSummary } from './CategoryPicker';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -26,7 +27,9 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
   const initial = (recue && decls.some((d) => d.id === recue) ? recue : decls[0]?.id) ?? null;
   const [addr, setAddr] = useState<string | null>(initial);
   // Parcours d'adresse sur place (§49 étape 4) : plus de détour par NavigationX.
+  // Parcours interrompu (appareil photo, rechargement) : on le rouvre tel quel (§55).
   const [locating, setLocating] = useState(false);
+  useEffect(() => { if (hasDraft('boutique-ouverture')) setLocating(true); }, []);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 
@@ -65,7 +68,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
 
   // Nouvelle adresse repérée : avant la boutique, elle devient l'adresse choisie ; après, elle est rattachée à la boutique.
   const located = (id: string) => { setLocating(false); setAddr(id); if (shop) void attach(id); else void reload(); };
-  if (locating) return <AdresseBoutique kicker={shop ? 'NOUVELLE ADRESSE DE LA BOUTIQUE' : 'OUVRIR MA BOUTIQUE · ÉTAPE 1'} onDone={located} onClose={() => setLocating(false)} />;
+  if (locating) return <AdresseBoutique draftKey="boutique-ouverture" kicker={shop ? 'NOUVELLE ADRESSE DE LA BOUTIQUE' : 'OUVRIR MA BOUTIQUE · ÉTAPE 1'} onDone={located} onClose={() => setLocating(false)} />;
 
   const bar = (on: boolean) => `h-1.5 rounded-full ${on ? 'bg-ink' : 'bg-[#e2ded3]'}`;
   const doneAll = certified && step === 3;

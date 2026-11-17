@@ -105,17 +105,22 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
   const sheetRef = useRef<HTMLDivElement>(null);
   /** L'utilisateur manipule la carte : la feuille se réduit au bouton principal, puis revient après 3 s de calme. */
   const [busy, setBusy] = useState(false);
+  const busyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  /** Flèche « afficher les détails » : la feuille revient tout de suite, sans attendre la fin du délai. */
+  const reveal = () => { clearTimeout(busyTimer.current); setBusy(false); };
+  /** Alerte brève (ex. toucher hors du cercle) : chaque nouveau toucher la relance. */
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t); }, [toast]);
   useEffect(() => {
     const el = mapDivRef.current;
     if (!el) return;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     const rest = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => setBusy(false), 3000);
+      clearTimeout(busyTimer.current);
+      busyTimer.current = setTimeout(() => setBusy(false), 3000);
     };
     const start = () => {
       if (phaseRef.current !== 'result' && phaseRef.current !== 'pick') return;
-      clearTimeout(timer);
+      clearTimeout(busyTimer.current);
       setBusy(true);
     };
     const wheel = () => {
@@ -127,7 +132,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
     window.addEventListener('pointerup', rest);
     window.addEventListener('pointercancel', rest);
     return () => {
-      clearTimeout(timer);
+      clearTimeout(busyTimer.current);
       el.removeEventListener('pointerdown', start);
       el.removeEventListener('wheel', wheel);
       window.removeEventListener('pointerup', rest);
@@ -232,7 +237,8 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       const err = (e as { error?: { status?: number; message?: string } }).error;
       const st = err?.status;
       setSatError((cur) => cur ?? (st === 401 ? 'Mapbox 401 : jeton absent ou invalide'
-        : st === 403 ? 'Mapbox 403 : jeton refusé pour cette adresse web (restrictions d’URL du jeton)'
+        // 403 : le jeton est valable mais limité à certaines adresses web (réglage du compte Mapbox) : on nomme l'adresse à ajouter.
+        : st === 403 ? `Mapbox 403 : jeton refusé pour ${typeof window !== 'undefined' ? window.location.origin : 'cette adresse web'}. Ajoutez cette adresse aux « URL restrictions » du jeton sur account.mapbox.com`
         : st ? `Mapbox ${st} : ${err?.message ?? 'erreur'}` : `Mapbox : ${err?.message ?? 'erreur inconnue'}`));
       if (!map.loaded()) fallback();
     });
@@ -256,6 +262,9 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       map.addLayer({ id: 'reg-chosen-fill', type: 'fill', source: 'reg-chosen', paint: { 'fill-color': COLOR_L2, 'fill-opacity': 0.3 } });
       map.addLayer({ id: 'reg-chosen-line', type: 'line', source: 'reg-chosen', paint: { 'line-color': COLOR_L2, 'line-width': 3.5 } });
       // Limite de désignation par touche (cercle pointillé), affichée seulement en mode « montrer mon bâtiment ».
+      // Voile sombre hors du cercle : le regard va vers l'intérieur, là où le bâtiment doit être touché.
+      map.addSource('reg-mask', { type: 'geojson', data: empty });
+      map.addLayer({ id: 'reg-mask-fill', type: 'fill', source: 'reg-mask', paint: { 'fill-color': '#05070d', 'fill-opacity': 0.5 } });
       map.addSource('reg-limit', { type: 'geojson', data: empty });
       map.addLayer({ id: 'reg-limit-line', type: 'line', source: 'reg-limit', paint: { 'line-color': '#ffffff', 'line-width': 1.6, 'line-dasharray': [2, 2], 'line-opacity': 0.8 } });
       map.addSource('reg-tap', { type: 'geojson', data: empty });
@@ -345,6 +354,9 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         ? detectAtTap(point, position, accuracy, osm, 12 * metersPerPx(map, point[1]), Infinity)
         : detectAtTap(point, position, accuracy, [...hailandRef.current, ...osm], 12 * metersPerPx(map, point[1]));
       setTap({ point, result });
+      if (result.kind === 'trop_loin') {
+        setToast({ id: Date.now(), text: `Hors du cercle (${Math.round(result.distance)} m de votre position). Touchez un bâtiment à l’intérieur ; s’il est vraiment dehors, touchez « Mon bâtiment est hors du cercle ».` });
+      } else setToast(null);
       let shape: GeoJSON.Polygon | null = null;
       let color = COLOR_L2;
       if (result.kind === 'osm') shape = result.candidate.polygon;
@@ -378,6 +390,11 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
     (map.getSource('reg-tap') as mapboxgl.GeoJSONSource | undefined)?.setData(empty);
     const limit = turf.circle(position, maxTapDistance(accuracy), { units: 'meters', steps: 72 }).geometry;
     (map.getSource('reg-limit') as mapboxgl.GeoJSONSource | undefined)?.setData(fc([limit]));
+    // Voile : un grand rectangle percé du cercle (anneau intérieur en sens inverse).
+    const [cx, cy] = position;
+    const outer: [number, number][] = [[cx - 1, cy - 1], [cx + 1, cy - 1], [cx + 1, cy + 1], [cx - 1, cy + 1], [cx - 1, cy - 1]];
+    const hole = [...(limit.coordinates[0] as [number, number][])].reverse();
+    (map.getSource('reg-mask') as mapboxgl.GeoJSONSource | undefined)?.setData(fc([{ type: 'Polygon', coordinates: [outer, hole] }]));
     // Vue élargie pour voir tout le cercle limite ; l'utilisateur agrandit ensuite à son bâtiment.
     const [w, so, e, n] = bboxOf(limit);
     map.fitBounds([w, so, e, n], { padding: { top: 70, bottom: sheetHRef.current + 10, left: 16, right: 16 }, duration: 600 });
@@ -475,7 +492,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
     </button>
   );
   /** Notification « c'est déjà votre emplacement » : aucune action d'enregistrement, on prévient seulement. */
-  const ownSheet = (d: DeclarationRecord, secondary: React.ReactNode) => ({
+  const ownSheet = (d: DeclarationRecord, more: { links?: Link[]; hint?: string }) => ({
     details: (
       <div role="status">
         <div className="flex items-center justify-between gap-2">
@@ -492,23 +509,13 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
       </div>
     ),
     primary: btn('Utiliser cette adresse', () => onUseExisting(d)),
-    secondary,
+    ...more,
   });
-  const sheet: { details: React.ReactNode; primary?: React.ReactNode; secondary?: React.ReactNode } =
+  const sheet: { details: React.ReactNode; primary?: React.ReactNode; links?: Link[]; hint?: string } =
     own && phase === 'pick'
-      ? ownSheet(own, <p className="mt-2 text-center text-[13px] font-semibold text-muted">Pour corriger, touchez un autre endroit de la carte.</p>)
+      ? ownSheet(own, { hint: 'Pour corriger, touchez un autre endroit de la carte.' })
       : own && phase === 'result'
-      ? ownSheet(
-          own,
-          <div className="mt-1 flex items-center justify-between">
-            <button type="button" onClick={onRetry} className="h-11 px-1 text-[14.5px] font-bold text-muted">
-              Relancer la localisation
-            </button>
-            <button type="button" onClick={startPick} className="h-11 px-1 text-[14.5px] font-bold text-blue">
-              Choisir un autre bâtiment
-            </button>
-          </div>,
-        )
+      ? ownSheet(own, { links: [{ label: 'Relancer la localisation', onClick: onRetry }, { label: 'Choisir un autre bâtiment', onClick: startPick, tone: 'blue' }] })
       : phase === 'pick'
       ? !tr
         ? {
@@ -523,9 +530,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 </p>
               </div>
             ),
-            secondary: !free && onOutside ? (
-              <button type="button" onClick={onOutside} className="pointer-events-auto mt-1 flex h-11 w-full items-center justify-center text-[14px] font-bold text-blue">Mon bâtiment est hors du cercle</button>
-            ) : undefined,
+            links: !free && onOutside ? [{ label: 'Mon bâtiment est hors du cercle', onClick: onOutside, tone: 'blue' }] : undefined,
           }
         : tr.kind === 'trop_loin'
           ? {
@@ -581,7 +586,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 </div>
               ),
               primary: btn(tr.kind === 'zone' ? 'Confirmer cet emplacement' : 'Confirmer ce bâtiment', confirmPick),
-              secondary: <p className="mt-2 text-center text-[13px] font-semibold text-muted">Pour corriger, touchez un autre endroit de la carte.</p>,
+              hint: 'Pour corriger, touchez un autre endroit de la carte.',
             }
       : phase !== 'result'
         ? {
@@ -641,18 +646,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 </div>
               ),
               primary: btn('Confirmer ce bâtiment', onConfirm),
-              secondary: (
-                <div className="mt-1 flex items-center justify-between">
-                  <button type="button" onClick={onRetry} className="h-11 px-1 text-[14.5px] font-bold text-muted">
-                    Relancer la localisation
-                  </button>
-                  {!noSatellite && (
-                    <button type="button" onClick={startPick} className="h-11 px-1 text-[14.5px] font-bold text-blue">
-                      Choisir un autre bâtiment
-                    </button>
-                  )}
-                </div>
-              ),
+              links: [{ label: 'Relancer la localisation', onClick: onRetry }, ...(!noSatellite ? [{ label: 'Choisir un autre bâtiment', onClick: startPick, tone: 'blue' as const }] : [])],
             }
           : {
               details: (
@@ -670,11 +664,7 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
                 </div>
               ),
               primary: noSatellite ? btn('Continuer avec cette position', onConfirm) : btn('Indiquer mon bâtiment sur la carte', startPick),
-              secondary: (
-                <button type="button" onClick={onRetry} className="mt-1 flex h-11 w-full items-center justify-center text-[14.5px] font-bold text-muted">
-                  Relancer la localisation
-                </button>
-              ),
+              links: [{ label: 'Relancer la localisation', onClick: onRetry }],
             };
   const ticks = pxPerM ? [1, 2, 3, 4, 5].map((k) => k * tickStep).filter((m) => m * pxPerM > rPx + 8) : [];
 
@@ -762,6 +752,11 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
           {free ? (free === 'a_distance' ? 'Adresse montrée à distance' : 'Désignation sans GPS') : `${fmtCoord(position[1])} · ${fmtCoord(position[0])}`}
         </div>
       </div>
+      {toast && (
+        <p key={toast.id} role="alert" className="absolute inset-x-4 top-[72px] z-20 rounded-xl bg-[#3a2a0a]/92 px-3.5 py-2.5 text-center text-[13px] font-bold leading-snug text-[#fcd38a] shadow-lg backdrop-blur motion-safe:animate-[pulse_0.6s_ease-out_1]">
+          {toast.text}
+        </p>
+      )}
       {satError && (
         <p role="status" className="absolute inset-x-4 top-[72px] z-10 rounded-xl bg-[#3a1a1a]/90 px-3 py-2 text-center text-[12px] font-bold text-[#ffb4a8]">
           Vue satellite indisponible — {satError}
@@ -779,13 +774,41 @@ export const BuildingScan: React.FC<Props> = ({ sb, token, position, accuracy, a
         />
         <div className="relative">
           <Collapse hidden={busy}>{sheet.details}</Collapse>
+          {/* Feuille réduite : une petite flèche rouvre les détails tout de suite, sans attendre le délai. */}
+          {sheet.details && (
+            <Collapse hidden={!busy}>
+              <div className="flex justify-center pb-1.5">
+                <button type="button" onClick={reveal} aria-label="Afficher les détails" className="flex h-9 w-14 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m6 15 6-6 6 6" /></svg>
+                </button>
+              </div>
+            </Collapse>
+          )}
           {sheet.primary && <div className="pointer-events-auto">{sheet.primary}</div>}
-          <Collapse hidden={busy}>{sheet.secondary}</Collapse>
+          {/* Actions secondaires : en clair quand la feuille est ouverte, en pastilles discrètes quand elle est réduite. */}
+          <Collapse hidden={busy}>
+            {sheet.hint && <p className="mt-2 text-center text-[13px] font-semibold text-muted">{sheet.hint}</p>}
+            {sheet.links && sheet.links.length > 0 && (
+              <div className={`mt-1 flex items-center ${sheet.links.length > 1 ? 'justify-between' : 'justify-center'}`}>
+                {sheet.links.map((l) => <button key={l.label} type="button" onClick={l.onClick} className={`h-11 px-1 text-[14.5px] font-bold ${l.tone === 'blue' ? 'text-blue' : 'text-muted'}`}>{l.label}</button>)}
+              </div>
+            )}
+          </Collapse>
+          {sheet.links && sheet.links.length > 0 && (
+            <Collapse hidden={!busy}>
+              <div className="flex flex-wrap justify-center gap-2 pt-2">
+                {sheet.links.map((l) => <button key={l.label} type="button" onClick={l.onClick} className={`h-9 rounded-full px-3.5 text-[13px] font-bold backdrop-blur ${l.tone === 'blue' ? 'bg-blue/85 text-white' : 'bg-black/60 text-white'}`}>{l.label}</button>)}
+              </div>
+            </Collapse>
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+/** Action secondaire de la feuille (relancer, choisir un autre bâtiment…). */
+type Link = { label: string; onClick: () => void; tone?: 'blue' };
 
 /** Bloc qui se replie en hauteur et en opacité (transition fluide). */
 const Collapse: React.FC<{ hidden: boolean; children?: React.ReactNode }> = ({ hidden, children }) =>
