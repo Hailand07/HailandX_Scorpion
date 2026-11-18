@@ -1,6 +1,6 @@
 'use client';
 import { ActionBar, Btn } from '@/components/ui';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
@@ -8,6 +8,7 @@ import { BackHeader, browserClient, errText, Icon, mediaUrl, Notice, Screen, Swi
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { ProductPublished } from './ProductPublished';
+import { brouillonUtile, cleBrouillon, ecrireBrouillon, effacerBrouillon, lireBrouillon, type BrouillonProduit } from '@/lib/brouillonProduit';
 import { Chargement, FitImage, Lightbox } from '@hailandx/ui';
 
 interface Variant { key: number; id: string; label: string; stock: number }
@@ -15,6 +16,8 @@ interface Section { id: string; name: string }
 interface Cat { id: string; name: string }
 interface Existing { id: string; price_gnf: number; compare_at_gnf: number | null; section_id: string | null; active: boolean; photo_paths: string[] | null; description: string | null; condition: 'neuf' | 'occasion'; offer_variants: { id: string; label: string; stock: number }[] | null; catalog_products: { id: string; name: string; slug: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null; created_by: string | null } | null }
 interface Linked { id: string; name: string; category_id: string | null; description: string | null; attributes: Record<string, unknown> | null }
+/** Photo ajoutée pendant la saisie : envoyée tout de suite (§61), pour survivre à un rechargement de l'application. */
+interface Pic { key: string; preview: string; file: File; path: string | null; status: 'envoi' | 'ok' | 'erreur' }
 
 const MAX_PHOTOS = 5;
 const rand = () => Math.random().toString(36).slice(2, 6);
@@ -47,7 +50,11 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   const [cat, setCat] = useState<string | null>(shop.category_id);
   const [active, setActive] = useState(true);
   const [kept, setKept] = useState<string[]>([]);
-  const [files, setFiles] = useState<File[]>([]);
+  const [pics, setPics] = useState<Pic[]>([]);
+  // Brouillon (§61) : la saisie est gardée sur le téléphone tant que le produit n'est pas publié.
+  const cle = cleBrouillon(shop.id, offerId, copyFrom);
+  const [pret, setPret] = useState(false);
+  const base = useRef<string>('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [published, setPublished] = useState<{ slug: string; name: string; offerId?: string } | null>(null);
@@ -55,8 +62,17 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   const [viewing, setViewing] = useState<number | null>(null);
   const [nextKey, setNextKey] = useState(1);
 
+  function reprendre(d: BrouillonProduit) {
+    setName(d.name); setLinked(d.linked); setDesc(d.desc); setPoints(d.points); setValues(d.values); setCondition(d.condition); setNote(d.note);
+    setPrice(d.price); setCompareAt(d.compareAt); setVariants(d.variants); setNextKey(Math.max(0, ...d.variants.map((v) => v.key)) + 1); setRemoved(d.removed);
+    setSection(d.section); setCat(d.cat); setActive(d.active); setKept(d.kept);
+    setMsg({ tone: 'ok', text: 'Votre saisie a été reprise là où vous l’aviez laissée.' });
+  }
+
   useEffect(() => {
     if (!sb) return;
+    // Nouveau produit : on reprend le brouillon s'il y en a un (l'application a pu être rechargée pendant la photo).
+    if (!offerId && !copyFrom) { const d = lireBrouillon(cle); if (d && brouillonUtile(d)) reprendre(d); setPret(true); }
     sb.from('shop_sections').select('id,name').eq('shop_id', shop.id).order('position').order('name').then(({ data }) => setSections((data as Section[]) ?? []));
     sb.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? []));
     const source = offerId ?? copyFrom;
@@ -72,11 +88,39 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       if (cp) { setCat(cp.category_id); setDesc(cp.description ?? ''); const d = readAttributes(cp.attributes); setValues(d.values); setPoints([...d.points, '', '', ''].slice(0, Math.max(3, d.points.length))); }
       const vs = (o.offer_variants ?? []).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
       if (vs.length) { setVariants(vs.map((v, i) => ({ key: i, id: editing ? v.id : '', label: v.label === 'Standard' && vs.length === 1 ? '' : v.label, stock: v.stock }))); setNextKey(vs.length); }
+      // Puis le brouillon, s'il y en a un pour ce produit : il passe avant ce qui est enregistré.
+      const d = lireBrouillon(cle); if (d && brouillonUtile(d)) reprendre(d);
+      setPret(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sb, shop.id, offerId, copyFrom, editing]);
 
-  const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
-  useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
+  // Photos en cours : les aperçus locaux sont libérés en quittant l'écran.
+  const picsRef = useRef<Pic[]>([]); picsRef.current = pics;
+  useEffect(() => () => picsRef.current.forEach((p) => URL.revokeObjectURL(p.preview)), []);
+
+  // Écriture du brouillon à chaque changement, une fois l'écran prêt. Rien n'est écrit tant que rien n'a changé.
+  const snapshot: BrouillonProduit = { name, linked, desc, points, values, condition, note, price, compareAt, variants, removed, section, cat, active, kept: [...kept, ...pics.filter((p) => p.path).map((p) => p.path!)] };
+  const json = JSON.stringify(snapshot);
+  useEffect(() => {
+    if (!pret || published) return;
+    if (!base.current) { base.current = json; return; }
+    if (json !== base.current && brouillonUtile(snapshot)) ecrireBrouillon(cle, snapshot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pret, published, json, cle]);
+
+  async function envoyer(p: Pic) {
+    setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'envoi' } : x)));
+    try {
+      const path = await uploadPhoto(sb!, uid, p.file);
+      setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, path, status: 'ok' } : x)));
+    } catch {
+      setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'erreur' } : x)));
+    }
+  }
+  function retirer(key: string) {
+    setPics((ps) => { const p = ps.find((x) => x.key === key); if (p) URL.revokeObjectURL(p.preview); return ps.filter((x) => x.key !== key); });
+  }
 
   const setVar = (key: number, patch: Partial<Variant>) => setVariants((vs) => vs.map((v) => (v.key === key ? { ...v, ...patch } : v)));
   const priceN = Number(price.replace(/\s/g, ''));
@@ -94,7 +138,9 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
     try {
       if (!editing && name.trim().length < 2) throw new Error('Donnez un nom au produit.');
       // Sans photo, un lien partagé ne donne pas envie : on prévient, sans bloquer (appareil photo refusé, réseau faible).
-      if (!editing && kept.length + files.length === 0 && typeof window !== 'undefined' && Number.isFinite(priceN) && priceN >= 500 && !window.confirm('Publier sans photo ? Un produit sans photo se vend très mal. Touchez « Annuler » pour en ajouter une.')) return;
+      if (pics.some((p) => p.status === 'envoi')) throw new Error('Les photos s’envoient encore : patientez un instant, puis réessayez.');
+      if (pics.some((p) => p.status === 'erreur')) throw new Error('Une photo n’a pas pu être envoyée : touchez « Réessayer » sur la photo, ou retirez-la.');
+      if (!editing && kept.length + pics.length === 0 && typeof window !== 'undefined' && Number.isFinite(priceN) && priceN >= 500 && !window.confirm('Publier sans photo ? Un produit sans photo se vend très mal. Touchez « Annuler » pour en ajouter une.')) return;
       if (!Number.isFinite(priceN) || priceN < 500) throw new Error('Indiquez un prix en GNF (500 au minimum).');
       if (compareN && compareN <= priceN) throw new Error('Le prix barré doit être plus élevé que le prix de vente (ou laissez-le vide).');
       if (rows.some((r) => !r.label)) throw new Error('Donnez un nom à chaque variante (ex. M · Bleu).');
@@ -102,9 +148,8 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       if (desc.length > FICHE_LIMITS.description) throw new Error(`Description trop longue (${FICHE_LIMITS.description} caractères au plus).`);
       if (note.length > 1000) throw new Error('Le mot du vendeur dépasse 1 000 caractères.');
       setBusy(true);
-      const uploaded: string[] = [];
-      for (const f of files) uploaded.push(await uploadPhoto(sb!, uid, f));
-      const photos = [...kept, ...uploaded].slice(0, MAX_PHOTOS);
+      // Les photos sont déjà envoyées (dès leur ajout) : on ne garde que leurs chemins.
+      const photos = [...kept, ...pics.map((p) => p.path!)].slice(0, MAX_PHOTOS);
 
       if (!editing) {
         let productId = linked?.id;
@@ -123,6 +168,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         if (e2) throw new Error(errText(e2));
         const { error: e3 } = await sb!.from('offer_variants').insert(rows.map((v) => ({ offer_id: (off as { id: string }).id, label: v.label, stock: v.stock })));
         if (e3) throw new Error(errText(e3));
+        effacerBrouillon(cle);
         setPublished({ slug, name: linked?.name ?? name.trim(), offerId: (off as { id: string }).id });
       } else {
         const { error } = await sb!.from('offers').update({ price_gnf: Math.round(priceN), compare_at_gnf: compareN ? Math.round(compareN) : null, section_id: section, active, photo_paths: photos, condition, description: note.trim() || null }).eq('id', offerId!);
@@ -140,6 +186,7 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         for (const v of rows.filter((x) => x.id)) { const r = await sb!.from('offer_variants').update({ label: v.label, stock: v.stock }).eq('id', v.id); if (r.error) throw new Error(r.error.code === '23505' ? 'Deux variantes portent le même nom.' : errText(r.error)); }
         const fresh = rows.filter((x) => !x.id);
         if (fresh.length) { const r = await sb!.from('offer_variants').insert(fresh.map((v) => ({ offer_id: offerId, label: v.label, stock: v.stock }))); if (r.error) throw new Error(r.error.code === '23505' ? 'Deux variantes portent le même nom.' : errText(r.error)); }
+        effacerBrouillon(cle);
         router.push('/produits');
         return;
       }
@@ -149,18 +196,24 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
     setBusy(false);
   }
 
-  if (published) return <ProductPublished shop={shop} published={published} priceGnf={Math.round(priceN)} onAnother={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setFiles([]); setKept([]); setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} />;
+  if (published) return <ProductPublished shop={shop} published={published} priceGnf={Math.round(priceN)} onAnother={() => { setPublished(null); setName(''); setLinked(null); setPrice(''); setVariants([{ key: nextKey, id: '', label: '', stock: 1 }]); setNextKey((k) => k + 1); setPics([]); setKept([]); setMsg(null); base.current = ''; setDesc(''); setPoints(['', '', '']); setValues({}); setNote(''); setCondition('neuf'); setBusy(false); }} />;
   if (existing === undefined) return <Screen><BackHeader icon="close" href="/produits" title="Modifier le produit" label="Fermer" /><Chargement /></Screen>;
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
-  const nPhotos = kept.length + files.length;
-  const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => { const list = Array.from(e.target.files ?? []); setFiles((f) => [...f, ...list].slice(0, MAX_PHOTOS - kept.length)); e.target.value = ''; };
+  const nPhotos = kept.length + pics.length;
+  const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const list = Array.from(e.target.files ?? []).slice(0, Math.max(0, MAX_PHOTOS - nPhotos));
+    e.target.value = '';
+    const nouvelles: Pic[] = list.map((file) => ({ key: `${Date.now()}-${rand()}`, preview: URL.createObjectURL(file), file, path: null, status: 'envoi' }));
+    setPics((ps) => [...ps, ...nouvelles]);
+    nouvelles.forEach((p) => void envoyer(p));
+  };
   const completeness = ficheCompleteness(cat, desc, attrs, nPhotos);
   const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
   return (
     <Screen className="gap-3 pb-32">
       <BackHeader icon="close" href="/produits" label="Fermer sans enregistrer" title={editing ? 'Modifier le produit' : 'Nouveau produit'}
-        onBack={(e) => { if (!editing && !busy && (name.trim() || price.trim() || files.length > 0) && !window.confirm('Quitter sans publier ? Ce que vous avez saisi sera perdu.')) e.preventDefault(); }}
+        onBack={(e) => { if (!editing && !busy && (name.trim() || price.trim() || pics.length > 0) && !window.confirm('Quitter sans publier ? Ce que vous avez saisi sera perdu.')) { e.preventDefault(); return; } effacerBrouillon(cle); }}
         right={editing && existing ? <span className="flex gap-1.5">
           <Link href={`/produits/nouveau?depuis=${existing.id}`} className="flex h-10 items-center rounded-full border border-line px-3 text-[13px] font-extrabold">Dupliquer</Link>
           {existing.active && existing.catalog_products && <button type="button" onClick={() => setSharing(true)} className="h-10 rounded-full border border-line px-3 text-[13px] font-extrabold">Partager</button>}
@@ -183,8 +236,8 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
           </>
         )}
         {kept.map((p, i) => <Thumb key={p} src={mediaUrl(p)} onOpen={() => setViewing(i)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
-        {previews.map((u, i) => <Thumb key={u} src={u} onOpen={() => setViewing(kept.length + i)} onRemove={() => setFiles((f) => f.filter((_, j) => j !== i))} />)}
-        {viewing !== null && <Lightbox photos={[...kept.map((p) => mediaUrl(p) ?? ''), ...previews].filter(Boolean)} start={viewing} label={name || 'Produit'} onClose={() => setViewing(null)} />}
+        {pics.map((p, i) => <Thumb key={p.key} src={p.preview} status={p.status} onRetry={() => void envoyer(p)} onOpen={() => setViewing(kept.length + i)} onRemove={() => retirer(p.key)} />)}
+        {viewing !== null && <Lightbox photos={[...kept.map((p) => mediaUrl(p) ?? ''), ...pics.map((p) => p.preview)].filter(Boolean)} start={viewing} label={name || 'Produit'} onClose={() => setViewing(null)} />}
         {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos :<br />elles font vendre.</span>}
       </section>
 
@@ -312,10 +365,13 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   );
 }
 
-function Thumb({ src, onRemove, onOpen }: { src: string | null; onRemove: () => void; onOpen: () => void }) {
+function Thumb({ src, onRemove, onOpen, status = 'ok', onRetry }: { src: string | null; onRemove: () => void; onOpen: () => void; status?: Pic['status']; onRetry?: () => void }) {
   return (
     <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[20px] bg-sand">
       {src && <FitImage src={src} alt="Photo du produit" onOpen={onOpen} className="h-full w-full" />}
+      {/* État de l'envoi (§61) : la photo part dès qu'elle est ajoutée. */}
+      {status === 'envoi' && <span role="status" className="absolute inset-x-0 bottom-0 bg-black/55 py-1 text-center text-[11px] font-extrabold text-white">Envoi…</span>}
+      {status === 'erreur' && <button type="button" onClick={onRetry} className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-[#8a2a1c]/80 text-[11.5px] font-extrabold text-white">Échec<span className="underline">Réessayer</span></button>}
       <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
     </span>
   );
