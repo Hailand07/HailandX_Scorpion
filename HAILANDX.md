@@ -595,6 +595,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | §59 : réglages Supabase appliqués par l'API d'administration : téléphone activé sans « Confirm phone », mots de passe 8 caractères avec lettres et chiffres (vérifié : refus `weak_password`). Modèle « Reset password » bloqué par Supabase sans SMTP personnalisé (offre gratuite) ; SMTP non touché. |
 | 2026-11-18 | §60 : **installation sur l'écran d'accueil** (PWA) de HailandX, Vendeur et Flotte : bandeau « Installez … » (fermable, revient après 14 jours) — HailandX après une commande (Mes commandes, Aperçu), Vendeur sur l'accueil, Flotte hors service — et ligne « Installer l'application » (Mon compte, Plus, menu Flotte) ; guide adapté (Android : invitation directe de Chrome ; iPhone : Partager → « Sur l'écran d'accueil » ; WhatsApp : ouvrir d'abord dans le navigateur) ; service `sw.js` minimal : page « Pas de connexion » hors réseau, aucune mise en cache. Kit : `Installation.tsx`, `plateforme.ts` (2 tests). NavigationX et HailandMap : pas maintenant (décision du fondateur). |
 | 2026-11-18 | §60 corrigé (précision du fondateur) : **pas d'installation pour HailandX ni pour la Console**, seulement pour les vendeurs. Retirés de HailandX : bandeau, ligne du compte, `EcouteInstallation`, `sw.js`, fiche d'installation (`manifest.ts`) et ses icônes ; retirés de la Console : fiche d'installation et icônes. Restent : Vendeur et Flotte (Flotte confirmée par le fondateur). |
+| 2026-11-18 | §61 : photos de produit perdues dans HailandX Vendeur installé sur l'écran d'accueil — Android ferme l'application pendant l'appareil photo et la recharge au retour ; les photos n'étaient envoyées qu'à « Publier ». Corrigé : chaque photo part dès qu'elle est prise ou choisie (« Envoi… », « Échec — Réessayer ») et la saisie est gardée en brouillon sur le téléphone (24 h), reprise automatiquement (`lib/brouillonProduit.ts`, 3 tests). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1394,4 +1395,14 @@ Rappel des réglages prévus :
 - ✅ `GuideInstallation` : Android/ordinateur sans invitation → menu ⋮ → « Installer l'application » ; iPhone → Partager → « Sur l'écran d'accueil » → « Ajouter » (Apple n'autorise pas de bouton direct) ; navigateur de WhatsApp, Facebook… → l'ouvrir d'abord dans Chrome ou Safari (copie du lien).
 - ✅ `public/sw.js` (HailandX, Vendeur, Flotte) : ne met **rien** en cache (pas de risque d'ancienne version) ; seulement, sans réseau, une page « Pas de connexion — Réessayer » aux couleurs de l'application.
 - Vérifié dans un navigateur (iPhone et navigateur intégré simulés) : bandeau, guide, « Plus tard », ligne du compte. ⚠️ L'invitation directe de Chrome ne se teste que sur un vrai téléphone Android, site en ligne.
+
+## 61. Photos de produit qui disparaissent dans l'application installée (2026-11-18) — ✅ code, ⚠️ à essayer sur téléphone
+
+**Constat du fondateur** : après avoir installé HailandX Vendeur sur l'écran d'accueil (§60), l'ajout d'une image de produit ou la prise directe de la photo ne marche pas.
+**Cause (✅ constatée dans le code)** : l'éditeur gardait les photos en mémoire jusqu'au bouton « Publier ». Une application installée est souvent fermée par Android pendant que l'appareil photo est ouvert, puis rechargée au retour : la photo et toute la saisie disparaissaient (même cause que la photo de l'entrée, §53–§55).
+**Correctif** :
+- chaque photo est **envoyée tout de suite** (prise ou choisie) ; sur la vignette : « Envoi… », puis rien, ou « Échec — Réessayer » ; « Publier » attend que toutes les photos soient envoyées ;
+- la saisie (nom, prix, variantes, détails, photos déjà envoyées) est gardée en **brouillon sur le téléphone** pendant 24 h (`apps/vendeur/src/lib/brouillonProduit.ts`, une clé par boutique et par produit : nouveau, copie, modification) et **reprise automatiquement** à la réouverture (« Votre saisie a été reprise… ») ; effacé à la publication, à l'enregistrement ou en quittant volontairement.
+- Vérifié dans un navigateur : photo ajoutée, saisie, page rechargée → nom, prix et photo revenus ; publication avec la photo ; brouillon effacé.
+- Non touché : logo et bandeau des réglages (déjà envoyés tout de suite). Le logo du formulaire d'ouverture de boutique reste envoyé à la validation (risque plus faible : galerie).
 
