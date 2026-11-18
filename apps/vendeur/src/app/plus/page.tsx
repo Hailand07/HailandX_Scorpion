@@ -43,10 +43,10 @@ export default function PlusPage() {
       {open && owner && (
         <Link href="/argent" className="flex items-end justify-between gap-3 rounded-[24px] bg-ink p-5 text-white">
           <span className="flex flex-col gap-1">
-            <span className="text-[12px] font-bold text-white/65">Hailand vous doit</span>
+            <span className="text-[12px] font-bold text-white/65">Solde</span>
             <span className="font-display text-[30px] font-semibold leading-none tracking-tight">{balance === null ? '…' : formatGnf(balance, false)} <span className="text-[14px] text-white/65">GNF</span></span>
           </span>
-          <span className="flex h-10 items-center gap-1 rounded-full bg-white/10 px-3.5 text-[13px] font-extrabold">Argent<Icon name="chevron" size={15} stroke={2.2} /></span>
+          <span className="flex h-10 items-center gap-1 rounded-full bg-white/10 px-3.5 text-[13px] font-extrabold">Retirer<Icon name="chevron" size={15} stroke={2.2} /></span>
         </Link>
       )}
 

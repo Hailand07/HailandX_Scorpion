@@ -6,11 +6,12 @@ import { BackHeader, browserClient, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShopWallet } from '@/components/ShopWallet';
 import { PayoutCard } from '@/components/PayoutCard';
+import { SoldeCard } from '@/components/SoldeCard';
 
 interface Entry { id: number; kind: string; amount_gnf: number; created_at: string; parcel_id: string | null }
-const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Versement reçu de Hailand', reversement_portefeuille: 'Versé dans le portefeuille HailandPay', reprise_portefeuille: 'Repris au portefeuille HailandPay' };
+const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Retrait envoyé sur votre compte', reversement_portefeuille: 'Versé dans le portefeuille HailandPay', reprise_portefeuille: 'Repris au portefeuille HailandPay' };
 
-/** Argent (v2) : ce que Hailand doit à la boutique, l'argent bloqué en attente de remise, et les mouvements. */
+/** Argent (§62) : le solde (disponible, en attente) et le bouton « Retirer », où recevoir l'argent, les colis payés pas encore remis, les mouvements. */
 export default function MoneyPage() {
   return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} />}</SellerGate>;
 }
@@ -19,6 +20,8 @@ function Money({ shopId }: { shopId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [pending, setPending] = useState<{ n: number; sum: number } | null>(null);
   const [commission, setCommission] = useState<number | null>(null);
+  // Le solde se recharge quand le moyen de versement change (retrait possible ou non).
+  const [version, setVersion] = useState(0);
   useEffect(() => {
     const sb = browserClient(); if (!sb) return;
     sb.from('ledger_entries').select('id,kind,amount_gnf,created_at,parcel_id').eq('account', 'shop').eq('account_id', shopId).order('id', { ascending: false }).limit(200).then(({ data }) => setEntries((data as Entry[]) ?? []));
@@ -26,17 +29,13 @@ function Money({ shopId }: { shopId: string }) {
       .then(({ data }) => { const xs = (data as { subtotal_gnf: number }[]) ?? []; setPending({ n: xs.length, sum: xs.reduce((k, x) => k + x.subtotal_gnf, 0) }); });
     sb.from('settings').select('value').eq('key', 'commission_bps').maybeSingle().then(({ data }) => { const n = data ? Number((data as { value: string }).value) / 100 : NaN; setCommission(Number.isFinite(n) ? n : null); });
   }, [shopId]);
-  const balance = (entries ?? []).reduce((n, e) => n + e.amount_gnf, 0);
   const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   return (
     <Screen>
       <BackHeader href="/plus" title="Argent" label="Retour" />
-      <section className="flex flex-col gap-3 rounded-[24px] bg-ink p-[18px] text-white">
-        <span className="text-[13px] font-bold text-white/70">Hailand vous doit</span>
-        <span className="font-display text-[30px] font-semibold tracking-tight">{entries ? formatGnf(balance, false) : '…'} <span className="text-[15px] text-white/65">GNF</span></span>
-      </section>
-      <PayoutCard shopId={shopId} />
+      <SoldeCard key={version} shopId={shopId} />
+      <PayoutCard shopId={shopId} onSaved={() => setVersion((v) => v + 1)} />
 
       {pending && pending.n > 0 && (
         <section className="flex items-center gap-3 rounded-[20px] border border-line-soft bg-card px-4 py-3.5">

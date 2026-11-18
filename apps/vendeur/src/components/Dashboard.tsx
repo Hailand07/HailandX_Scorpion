@@ -157,8 +157,8 @@ export function Dashboard({ shop }: { shop: MyShop }) {
 
       {owner && (
         <Link href="/argent" className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card p-4">
-          <span className="flex flex-col gap-0.5"><span className="text-[12px] font-bold text-muted">Hailand vous doit</span><span className="font-display text-[20px] font-semibold">{d ? formatGnf(d.balance, false) : '…'} <span className="text-[12px] text-muted">GNF</span></span></span>
-          <span className="flex items-center gap-1 text-[13px] font-extrabold text-blue-ink">Voir<Icon name="chevron" size={15} stroke={2.2} /></span>
+          <span className="flex flex-col gap-0.5"><span className="text-[12px] font-bold text-muted">Solde</span><span className="font-display text-[20px] font-semibold">{d ? formatGnf(d.balance, false) : '…'} <span className="text-[12px] text-muted">GNF</span></span></span>
+          <span className="flex items-center gap-1 text-[13px] font-extrabold text-blue-ink">Retirer<Icon name="chevron" size={15} stroke={2.2} /></span>
         </Link>
       )}
     </Screen>
