@@ -12,6 +12,7 @@
   "dependencies": {
     "@hailandx/commerce": "*",
     "@hailandx/ui": "*",
-    "@supabase/supabase-js": "^2.117.3"
+    "@supabase/supabase-js": "^2.117.3",
+    "heic-to": "1.6.7"
   }
 }

@@ -7,7 +7,20 @@ export const mediaUrl = (path: string | null | undefined): string | null =>
   path?.startsWith('https://') ? path
   : path && process.env.NEXT_PUBLIC_SUPABASE_URL ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}` : null;
 
-/** Décode une image : `createImageBitmap` d'abord, sinon un élément <img> (anciens navigateurs, certains formats d'appareil photo). */
+/**
+ * Photo au format HEIC / HEIF (« photos à haute efficacité » de Samsung et de l'iPhone), que Chrome ne sait pas afficher (§61).
+ * Reconnue au type, à l'extension ou à la signature du fichier (`ftyp` + marque heic, heix, mif1…).
+ */
+export async function estHeic(file: Blob & { name?: string }): Promise<boolean> {
+  if (/image\/hei[cf]/i.test(file.type) || /\.hei[cf]$/i.test(file.name ?? '')) return true;
+  try {
+    const head = new Uint8Array(await file.slice(0, 12).arrayBuffer());
+    const txt = String.fromCharCode(...head.slice(4, 12));
+    return /^ftyp(heic|heix|hevc|hevx|heim|heis|mif1|msf1)$/.test(txt);
+  } catch { return false; }
+}
+
+/** Décode une image : `createImageBitmap` d'abord, sinon un élément <img> (anciens navigateurs), sinon conversion HEIC (§61). */
 async function decode(file: Blob): Promise<{ source: CanvasImageSource; width: number; height: number; close: () => void }> {
   try {
     const bmp = await createImageBitmap(file);
@@ -17,7 +30,18 @@ async function decode(file: Blob): Promise<{ source: CanvasImageSource; width: n
     try {
       const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('image')); i.src = url; });
       return { source: img, width: img.naturalWidth, height: img.naturalHeight, close: () => URL.revokeObjectURL(url) };
-    } catch { URL.revokeObjectURL(url); throw new Error('Cette photo ne peut pas être lue sur ce téléphone. Prenez-la à nouveau, ou choisissez-en une autre.'); }
+    } catch {
+      URL.revokeObjectURL(url);
+      // HEIC : le convertisseur (≈ 3 Mo) n'est chargé que dans ce cas.
+      if (await estHeic(file)) {
+        try {
+          const { heicTo } = await import('heic-to/next');
+          const bmp = await heicTo({ blob: file, type: 'bitmap' });
+          return { source: bmp, width: bmp.width, height: bmp.height, close: () => bmp.close() };
+        } catch { /* message ci-dessous */ }
+      }
+      throw new Error('Cette photo ne peut pas être lue sur ce téléphone. Prenez-la à nouveau, ou choisissez-en une autre.');
+    }
   }
 }
 
@@ -27,7 +51,7 @@ async function decode(file: Blob): Promise<{ source: CanvasImageSource; width: n
  * pèse moins de 8 Mo : mieux vaut une photo lourde que pas de photo.
  */
 export async function shrinkImage(file: File, maxSide = 1280, quality = 0.8): Promise<Blob> {
-  if (file.type && !file.type.startsWith('image/')) throw new Error('Choisissez une image (JPEG, PNG ou WebP).');
+  if (file.type && !file.type.startsWith('image/') && !(await estHeic(file))) throw new Error('Choisissez une image (JPEG, PNG ou WebP).');
   try {
     const img = await decode(file);
     const scale = Math.min(1, maxSide / Math.max(img.width, img.height));

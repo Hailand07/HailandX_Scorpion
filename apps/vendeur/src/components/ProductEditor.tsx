@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
-import { BackHeader, browserClient, CameraDirecte, errText, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, CameraDirecte, errText, Icon, mediaUrl, Notice, Screen, shrinkImage, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { ProductPublished } from './ProductPublished';
@@ -115,15 +115,26 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   async function envoyer(p: Pic) {
     setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'envoi' } : x)));
     try {
-      const path = await uploadPhoto(sb!, uid, p.file);
+      // D'abord la réduction en JPEG (qui convertit aussi les photos HEIC de Samsung et de l'iPhone, illisibles pour Chrome) :
+      // l'aperçu montre la photo convertie, et c'est elle qui est envoyée.
+      const jpeg = p.path ? null : await shrinkImage(p.file);
+      const fichier = jpeg ? new File([jpeg], 'photo.jpg', { type: jpeg.type || 'image/jpeg' }) : p.file;
+      if (jpeg) {
+        const apercu = URL.createObjectURL(jpeg);
+        setPics((ps) => ps.map((x) => { if (x.key !== p.key) return x; if (x.preview) URL.revokeObjectURL(x.preview); return { ...x, preview: apercu, file: fichier }; }));
+      }
+      const path = await uploadPhoto(sb!, uid, fichier);
       setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, path, status: 'ok' } : x)));
     } catch (e) {
-      setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'erreur' } : x)));
-      setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée. Réessayez.' });
+      const texte = e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée. Réessayez.';
+      // Photo illisible : la réessayer ne sert à rien, on la retire ; problème de réseau : on garde « Réessayer ».
+      if (/ne peut pas être lue|Choisissez une image/.test(texte)) retirer(p.key);
+      else setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'erreur' } : x)));
+      setMsg({ tone: 'err', text: texte });
     }
   }
   function retirer(key: string) {
-    setPics((ps) => { const p = ps.find((x) => x.key === key); if (p) URL.revokeObjectURL(p.preview); return ps.filter((x) => x.key !== key); });
+    setPics((ps) => { const p = ps.find((x) => x.key === key); if (p?.preview) URL.revokeObjectURL(p.preview); return ps.filter((x) => x.key !== key); });
   }
 
   const setVar = (key: number, patch: Partial<Variant>) => setVariants((vs) => vs.map((v) => (v.key === key ? { ...v, ...patch } : v)));
@@ -206,7 +217,8 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
 
   const nPhotos = kept.length + pics.length;
   const ajouter = (list: File[]) => {
-    const nouvelles: Pic[] = list.slice(0, Math.max(0, MAX_PHOTOS - nPhotos)).map((file) => ({ key: `${Date.now()}-${rand()}`, preview: URL.createObjectURL(file), file, path: null, status: 'envoi' }));
+    // Pas d'aperçu tant que la photo n'est pas convertie : une photo HEIC s'afficherait cassée.
+    const nouvelles: Pic[] = list.slice(0, Math.max(0, MAX_PHOTOS - nPhotos)).map((file) => ({ key: `${Date.now()}-${rand()}`, preview: '', file, path: null, status: 'envoi' }));
     setPics((ps) => [...ps, ...nouvelles]);
     nouvelles.forEach((p) => void envoyer(p));
   };
@@ -238,31 +250,40 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
       {camera && <CameraDirecte restantes={MAX_PHOTOS - nPhotos} onPhoto={(f) => ajouter([f])} onClose={() => setCamera(false)}
         onRepli={() => { setCamera(false); setNatif(true); setMsg({ tone: 'ok', text: 'Touchez de nouveau « Appareil photo » : l’appareil photo du téléphone va s’ouvrir.' }); }} />}
 
-      <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
+      {/* Photos (§61) : une grille de 3, la première est la photo principale ; les deux boutons d'ajout en dessous. */}
+      <section aria-labelledby="photos-titre" className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
+        <div className="flex items-baseline justify-between">
+          <h2 id="photos-titre" className="text-[13px] font-extrabold">Photos</h2>
+          <span className="text-[12px] font-bold text-muted">{nPhotos} / {MAX_PHOTOS}</span>
+        </div>
+        {nPhotos > 0 ? (
+          <div className="grid grid-cols-3 gap-2">
+            {kept.map((p, i) => <Thumb key={p} src={mediaUrl(p)} principale={i === 0} onOpen={() => setViewing(i)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
+            {pics.map((p, i) => <Thumb key={p.key} src={p.preview} principale={kept.length + i === 0} status={p.status} onRetry={() => void envoyer(p)} onOpen={() => setViewing(kept.length + i)} onRemove={() => retirer(p.key)} />)}
+          </div>
+        ) : (
+          <p className="rounded-[14px] border border-dashed border-line px-3.5 py-4 text-center text-[12.5px] font-semibold leading-snug text-muted">Jusqu’à {MAX_PHOTOS} photos : elles font vendre.<br />La première est celle que les clients voient d’abord.</p>
+        )}
+        {viewing !== null && <Lightbox photos={[...kept.map((p) => mediaUrl(p) ?? ''), ...pics.map((p) => p.preview)].filter(Boolean)} start={viewing} label={name || 'Produit'} onClose={() => setViewing(null)} />}
         {nPhotos < MAX_PHOTOS && (
-          <>
-            {/* Deux entrées : l'appareil photo directement (un produit se photographie souvent sur le moment), ou la galerie. */}
+          <div className="grid grid-cols-2 gap-2">
             {/* Appareil photo dans l'application (§61) ; l'appareil photo du téléphone seulement en repli. */}
             {natif ? (
-              <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
-                <Icon name="camera" size={22} stroke={1.8} />Appareil photo
+              <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] bg-ink text-[13.5px] font-extrabold text-white">
+                <Icon name="camera" size={19} stroke={1.9} />Prendre une photo
                 <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={addPhotos} />
               </label>
             ) : (
-              <button type="button" onClick={() => setCamera(true)} className="flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
-                <Icon name="camera" size={22} stroke={1.8} />Appareil photo
+              <button type="button" onClick={() => setCamera(true)} className="flex h-12 items-center justify-center gap-2 rounded-[14px] bg-ink text-[13.5px] font-extrabold text-white">
+                <Icon name="camera" size={19} stroke={1.9} />Prendre une photo
               </button>
             )}
-            <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] border border-line bg-card text-[12px] font-extrabold">
-              <Icon name="image" size={22} stroke={1.8} />Galerie
+            <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-[14px] border border-line text-[13.5px] font-extrabold">
+              <Icon name="image" size={19} stroke={1.9} />Galerie
               <input type="file" accept="image/*" multiple className="sr-only" onChange={addPhotos} />
             </label>
-          </>
+          </div>
         )}
-        {kept.map((p, i) => <Thumb key={p} src={mediaUrl(p)} onOpen={() => setViewing(i)} onRemove={() => setKept((k) => k.filter((x) => x !== p))} />)}
-        {pics.map((p, i) => <Thumb key={p.key} src={p.preview} status={p.status} onRetry={() => void envoyer(p)} onOpen={() => setViewing(kept.length + i)} onRemove={() => retirer(p.key)} />)}
-        {viewing !== null && <Lightbox photos={[...kept.map((p) => mediaUrl(p) ?? ''), ...pics.map((p) => p.preview)].filter(Boolean)} start={viewing} label={name || 'Produit'} onClose={() => setViewing(null)} />}
-        {nPhotos === 0 && <span className="self-center pl-1 text-[12px] font-bold leading-snug text-muted">Jusqu’à 5 photos :<br />elles font vendre.</span>}
       </section>
 
       <section className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-3.5">
@@ -389,14 +410,15 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   );
 }
 
-function Thumb({ src, onRemove, onOpen, status = 'ok', onRetry }: { src: string | null; onRemove: () => void; onOpen: () => void; status?: Pic['status']; onRetry?: () => void }) {
+function Thumb({ src, onRemove, onOpen, status = 'ok', onRetry, principale = false }: { src: string | null; onRemove: () => void; onOpen: () => void; status?: Pic['status']; onRetry?: () => void; principale?: boolean }) {
   return (
-    <span className="relative h-[92px] w-[92px] shrink-0 overflow-hidden rounded-[20px] bg-sand">
-      {src && <FitImage src={src} alt="Photo du produit" onOpen={onOpen} className="h-full w-full" />}
+    <span className={`relative aspect-square w-full overflow-hidden rounded-[14px] bg-sand ${status === 'erreur' ? 'ring-2 ring-[#c0392b]' : ''}`}>
+      {src ? <FitImage src={src} alt="Photo du produit" onOpen={onOpen} className="h-full w-full" /> : <span aria-hidden="true" className="flex h-full w-full items-center justify-center text-muted"><Icon name="image" size={24} stroke={1.6} /></span>}
+      {principale && <span className="absolute bottom-1.5 left-1.5 rounded-md bg-ink/80 px-1.5 py-0.5 text-[10.5px] font-extrabold text-white">Principale</span>}
       {/* État de l'envoi (§61) : la photo part dès qu'elle est ajoutée. */}
-      {status === 'envoi' && <span role="status" className="absolute inset-x-0 bottom-0 bg-black/55 py-1 text-center text-[11px] font-extrabold text-white">Envoi…</span>}
-      {status === 'erreur' && <button type="button" onClick={onRetry} className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-[#8a2a1c]/80 text-[11.5px] font-extrabold text-white">Échec<span className="underline">Réessayer</span></button>}
-      <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-white/90"><Icon name="close" size={14} stroke={2.4} /></button>
+      {status === 'envoi' && <span role="status" className="absolute inset-0 flex items-center justify-center bg-black/35 text-[12px] font-extrabold text-white">Envoi…</span>}
+      {status === 'erreur' && <button type="button" onClick={onRetry} className="absolute inset-x-1.5 bottom-1.5 h-8 rounded-lg bg-[#c0392b] text-[12px] font-extrabold text-white">Réessayer</button>}
+      <button type="button" aria-label="Retirer cette photo" onClick={onRemove} className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 shadow-sm"><Icon name="close" size={14} stroke={2.4} /></button>
     </span>
   );
 }
