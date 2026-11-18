@@ -13,10 +13,10 @@ const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annul
 
 /** Argent (§62) : le solde (disponible, en attente) et le bouton « Retirer », où recevoir l'argent, les colis payés pas encore remis, les mouvements. */
 export default function MoneyPage() {
-  return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} />}</SellerGate>;
+  return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} nom={shop.name} />}</SellerGate>;
 }
 
-function Money({ shopId }: { shopId: string }) {
+function Money({ shopId, nom }: { shopId: string; nom: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [pending, setPending] = useState<{ n: number; sum: number } | null>(null);
   const [commission, setCommission] = useState<number | null>(null);
@@ -34,7 +34,7 @@ function Money({ shopId }: { shopId: string }) {
   return (
     <Screen>
       <BackHeader href="/plus" title="Argent" label="Retour" />
-      <SoldeCard key={version} shopId={shopId} />
+      <SoldeCard key={version} shopId={shopId} nom={nom} />
       <PayoutCard shopId={shopId} onSaved={() => setVersion((v) => v + 1)} />
 
       {pending && pending.n > 0 && (

@@ -23,9 +23,9 @@ const chiffres = (s: string) => Number(s.replace(/\D/g, '')) || 0;
 /**
  * Solde du vendeur (§62) : tout ce qui lui revient, la part disponible (48 h après la remise, sans litige), la part en attente
  * avec sa date de déblocage, et le bouton « Retirer » (à partir de 10 000 GNF). Étape 1 : un retrait crée une demande que
- * l'équipe Hailand envoie depuis son compte Chap Chap Pay ; le vendeur est prévenu à l'envoi.
+ * l'équipe Hailand envoie depuis son compte Chap Chap Pay ; le vendeur est prévenu à l'envoi. Les frais ne sont pas évoqués au vendeur.
  */
-export function SoldeCard({ shopId, onChange }: { shopId: string; onChange?: () => void }) {
+export function SoldeCard({ shopId, nom, onChange }: { shopId: string; nom?: string; onChange?: () => void }) {
   const sb = browserClient();
   const [b, setB] = useState<Balance | null>(null);
   const [open, setOpen] = useState<Request | null>(null);
@@ -74,41 +74,43 @@ export function SoldeCard({ shopId, onChange }: { shopId: string; onChange?: () 
   const peut = b && b.method && !(b.usable_from && new Date(b.usable_from).getTime() > Date.now()) && !open && b.withdrawable_gnf >= b.min_gnf;
   const pourquoi = !b ? null
     : !b.method ? 'Indiquez d’abord où recevoir votre argent (plus bas).'
-    : b.usable_from && new Date(b.usable_from).getTime() > Date.now() ? `Nouveau moyen de versement : retrait possible ${quand(b.usable_from)}.`
+    : b.usable_from && new Date(b.usable_from).getTime() > Date.now() ? `Nouveau compte de réception : retrait possible ${quand(b.usable_from)}.`
     : open ? null
     : b.withdrawable_gnf < b.min_gnf ? `Retrait possible dès ${formatGnf(b.min_gnf)} disponibles.` : null;
 
   return (
     <>
-      <section aria-label="Solde" className="flex flex-col gap-3.5 rounded-[24px] bg-ink p-[18px] text-white">
-        <span className="flex flex-col gap-0.5">
-          <span className="text-[13px] font-bold text-white/70">Solde</span>
-          <span className="font-display text-[32px] font-semibold leading-none tracking-tight">{b ? formatGnf(b.balance_gnf, false) : '…'} <span className="text-[15px] text-white/65">GNF</span></span>
+      {/* Même dessin que la carte HailandPay (§62, demande du fondateur) : fond noir, lueur verte, pastille « SOLDE » comme « TEST ». */}
+      <section aria-label="Solde" className="relative flex flex-col gap-3.5 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">
+        <span aria-hidden="true" className="absolute -right-10 -top-10 h-[170px] w-[170px] rounded-full bg-[radial-gradient(circle,rgba(200,242,90,.22),rgba(200,242,90,0)_70%)]" />
+        <span className="relative flex items-center justify-between gap-3">
+          <span className="truncate font-display text-[17px] font-semibold tracking-tight">{nom ?? 'Ma boutique'}</span>
+          <span className="shrink-0 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.04em] text-lime">SOLDE</span>
         </span>
-        <div className="grid grid-cols-2 gap-2">
-          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.08] px-3 py-2.5">
-            <span className="text-[11.5px] font-bold text-lime">Disponible</span>
+        <span className="relative font-display text-[32px] font-semibold leading-tight tracking-tight">{b ? formatGnf(b.balance_gnf, false) : '…'} <span className="text-[16px] text-lime">GNF</span></span>
+        <span className="relative grid grid-cols-2 gap-2">
+          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.07] px-3 py-2.5">
+            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/65"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-lime" />Disponible</span>
             <span className="font-display text-[17px] font-semibold">{b ? formatGnf(b.withdrawable_gnf, false) : '…'}</span>
           </span>
-          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.08] px-3 py-2.5">
-            <span className="text-[11.5px] font-bold text-white/70">En attente</span>
+          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.07] px-3 py-2.5">
+            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/65"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" />En attente</span>
             <span className="font-display text-[17px] font-semibold">{b ? formatGnf(b.waiting_gnf, false) : '…'}</span>
           </span>
-        </div>
-        {b && b.next_release_at && b.next_release_gnf ? (
-          <span className="flex items-center gap-2 text-[12.5px] font-semibold text-white/75"><Icon name="clock" size={15} stroke={2} />+ {formatGnf(b.next_release_gnf)} disponibles {quand(b.next_release_at)}</span>
-        ) : null}
+        </span>
+        <span className="relative text-[12px] font-bold text-white/60">
+          {b && b.next_release_at && b.next_release_gnf ? `+ ${formatGnf(b.next_release_gnf)} disponibles ${quand(b.next_release_at)}` : 'Chaque vente devient disponible 48 h après la remise du colis.'}
+        </span>
         {open ? (
-          <div className="flex items-center gap-3 rounded-[16px] bg-white/[0.08] px-3 py-2.5">
-            <span className="flex min-w-0 flex-1 flex-col"><span className="text-[13.5px] font-extrabold">Retrait de {formatGnf(open.amount_gnf)} en cours</span><span className="truncate text-[12px] font-semibold text-white/70">Vers {payoutMethodLabel(open.method)} {maskAccount(open.method, open.account_number)} · demandé {quand(open.created_at)}</span></span>
-            <button type="button" disabled={busy} onClick={annuler} className="h-9 shrink-0 rounded-xl px-2 text-[12.5px] font-bold text-white/75 underline underline-offset-4">Annuler</button>
-          </div>
+          <span className="relative flex items-center gap-3 rounded-[16px] bg-lime/10 px-3 py-2.5">
+            <span className="flex min-w-0 flex-1 flex-col"><span className="text-[13.5px] font-extrabold text-lime">Retrait de {formatGnf(open.amount_gnf)} en cours</span><span className="truncate text-[12px] font-semibold text-white/65">Vers {payoutMethodLabel(open.method)} {maskAccount(open.method, open.account_number)} · {quand(open.created_at)}</span></span>
+            <button type="button" disabled={busy} onClick={annuler} className="h-9 shrink-0 px-1 text-[12.5px] font-bold text-white/70 underline underline-offset-4">Annuler</button>
+          </span>
         ) : (
           <button type="button" disabled={!peut} onClick={() => { setSheet(true); setMsg(null); setMontant(b ? String(b.withdrawable_gnf) : ''); }}
-            className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-lime text-[15px] font-extrabold text-ink disabled:opacity-40">Retirer</button>
+            className="relative flex h-12 items-center justify-center rounded-2xl bg-lime text-[15px] font-extrabold text-ink disabled:opacity-40">Retirer</button>
         )}
-        {pourquoi && <span className="text-[12px] font-semibold leading-snug text-white/70">{pourquoi}</span>}
-        <span className="text-[11.5px] font-semibold leading-snug text-white/55">Une vente devient disponible 48 h après la remise du colis (le temps d’un éventuel problème signalé par le client). Les frais d’envoi sont payés par Hailand.</span>
+        {pourquoi && <span className="relative -mt-1.5 text-[12px] font-semibold leading-snug text-white/60">{pourquoi}</span>}
       </section>
       {last && <p role="status" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13px] font-semibold text-[#8a2a1c]">Retrait de {formatGnf(last.amount_gnf)} refusé : {last.reason}</p>}
       {msg && !sheet && <p role="status" className={`rounded-2xl px-4 py-3 text-[13px] font-semibold ${msg.ok ? 'bg-ok-soft text-ok' : 'bg-[#fde8e4] text-[#8a2a1c]'}`}>{msg.text}</p>}
@@ -133,7 +135,7 @@ export function SoldeCard({ shopId, onChange }: { shopId: string; onChange?: () 
             </div>
             <div className="flex items-center gap-3 rounded-2xl bg-bg px-3.5 py-3">
               <Icon name="wallet" size={20} />
-              <span className="flex min-w-0 flex-col"><span className="text-[13.5px] font-extrabold">Vers {payoutMethodLabel(b.method ?? '')} {maskAccount(b.method ?? '', b.account_number)}</span><span className="truncate text-[12px] font-semibold text-muted">{b.holder_name} · frais d’envoi payés par Hailand</span></span>
+              <span className="flex min-w-0 flex-col"><span className="text-[13.5px] font-extrabold">Vers {payoutMethodLabel(b.method ?? '')} {maskAccount(b.method ?? '', b.account_number)}</span><span className="truncate text-[12px] font-semibold text-muted">{b.holder_name}</span></span>
             </div>
             <p className="text-[12.5px] font-medium leading-snug text-muted">L’équipe Hailand envoie l’argent sur ce compte et vous prévient dès qu’il est parti. Minimum {formatGnf(b.min_gnf)}.</p>
             {msg && <p role="alert" className={`rounded-2xl px-4 py-3 text-[13px] font-semibold ${msg.ok ? 'bg-ok-soft text-ok' : 'bg-[#fde8e4] text-[#8a2a1c]'}`}>{msg.text}</p>}

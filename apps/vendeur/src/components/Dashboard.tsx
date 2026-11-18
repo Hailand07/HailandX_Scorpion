@@ -6,6 +6,7 @@ import { AppMark } from '@hailandx/ui';
 import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
+import { SoldeCard } from './SoldeCard';
 import { btn } from './ui';
 
 interface Review { rating: number; comment: string | null; created_at: string }
@@ -155,11 +156,12 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         <Link href="/statistiques" className="flex h-10 items-center justify-center rounded-full bg-white/10 text-[13px] font-extrabold">Voir le détail des ventes</Link>
       </section>
 
+      {/* §62 : le solde, comme la carte HailandPay, avec « Retirer » directement depuis l'accueil. */}
       {owner && (
-        <Link href="/argent" className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card p-4">
-          <span className="flex flex-col gap-0.5"><span className="text-[12px] font-bold text-muted">Solde</span><span className="font-display text-[20px] font-semibold">{d ? formatGnf(d.balance, false) : '…'} <span className="text-[12px] text-muted">GNF</span></span></span>
-          <span className="flex items-center gap-1 text-[13px] font-extrabold text-blue-ink">Retirer<Icon name="chevron" size={15} stroke={2.2} /></span>
-        </Link>
+        <>
+          <SoldeCard shopId={shop.id} nom={shop.name} />
+          <Link href="/argent" className="-mt-1.5 self-center text-[13px] font-extrabold text-blue-ink">Mouvements et compte de réception</Link>
+        </>
       )}
     </Screen>
   );
