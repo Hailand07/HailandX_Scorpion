@@ -12,6 +12,7 @@ export * from './motDePasse';
 export * from './tons';
 export * from './plateforme';
 export * from './Installation';
+export * from './CameraDirecte';
 export * from './DeleteAccount';
 export * from './Notifications';
 export * from './NotificationBell';

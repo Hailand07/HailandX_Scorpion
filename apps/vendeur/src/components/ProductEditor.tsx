@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cleanAttributes, FICHE_LIMITS, ficheCompleteness, ficheOf, readAttributes, slugify, type FicheField } from '@hailandx/commerce';
-import { BackHeader, browserClient, errText, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
+import { BackHeader, browserClient, CameraDirecte, errText, Icon, mediaUrl, Notice, Screen, Switch, uploadPhoto } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { ProductPublished } from './ProductPublished';
@@ -51,6 +51,9 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   const [active, setActive] = useState(true);
   const [kept, setKept] = useState<string[]>([]);
   const [pics, setPics] = useState<Pic[]>([]);
+  // Appareil photo dans l'application (§61) ; `natif` : repli sur l'appareil photo du téléphone (caméra refusée ou absente).
+  const [camera, setCamera] = useState(false);
+  const [natif, setNatif] = useState(false);
   // Brouillon (§61) : la saisie est gardée sur le téléphone tant que le produit n'est pas publié.
   const cle = cleBrouillon(shop.id, offerId, copyFrom);
   const [pret, setPret] = useState(false);
@@ -114,8 +117,9 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
     try {
       const path = await uploadPhoto(sb!, uid, p.file);
       setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, path, status: 'ok' } : x)));
-    } catch {
+    } catch (e) {
       setPics((ps) => ps.map((x) => (x.key === p.key ? { ...x, status: 'erreur' } : x)));
+      setMsg({ tone: 'err', text: e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée. Réessayez.' });
     }
   }
   function retirer(key: string) {
@@ -201,12 +205,23 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
   if (editing && existing === null) return <Screen><BackHeader icon="close" href="/produits" title="Produit introuvable" label="Fermer" /><p className="text-[14px] font-semibold text-muted">Ce produit n’existe plus dans votre boutique.</p></Screen>;
 
   const nPhotos = kept.length + pics.length;
-  const addPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const list = Array.from(e.target.files ?? []).slice(0, Math.max(0, MAX_PHOTOS - nPhotos));
-    e.target.value = '';
-    const nouvelles: Pic[] = list.map((file) => ({ key: `${Date.now()}-${rand()}`, preview: URL.createObjectURL(file), file, path: null, status: 'envoi' }));
+  const ajouter = (list: File[]) => {
+    const nouvelles: Pic[] = list.slice(0, Math.max(0, MAX_PHOTOS - nPhotos)).map((file) => ({ key: `${Date.now()}-${rand()}`, preview: URL.createObjectURL(file), file, path: null, status: 'envoi' }));
     setPics((ps) => [...ps, ...nouvelles]);
     nouvelles.forEach((p) => void envoyer(p));
+  };
+  // Galerie (et appareil photo du téléphone en repli) : sur Android, vider le sélecteur retire l'accès à la photo choisie.
+  // On copie donc chaque photo en mémoire AVANT de le vider (§61), sinon l'aperçu est cassé et l'envoi échoue.
+  const addPhotos = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const list = Array.from(input.files ?? []).slice(0, Math.max(0, MAX_PHOTOS - nPhotos));
+    const copies: File[] = [];
+    for (const f of list) {
+      try { copies.push(new File([await f.arrayBuffer()], f.name || `photo-${Date.now()}.jpg`, { type: f.type || 'image/jpeg' })); }
+      catch { setMsg({ tone: 'err', text: 'Cette photo n’a pas pu être lue. Choisissez-la à nouveau, ou prenez-en une autre.' }); }
+    }
+    input.value = '';
+    ajouter(copies);
   };
   const completeness = ficheCompleteness(cat, desc, attrs, nPhotos);
   const pill = (on: boolean) => `h-10 rounded-full px-3.5 text-[13px] font-bold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`;
@@ -220,15 +235,24 @@ export function ProductEditor({ shop, uid, offerId, copyFrom }: { shop: MyShop; 
         </span> : copyFrom ? <span className="rounded-full bg-blue-soft px-3 py-1.5 text-[12px] font-extrabold text-blue-ink">Copie</span> : null} />
       {sharing && editing && existing?.catalog_products && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name, offerId: existing.id, productSlug: existing.catalog_products.slug, name: existing.catalog_products.name, priceGnf: existing.price_gnf }} onClose={() => setSharing(false)} />}
       <Notice msg={msg} />
+      {camera && <CameraDirecte restantes={MAX_PHOTOS - nPhotos} onPhoto={(f) => ajouter([f])} onClose={() => setCamera(false)}
+        onRepli={() => { setCamera(false); setNatif(true); setMsg({ tone: 'ok', text: 'Touchez de nouveau « Appareil photo » : l’appareil photo du téléphone va s’ouvrir.' }); }} />}
 
       <section aria-label="Photos" className="-mx-5 flex gap-2 overflow-x-auto px-5 [scrollbar-width:none]">
         {nPhotos < MAX_PHOTOS && (
           <>
             {/* Deux entrées : l'appareil photo directement (un produit se photographie souvent sur le moment), ou la galerie. */}
-            <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
-              <Icon name="camera" size={22} stroke={1.8} />Appareil photo
-              <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={addPhotos} />
-            </label>
+            {/* Appareil photo dans l'application (§61) ; l'appareil photo du téléphone seulement en repli. */}
+            {natif ? (
+              <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
+                <Icon name="camera" size={22} stroke={1.8} />Appareil photo
+                <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={addPhotos} />
+              </label>
+            ) : (
+              <button type="button" onClick={() => setCamera(true)} className="flex h-[92px] w-[92px] shrink-0 flex-col items-center justify-center gap-1.5 rounded-[20px] bg-ink text-[12px] font-extrabold text-white">
+                <Icon name="camera" size={22} stroke={1.8} />Appareil photo
+              </button>
+            )}
             <label className="flex h-[92px] w-[92px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-[20px] border border-line bg-card text-[12px] font-extrabold">
               <Icon name="image" size={22} stroke={1.8} />Galerie
               <input type="file" accept="image/*" multiple className="sr-only" onChange={addPhotos} />

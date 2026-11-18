@@ -95,7 +95,14 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
       .then((path) => setGate((g) => (g && g.url === url ? { ...g, status: 'ok', path } : g)))
       .catch((e: unknown) => setGate((g) => (g && g.url === url ? { ...g, status: 'erreur', error: e instanceof Error ? e.message : 'La photo n’a pas pu être envoyée.' } : g)));
   }, [uploadPhoto]);
-  const pickGate = (e: React.ChangeEvent<HTMLInputElement>) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) sendGate(f, URL.createObjectURL(f)); };
+  // Sur Android, vider le sélecteur retire l'accès à la photo : on la copie en mémoire d'abord (§61), sinon elle devient illisible.
+  const pickGate = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target; const f0 = input.files?.[0];
+    let f: File | null = null;
+    if (f0) { try { f = new File([await f0.arrayBuffer()], f0.name || 'portail.jpg', { type: f0.type || 'image/jpeg' }); } catch { f = null; } }
+    input.value = '';
+    if (f) sendGate(f, URL.createObjectURL(f));
+  };
   useEffect(() => () => { if (gate?.url?.startsWith('blob:')) URL.revokeObjectURL(gate.url); }, [gate]);
   const [gps, setGps] = useState<{ lngLat: [number, number]; accuracy: number } | null>(draft?.gps ?? null);
   const [polygon, setPolygon] = useState<GeoJSON.Polygon | null>(draft?.polygon ?? null);
