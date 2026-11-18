@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf, maskPhone } from '@hailandx/commerce';
-import { BackHeader, browserClient, GroupTitle, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
+import { BackHeader, browserClient, GroupTitle, Installer, HAILANDX_URL, Icon, LienHailand, ListRow, Screen, unreadNotifications, signOutHailand } from '@hailandx/kit';
 import { useMyShop } from '@/lib/useMyShop';
 import { Btn, BtnLink, PageTitle } from '@/components/ui';
 import { Chargement } from '@hailandx/ui';
@@ -83,6 +83,7 @@ export default function PlusPage() {
             <Icon name="user" /><span className="flex flex-col"><span className="text-[15px] font-bold">{maskPhone(session.user.phone)}</span><span className="text-[12px] font-semibold text-muted">Compte Hailand depuis {since}</span></span>
           </div>
           <ListRow href="/securite" icon="shield" label="Mot de passe et e-mail" />
+          <Installer nom="HailandX Vendeur" render={(ouvrir) => <ListRow onClick={ouvrir} icon="download" label="Installer l’application" />} />
           <ListRow href="/notifications" icon="bell" label="Notifications" value={unread ? <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-extrabold text-blue">{unread} nouvelle{unread > 1 ? 's' : ''}</span> : null} />
           <ListRow href="/aide" icon="help" label="Aide aux vendeurs" last />
         </div>

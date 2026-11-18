@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
 import { formatGnf } from '@hailandx/commerce';
 import { AppMark } from '@hailandx/ui';
+import { Installer } from '@hailandx/kit';
 import { Ico } from './Icons';
 
 /**
@@ -81,6 +82,7 @@ export function Menu({ courier, onClose, onSignOut }: { courier: MenuCourier; on
         <Link href="/livraisons" className={item} onClick={onClose}><Line icon={Ico.route(20)} label="Mes livraisons" sub="Historique, gains et HailandPay" /></Link>
         <Link href="/livraisons#especes" className={item} onClick={onClose}><Line icon={Ico.wallet(20)} label="Espèces à reverser" sub={formatGnf(courier.cash_balance_gnf)} /></Link>
         <Link href="/aide" className={item} onClick={onClose}><Line icon={Ico.help(20)} label="Aide" sub="Client absent, colis refusé, problème de code…" /></Link>
+        <Installer nom="Hailand Flotte" tone="nuit" render={(ouvrir) => <button type="button" onClick={ouvrir} className={item}><Line icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>} label="Installer l’application" sub="Une icône sur votre écran d’accueil" /></button>} />
         <button type="button" onClick={onSignOut} className="flex items-center gap-3.5 py-3.5 text-left text-[15px] font-extrabold text-[#ffb4a8]">{Ico.logout(20)}Se déconnecter</button>
         <span className="mt-auto text-[12px] font-semibold leading-relaxed text-night-muted">Nom ou moyen de transport à corriger : demandez à l’équipe Hailand.</span>
       </nav>

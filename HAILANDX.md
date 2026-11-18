@@ -593,6 +593,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-17 | §58 : page de commande — chaque adresse en carte « quartier · commune » + code Hailand (lus via `quartiers(nom)`, `communes(nom)` ; 8/8 adresses actives en ont) au lieu de « Autre — niveau 2 » ; le numéro où le livreur appelle le client (ex-« Téléphone du livreur ») est affiché clairement, numéro du compte par défaut, modifiable par « Modifier » ; « Mes adresses » au même format. |
 | 2026-11-17 | §59 : **connexion par numéro + mot de passe** (création de compte avec prénom, nom, mot de passe robuste, e-mail facultatif) dans HailandX, Vendeur, Flotte et Console, en attendant la vérification par WhatsApp ; « Mot de passe oublié » par code reçu sur l'e-mail ; « Mot de passe et e-mail » dans le compte (client et vendeur) ; code SMS gardé derrière un lien. Kit : `CompteMotDePasse`, `MotDePasseOublie`, `SecuriteCompte`, `motDePasse.ts` (4 tests). ⏳ Réglages Supabase à faire par le fondateur (voir §59). |
 | 2026-11-17 | §59 : réglages Supabase appliqués par l'API d'administration : téléphone activé sans « Confirm phone », mots de passe 8 caractères avec lettres et chiffres (vérifié : refus `weak_password`). Modèle « Reset password » bloqué par Supabase sans SMTP personnalisé (offre gratuite) ; SMTP non touché. |
+| 2026-11-18 | §60 : **installation sur l'écran d'accueil** (PWA) de HailandX, Vendeur et Flotte : bandeau « Installez … » (fermable, revient après 14 jours) — HailandX après une commande (Mes commandes, Aperçu), Vendeur sur l'accueil, Flotte hors service — et ligne « Installer l'application » (Mon compte, Plus, menu Flotte) ; guide adapté (Android : invitation directe de Chrome ; iPhone : Partager → « Sur l'écran d'accueil » ; WhatsApp : ouvrir d'abord dans le navigateur) ; service `sw.js` minimal : page « Pas de connexion » hors réseau, aucune mise en cache. Kit : `Installation.tsx`, `plateforme.ts` (2 tests). NavigationX et HailandMap : pas maintenant (décision du fondateur). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1379,4 +1380,15 @@ Rappel des réglages prévus :
 - ⚠️ **NavigationX** (dépôt Lynx) ne connaît encore que le code par SMS : un compte créé avec mot de passe ne s'y connecte pas encore. À reprendre dans NavigationX.
 - Sans e-mail sur le compte, un mot de passe oublié ne se récupère que par l'équipe.
 - Connexion Google : gratuite chez Supabase et Google, mais le compte Google ne donne pas de numéro de téléphone (identité de l'écosystème) ; non mise en place.
+
+## 60. Installer les applications sur l'écran d'accueil (2026-11-18) — ✅ code, ⚠️ à essayer sur téléphone
+
+**Décision du fondateur** : pas encore d'applications dans les boutiques (Play Store, App Store). D'abord, guider chacun à **mettre l'application sur son écran d'accueil** (application web installable, « PWA »), pour **HailandX, HailandX Vendeur et Hailand Flotte**. NavigationX et HailandMap : pas maintenant. Plus tard (accord de principe) : HailandX reste un site installable ; Vendeur, Flotte et NavigationX en applications Android emballées (Capacitor) ; HailandMap installable sur ordinateur, puis logiciel (Tauri) si besoin ; la Console reste un site.
+
+- ✅ Fiches d'installation et icônes : déjà présentes (`manifest.ts`, icônes 192, 512 et « maskable », icône Apple) dans les 4 applications Next.
+- ✅ `EcouteInstallation` (dans la mise en page de chaque application) : garde l'invitation d'installation de Chrome (`beforeinstallprompt`) et enregistre `/sw.js` en production.
+- ✅ `BandeauInstaller` (fermable ; « Plus tard » le cache 14 jours, par application) et `Installer` (ligne de menu) ; rien n'est montré quand l'application est déjà ouverte depuis son icône. Emplacements : HailandX — Mes commandes (dès qu'il y a une commande) et Aperçu d'une commande, ligne dans Mon compte ; Vendeur — accueil, ligne dans « Plus » ; Flotte — panneau « hors service » (jamais pendant une mission), ligne dans le menu.
+- ✅ `GuideInstallation` : Android/ordinateur sans invitation → menu ⋮ → « Installer l'application » ; iPhone → Partager → « Sur l'écran d'accueil » → « Ajouter » (Apple n'autorise pas de bouton direct) ; navigateur de WhatsApp, Facebook… → l'ouvrir d'abord dans Chrome ou Safari (copie du lien).
+- ✅ `public/sw.js` (HailandX, Vendeur, Flotte) : ne met **rien** en cache (pas de risque d'ancienne version) ; seulement, sans réseau, une page « Pas de connexion — Réessayer » aux couleurs de l'application.
+- Vérifié dans un navigateur (iPhone et navigateur intégré simulés) : bandeau, guide, « Plus tard », ligne du compte. ⚠️ L'invitation directe de Chrome ne se teste que sur un vrai téléphone Android, site en ligne.
 

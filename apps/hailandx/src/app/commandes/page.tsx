@@ -2,8 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { BUYER_STEPS, formatGnf, isOrderActive, orderStep, type ParcelStatus, STEP_HEADLINE } from '@hailandx/commerce';
-import { browserClient, mediaUrl, Screen, Segmented, useSession } from '@hailandx/kit';
-import { Chargement } from '@hailandx/ui';
+import { BandeauInstaller, browserClient, mediaUrl, Screen, Segmented, useSession } from '@hailandx/kit';
+import { AppMark, Chargement } from '@hailandx/ui';
 import { groupLines } from '@/lib/orderLines';
 
 interface Item { offer_id: string | null; name_snapshot: string; variant_label: string | null; quantity: number; price_gnf_snapshot: number; offers: { photo_paths: string[] | null; catalog_products: { slug: string } | null } | null }
@@ -58,6 +58,8 @@ export default function OrdersPage() {
       )}
       {session && (
         <>
+          {/* Après une première commande (§60) : proposer l'icône sur l'écran d'accueil pour suivre ses colis en un geste. */}
+          {orders && orders.length > 0 && <BandeauInstaller nom="HailandX" cle="hailandx" texte="Suivez vos commandes en un geste, depuis une icône sur votre écran d’accueil." icone={<AppMark app="hailandx" size={44} />} />}
           <Segmented label="Filtrer les commandes" value={tab} onChange={setTab} items={[{ id: 'cours', label: `En cours · ${active.length}` }, { id: 'fini', label: `Terminées · ${done.length}` }]} />
           {orders === null && <Chargement />}
 

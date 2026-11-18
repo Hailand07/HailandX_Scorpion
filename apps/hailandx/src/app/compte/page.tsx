@@ -3,7 +3,7 @@ import { myAddresses } from '@/lib/addresses';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, useWallet, signOutHailand } from '@hailandx/kit';
+import { browserClient, GroupTitle, Icon, Installer, ListRow, Screen, unreadNotifications, useSession, useWallet, signOutHailand } from '@hailandx/kit';
 import { formatSyli, maskPhone } from '@hailandx/commerce';
 import { Chargement } from '@hailandx/ui';
 
@@ -63,6 +63,7 @@ export default function AccountPage() {
         <GroupTitle>Application</GroupTitle>
         <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
           <ListRow href="/compte/securite" icon="shield" label="Mot de passe et e-mail" />
+          <Installer nom="HailandX" render={(ouvrir) => <ListRow onClick={ouvrir} icon="download" label="Installer l’application" />} />
           <ListRow href="/notifications" icon="bell" label="Notifications" value={counts?.unread ? <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-extrabold text-blue">{counts.unread} nouvelle{counts.unread > 1 ? 's' : ''}</span> : null} />
           <ListRow href="/aide" icon="help" label="Aide et contact" last />
         </div>

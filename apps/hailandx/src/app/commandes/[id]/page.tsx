@@ -2,8 +2,8 @@
 import { GarderSuivi } from '@/components/GarderSuivi';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Badge, QrScanner, Chargement } from '@hailandx/ui';
-import { BackHeader, browserClient, DisputeThread, mediaUrl, ProofPhoto, useSession } from '@hailandx/kit';
+import { AppMark, Badge, QrScanner, Chargement } from '@hailandx/ui';
+import { BackHeader, BandeauInstaller, browserClient, DisputeThread, mediaUrl, ProofPhoto, useSession } from '@hailandx/kit';
 import { groupLines } from '@/lib/orderLines';
 import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
@@ -127,6 +127,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
           {parcels.some((x) => !['remis', 'annule'].includes(x.status)) && <GarderSuivi orderId={id} />}
+          <BandeauInstaller nom="HailandX" cle="hailandx" texte="Retrouvez cette commande en un geste, depuis une icône sur votre écran d’accueil." icone={<AppMark app="hailandx" size={44} />} />
           {/* Discret, tout en bas (§57) : l'action reste trouvable sans attirer l'œil. */}
           {parcels.some((x) => CANCELLABLE.includes(x.status)) && <CancelOrder parcels={parcels.filter((x) => CANCELLABLE.includes(x.status)).map((x) => ({ id: x.id, status: x.status }))} onDone={async (text) => { setMsg(text); await load(); }} />}
         </>
