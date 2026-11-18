@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { formatGnf } from '@hailandx/commerce';
-import { telMasque } from '@hailandx/kit';
+import { BandeauInstaller, telMasque } from '@hailandx/kit';
 import { AppMark, Chargement } from '@hailandx/ui';
 import { browserClient, signOutFlotte } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
@@ -263,6 +263,8 @@ export default function Home() {
             {room <= 0 && <p className={WARN}>{Ico.wallet(18)}Plafond d’espèces atteint ({formatGnf(courier.cash_limit_gnf)}) : reversez vos espèces à Hailand avant une mission payable à la livraison.</p>}
             <button type="button" onClick={toggle} className={cta}>{Ico.bolt(20)}Passer en service</button>
             <p className="text-center text-[12.5px] font-semibold text-night-muted">Les missions proches apparaissent dès que vous êtes en service. Votre position n’est partagée que pendant le service.</p>
+            {/* §60 : hors service seulement, pour ne jamais gêner une mission. */}
+            <BandeauInstaller nom="Hailand Flotte" cle="flotte" tone="nuit" texte="Ouvrez Flotte en un geste depuis une icône sur votre écran d’accueil." icone={<AppMark app="flotte" size={44} />} />
           </>
         )}
 

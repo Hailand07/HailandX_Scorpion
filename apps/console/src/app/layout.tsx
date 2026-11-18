@@ -7,7 +7,6 @@ export const metadata: Metadata = {
   title: { default: 'Hailand Console', template: '%s · Hailand Console' },
   description: 'Outil interne de l’équipe Hailand : certifications, boutiques, livreurs, litiges, argent, paramètres.',
   applicationName: 'Hailand Console',
-  manifest: '/manifest.webmanifest',
   robots: { index: false, follow: false },
 };
 

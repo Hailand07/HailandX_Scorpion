@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { Ouverture } from '@hailandx/ui';
+import { EcouteInstallation } from '@hailandx/kit';
 import { VendeurNav } from '@/components/VendeurNav';
 
 export const metadata: Metadata = {
@@ -20,7 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&display=swap" rel="stylesheet" />
       </head>
-      <body className="min-h-dvh bg-bg font-sans text-ink"><Ouverture app="vendeur" />{children}<VendeurNav /></body>
+      <body className="min-h-dvh bg-bg font-sans text-ink"><Ouverture app="vendeur" /><EcouteInstallation />{children}<VendeurNav /></body>
     </html>
   );
 }

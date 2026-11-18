@@ -7,7 +7,6 @@ import { InAppBrowserNotice } from '@/components/InAppBrowserNotice';
 export const metadata: Metadata = {
   title: { default: 'HailandX — vendez en ligne, on livre pour vous', template: '%s · HailandX' },
   description: 'Les commerçants de Conakry vendent par un simple lien. Le client paie, l’argent est bloqué jusqu’à la remise, la Flotte Hailand livre à sa porte.',
-  manifest: '/manifest.webmanifest',
   applicationName: 'HailandX',
 };
 

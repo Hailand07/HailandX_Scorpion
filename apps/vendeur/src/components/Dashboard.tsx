@@ -2,7 +2,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ago, barHeights, formatGnf, onVacation, periodStats, type SalesDay } from '@hailandx/commerce';
-import { browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
+import { AppMark } from '@hailandx/ui';
+import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { btn } from './ui';
@@ -95,6 +96,9 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         <NotificationBell scope="vendeur" />
         <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-card"><Icon name="eye" /></LienHailand>
       </header>
+
+      {/* §60 : l'icône sur l'écran d'accueil, pour ne manquer aucune commande. */}
+      <BandeauInstaller nom="HailandX Vendeur" cle="vendeur" texte="Ouvrez votre boutique en un geste et voyez vos commandes dès qu’elles arrivent." icone={<AppMark app="vendeur" size={44} />} />
 
       {/* 1. Ce qui attend le vendeur. Un colis à préparer passe avant tout : carte pleine, en tête. */}
       {urgent && (

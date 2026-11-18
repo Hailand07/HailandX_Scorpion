@@ -10,6 +10,8 @@ export * from './MotDePasseOublie';
 export * from './SecuriteCompte';
 export * from './motDePasse';
 export * from './tons';
+export * from './plateforme';
+export * from './Installation';
 export * from './DeleteAccount';
 export * from './Notifications';
 export * from './NotificationBell';
