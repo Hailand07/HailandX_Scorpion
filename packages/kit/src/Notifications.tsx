@@ -68,6 +68,12 @@ export function Notifications({ scope, backHref }: { scope: NotificationScope; b
 }
 
 /** Nombre de notifications non lues d'une application. */
+/** Les dernières notifications non lues (titre, texte, lien local à l'application), pour un aperçu sur l'accueil (§62). */
+export async function unreadLatest(sb: SupabaseClient, scope: NotificationScope, limit = 3): Promise<{ id: number; title: string; body: string | null; link: string | null; created_at: string }[]> {
+  const { data } = await scoped(sb.from('notifications').select('id,title,body,link,created_at').is('read_at', null), scope).order('id', { ascending: false }).limit(limit);
+  return ((data as { id: number; title: string; body: string | null; link: string | null; created_at: string }[] | null) ?? []).map((n) => ({ ...n, link: n.link ? localLink(scope, n.link) : null }));
+}
+
 export async function unreadNotifications(sb: SupabaseClient, scope: NotificationScope): Promise<number> {
   const { count } = await scoped(sb.from('notifications').select('id', { count: 'exact', head: true }).is('read_at', null), scope);
   return count ?? 0;

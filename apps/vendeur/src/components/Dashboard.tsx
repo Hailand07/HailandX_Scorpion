@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ago, barHeights, formatGnf, onVacation, periodStats, type SalesDay } from '@hailandx/commerce';
 import { AppMark } from '@hailandx/ui';
-import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen } from '@hailandx/kit';
+import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, unreadLatest, unreadNotifications } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
 import { SoldeAccueil } from './SoldeCard';
@@ -14,13 +14,15 @@ interface OfferStock { id: string; active: boolean; photo_paths: string[] | null
 interface Data {
   series: SalesDay[]; prep: { created_at: string }[]; disputes: number; recent: Review[];
   offers: OfferStock[]; balance: number; questions: number; shares: number;
+  notifs: { list: Awaited<ReturnType<typeof unreadLatest>>; count: number };
 }
 type Period = 'jour' | 'semaine' | 'mois';
 const DAYS: Record<Period, number> = { jour: 1, semaine: 7, mois: 30 };
 
 /**
- * Accueil (§52, réorganisé au §62) : 1. l'urgence (colis à préparer) ; 2. UNE carte, au dessin de HailandPay, qui marie le solde
- * (« Retirer ») et les ventes ; 3. les deux gestes qui font vendre ; 4. le reste à faire et « Bien démarrer » ; 5. l'installation.
+ * Accueil (§52, réorganisé au §62) : notifications non lues (la plus récente), 1. l'urgence (colis à préparer) ; 2. les deux gestes
+ * qui font vendre ; 3. UNE carte, au dessin de HailandPay, qui marie le solde (« Retirer ») et les ventes ; 4. le reste à faire et
+ * « Bien démarrer » (disparaît une fois tout fait) ; 5. l'installation (disparaît une fois installée, ou 14 jours après « Plus tard »).
  * Le reste est dans l'onglet Boutique.
  */
 export function Dashboard({ shop }: { shop: MyShop }) {
@@ -31,7 +33,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   const load = useCallback(async () => {
     const sb = browserClient(); if (!sb) return;
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const [sales, prep, disputes, recent, offers, ledger, questions, shares] = await Promise.all([
+    const [sales, prep, disputes, recent, offers, ledger, questions, shares, nList, nCount] = await Promise.all([
       sb.rpc('fn_shop_sales', { p_shop: shop.id, p_days: 60 }),
       sb.from('parcels').select('created_at').eq('shop_id', shop.id).eq('status', 'attente_vendeur').order('created_at'),
       sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id).eq('status', 'litige'),
@@ -40,6 +42,8 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       sb.from('ledger_entries').select('amount_gnf').eq('account', 'shop').eq('account_id', shop.id),
       sb.rpc('fn_shop_questions', { p_shop: shop.id }),
       sb.from('share_links').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id),
+      unreadLatest(sb, 'vendeur', 1),
+      unreadNotifications(sb, 'vendeur'),
     ]);
     setD({
       series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf), delivered_gnf: Number(x.delivered_gnf ?? 0) })),
@@ -50,6 +54,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       balance: ((ledger.data as { amount_gnf: number }[]) ?? []).reduce((n, e) => n + e.amount_gnf, 0),
       questions: ((questions.data as { answer: string | null }[]) ?? []).filter((q) => !q.answer).length,
       shares: shares.count ?? 0,
+      notifs: { list: nList, count: nCount },
     });
   }, [shop.id]);
 
@@ -126,6 +131,20 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-card"><Icon name="eye" /></LienHailand>
       </header>
 
+      {/* Notifications non lues (§62) : la plus récente, sous l'en-tête ; la cloche en haut à droite garde la liste complète. */}
+      {d && d.notifs.count > 0 && d.notifs.list[0] && (
+        <div className="flex items-center gap-3 rounded-[20px] border border-blue/20 bg-blue-soft px-3.5 py-3">
+          <Link href={d.notifs.list[0].link ?? '/notifications'} className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-card text-blue"><Icon name="bell" size={19} stroke={2} /><span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue px-1 text-[10.5px] font-extrabold text-white">{d.notifs.count > 9 ? '9+' : d.notifs.count}</span></span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[14px] font-extrabold">{d.notifs.list[0].title}</span>
+            <span className="truncate text-[12px] font-semibold text-muted">{[d.notifs.list[0].body, ago(d.notifs.list[0].created_at)].filter(Boolean).join(' · ')}</span>
+          </span>
+          </Link>
+          {d.notifs.count > 1 && <Link href="/notifications" aria-label={`Voir les ${d.notifs.count} notifications`} className="shrink-0 rounded-full bg-card px-2.5 py-1 text-[12px] font-extrabold text-blue-ink">+ {d.notifs.count - 1}</Link>}
+        </div>
+      )}
+
       {/* 1. L'urgence : un colis à préparer (ou un litige) passe avant tout. */}
       {urgent && (
         <Link href={urgent.href} className="flex items-center gap-3.5 rounded-[20px] bg-lime p-4">
@@ -135,17 +154,17 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         </Link>
       )}
 
-      {/* 2. Une seule carte : le solde et les ventes (§62). L'employé ne voit que les ventes. */}
-      {owner ? <SoldeAccueil shopId={shop.id} nom={shop.name}>{ventes}</SoldeAccueil> : (
-        <section aria-label="Ventes" className="relative flex flex-col gap-3 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">{ventes}</section>
-      )}
-
-      {/* 3. Les deux gestes qui font vendre, sous le pouce. */}
+      {/* 2. Les deux gestes qui font vendre, sous le pouce (au-dessus de la carte, demande du fondateur). */}
       <div className="grid grid-cols-2 gap-2.5">
         <Link href="/produits/nouveau" className={`${btn('primary', 'lg')} whitespace-nowrap !px-3`}><Icon name="plus" size={18} stroke={2.4} />Nouveau produit</Link>
         <button type="button" onClick={() => setSharing(true)} className={btn('secondary', 'lg')}><Icon name="share" size={18} stroke={2} />Partager</button>
       </div>
       {sharing && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name }} onClose={() => setSharing(false)} />}
+
+      {/* 3. Une seule carte : le solde et les ventes (§62). L'employé ne voit que les ventes. */}
+      {owner ? <SoldeAccueil shopId={shop.id} nom={shop.name}>{ventes}</SoldeAccueil> : (
+        <section aria-label="Ventes" className="relative flex flex-col gap-3 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">{ventes}</section>
+      )}
 
       {/* 4. Le reste à faire, puis « Bien démarrer » tant qu'il reste des étapes. */}
       {rest.length > 0 && (
