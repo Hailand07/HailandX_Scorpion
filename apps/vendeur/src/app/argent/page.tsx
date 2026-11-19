@@ -6,17 +6,17 @@ import { BackHeader, browserClient, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { ShopWallet } from '@/components/ShopWallet';
 import { PayoutCard } from '@/components/PayoutCard';
-import { SoldeCard } from '@/components/SoldeCard';
+import { SoldeArgent } from '@/components/SoldeCard';
 
 interface Entry { id: number; kind: string; amount_gnf: number; created_at: string; parcel_id: string | null }
 const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Retrait envoyé sur votre compte', reversement_portefeuille: 'Versé dans le portefeuille HailandPay', reprise_portefeuille: 'Repris au portefeuille HailandPay' };
 
 /** Argent (§62) : le solde (disponible, en attente) et le bouton « Retirer », où recevoir l'argent, les colis payés pas encore remis, les mouvements. */
 export default function MoneyPage() {
-  return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} nom={shop.name} />}</SellerGate>;
+  return <SellerGate title="Argent" ownerOnly>{({ shop }) => <Money shopId={shop.id} />}</SellerGate>;
 }
 
-function Money({ shopId, nom }: { shopId: string; nom: string }) {
+function Money({ shopId }: { shopId: string }) {
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [pending, setPending] = useState<{ n: number; sum: number } | null>(null);
   const [commission, setCommission] = useState<number | null>(null);
@@ -34,7 +34,7 @@ function Money({ shopId, nom }: { shopId: string; nom: string }) {
   return (
     <Screen>
       <BackHeader href="/plus" title="Argent" label="Retour" />
-      <SoldeCard key={version} shopId={shopId} nom={nom} />
+      <SoldeArgent key={version} shopId={shopId} />
       <PayoutCard shopId={shopId} onSaved={() => setVersion((v) => v + 1)} />
 
       {pending && pending.n > 0 && (

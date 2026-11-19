@@ -1,5 +1,7 @@
 'use client';
 import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import Link from 'next/link';
 import { formatGnf, maskAccount, payoutMethodLabel } from '@hailandx/commerce';
 import { browserClient, Icon } from '@hailandx/kit';
 
@@ -10,7 +12,7 @@ export interface Balance {
 }
 interface Request { id: string; amount_gnf: number; status: 'demande' | 'envoye' | 'refuse' | 'annule'; reason: string | null; method: string; account_number: string; created_at: string }
 
-const quand = (iso: string) => {
+export const quand = (iso: string) => {
   const d = new Date(iso); const today = new Date();
   const demain = new Date(today); demain.setDate(today.getDate() + 1);
   const h = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -21,11 +23,12 @@ const quand = (iso: string) => {
 const chiffres = (s: string) => Number(s.replace(/\D/g, '')) || 0;
 
 /**
- * Solde du vendeur (§62) : tout ce qui lui revient, la part disponible (48 h après la remise, sans litige), la part en attente
- * avec sa date de déblocage, et le bouton « Retirer » (à partir de 10 000 GNF). Étape 1 : un retrait crée une demande que
- * l'équipe Hailand envoie depuis son compte Chap Chap Pay ; le vendeur est prévenu à l'envoi. Les frais ne sont pas évoqués au vendeur.
+ * Solde et retraits du vendeur (§62). Une seule logique (`useRetrait`) et deux présentations :
+ * - `SoldeAccueil` : la carte de l'accueil, au dessin de la carte HailandPay, qui porte aussi les ventes (une seule carte) ;
+ * - `SoldeArgent` : la page Argent, présentée comme un réglage (lignes claires, grand bouton « Retirer »).
+ * Étape 1 : un retrait crée une demande que l'équipe envoie depuis le compte Chap Chap Pay de Hailand ; les frais ne sont pas évoqués.
  */
-export function SoldeCard({ shopId, nom, onChange }: { shopId: string; nom?: string; onChange?: () => void }) {
+export function useRetrait(shopId: string, onChange?: () => void) {
   const sb = browserClient();
   const [b, setB] = useState<Balance | null>(null);
   const [open, setOpen] = useState<Request | null>(null);
@@ -70,51 +73,25 @@ export function SoldeCard({ shopId, nom, onChange }: { shopId: string; nom?: str
     setMsg(error ? { ok: false, text: error.message.replace(/^.*?:\s*/, '') } : { ok: true, text: 'Demande de retrait annulée.' });
     await load(); onChange?.();
   }
+  const ouvrir = () => { setSheet(true); setMsg(null); setMontant(b ? String(b.withdrawable_gnf) : ''); };
 
-  const peut = b && b.method && !(b.usable_from && new Date(b.usable_from).getTime() > Date.now()) && !open && b.withdrawable_gnf >= b.min_gnf;
+  const peut = Boolean(b && b.method && !(b.usable_from && new Date(b.usable_from).getTime() > Date.now()) && !open && b.withdrawable_gnf >= b.min_gnf);
   const pourquoi = !b ? null
-    : !b.method ? 'Indiquez d’abord où recevoir votre argent (plus bas).'
+    : !b.method ? 'Indiquez d’abord où recevoir votre argent.'
     : b.usable_from && new Date(b.usable_from).getTime() > Date.now() ? `Nouveau compte de réception : retrait possible ${quand(b.usable_from)}.`
     : open ? null
     : b.withdrawable_gnf < b.min_gnf ? `Retrait possible dès ${formatGnf(b.min_gnf)} disponibles.` : null;
+  return { b, open, last, sheet, setSheet, montant, setMontant, busy, msg, setMsg, retirer, annuler, ouvrir, peut, pourquoi };
+}
+type Retrait = ReturnType<typeof useRetrait>;
 
+/** Messages (demande envoyée, refus récent) et fenêtre « Retirer de l'argent », communs aux deux présentations. */
+function Suite({ r }: { r: Retrait }) {
+  const { b, sheet, setSheet, montant, setMontant, busy, msg, setMsg, retirer, last } = r;
   return (
     <>
-      {/* Même dessin que la carte HailandPay (§62, demande du fondateur) : fond noir, lueur verte, pastille « SOLDE » comme « TEST ». */}
-      <section aria-label="Solde" className="relative flex flex-col gap-3.5 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">
-        <span aria-hidden="true" className="absolute -right-10 -top-10 h-[170px] w-[170px] rounded-full bg-[radial-gradient(circle,rgba(200,242,90,.22),rgba(200,242,90,0)_70%)]" />
-        <span className="relative flex items-center justify-between gap-3">
-          <span className="truncate font-display text-[17px] font-semibold tracking-tight">{nom ?? 'Ma boutique'}</span>
-          <span className="shrink-0 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.04em] text-lime">SOLDE</span>
-        </span>
-        <span className="relative font-display text-[32px] font-semibold leading-tight tracking-tight">{b ? formatGnf(b.balance_gnf, false) : '…'} <span className="text-[16px] text-lime">GNF</span></span>
-        <span className="relative grid grid-cols-2 gap-2">
-          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.07] px-3 py-2.5">
-            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/65"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-lime" />Disponible</span>
-            <span className="font-display text-[17px] font-semibold">{b ? formatGnf(b.withdrawable_gnf, false) : '…'}</span>
-          </span>
-          <span className="flex flex-col gap-0.5 rounded-[16px] bg-white/[0.07] px-3 py-2.5">
-            <span className="flex items-center gap-1.5 text-[11.5px] font-bold text-white/65"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" />En attente</span>
-            <span className="font-display text-[17px] font-semibold">{b ? formatGnf(b.waiting_gnf, false) : '…'}</span>
-          </span>
-        </span>
-        <span className="relative text-[12px] font-bold text-white/60">
-          {b && b.next_release_at && b.next_release_gnf ? `+ ${formatGnf(b.next_release_gnf)} disponibles ${quand(b.next_release_at)}` : 'Chaque vente devient disponible 48 h après la remise du colis.'}
-        </span>
-        {open ? (
-          <span className="relative flex items-center gap-3 rounded-[16px] bg-lime/10 px-3 py-2.5">
-            <span className="flex min-w-0 flex-1 flex-col"><span className="text-[13.5px] font-extrabold text-lime">Retrait de {formatGnf(open.amount_gnf)} en cours</span><span className="truncate text-[12px] font-semibold text-white/65">Vers {payoutMethodLabel(open.method)} {maskAccount(open.method, open.account_number)} · {quand(open.created_at)}</span></span>
-            <button type="button" disabled={busy} onClick={annuler} className="h-9 shrink-0 px-1 text-[12.5px] font-bold text-white/70 underline underline-offset-4">Annuler</button>
-          </span>
-        ) : (
-          <button type="button" disabled={!peut} onClick={() => { setSheet(true); setMsg(null); setMontant(b ? String(b.withdrawable_gnf) : ''); }}
-            className="relative flex h-12 items-center justify-center rounded-2xl bg-lime text-[15px] font-extrabold text-ink disabled:opacity-40">Retirer</button>
-        )}
-        {pourquoi && <span className="relative -mt-1.5 text-[12px] font-semibold leading-snug text-white/60">{pourquoi}</span>}
-      </section>
       {last && <p role="status" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13px] font-semibold text-[#8a2a1c]">Retrait de {formatGnf(last.amount_gnf)} refusé : {last.reason}</p>}
       {msg && !sheet && <p role="status" className={`rounded-2xl px-4 py-3 text-[13px] font-semibold ${msg.ok ? 'bg-ok-soft text-ok' : 'bg-[#fde8e4] text-[#8a2a1c]'}`}>{msg.text}</p>}
-
       {sheet && b && (
         <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center">
           <button type="button" aria-label="Fermer" onClick={() => setSheet(false)} className="absolute inset-0 bg-black/45" />
@@ -145,6 +122,78 @@ export function SoldeCard({ shopId, nom, onChange }: { shopId: string; nom?: str
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+/**
+ * Carte de l'accueil (§62, dessin de la carte HailandPay) : le solde en haut (pastille « SOLDE », GNF en vert lime, disponible,
+ * en attente, « Retirer »), puis les ventes en bas (`children`) — une seule carte, pas deux.
+ */
+export function SoldeAccueil({ shopId, nom, children }: { shopId: string; nom: string; children?: ReactNode }) {
+  const r = useRetrait(shopId);
+  const { b, open, busy, annuler, ouvrir, peut, pourquoi } = r;
+  return (
+    <>
+      <section aria-label="Solde et ventes" className="relative flex flex-col gap-3 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">
+        <span aria-hidden="true" className="absolute -right-10 -top-10 h-[170px] w-[170px] rounded-full bg-[radial-gradient(circle,rgba(200,242,90,.22),rgba(200,242,90,0)_70%)]" />
+        <span className="relative flex items-center justify-between gap-3">
+          {/* Marque comme « HailandPay » ; le nom de la boutique est déjà dans l'en-tête de l'accueil. */}
+          <span aria-label={`Argent de ${nom}`} className="font-display text-[17px] font-semibold tracking-tight">Hailand<span className="text-lime">X</span></span>
+          <span className="shrink-0 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.04em] text-lime">SOLDE</span>
+        </span>
+        <span className="relative font-display text-[32px] font-semibold leading-tight tracking-tight">{b ? formatGnf(b.balance_gnf, false) : '…'} <span className="text-[16px] text-lime">GNF</span></span>
+        <span className="relative flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] font-bold">
+          <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-lime" /><span className="text-white/60">Disponible</span> {b ? formatGnf(b.withdrawable_gnf, false) : '…'}</span>
+          <span className="flex items-center gap-1.5"><span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-white/40" /><span className="text-white/60">En attente</span> {b ? formatGnf(b.waiting_gnf, false) : '…'}</span>
+        </span>
+        {open ? (
+          <span className="relative flex items-center gap-3 rounded-[16px] bg-lime/10 px-3 py-2.5">
+            <span className="flex min-w-0 flex-1 flex-col"><span className="text-[13.5px] font-extrabold text-lime">Retrait de {formatGnf(open.amount_gnf)} en cours</span><span className="truncate text-[12px] font-semibold text-white/65">Vers {payoutMethodLabel(open.method)} {maskAccount(open.method, open.account_number)}</span></span>
+            <button type="button" disabled={busy} onClick={annuler} className="h-9 shrink-0 px-1 text-[12.5px] font-bold text-white/70 underline underline-offset-4">Annuler</button>
+          </span>
+        ) : peut ? (
+          <button type="button" onClick={ouvrir} className="relative flex h-11 items-center justify-center rounded-2xl bg-lime text-[14.5px] font-extrabold text-ink">Retirer</button>
+        ) : (
+          <Link href="/argent" className="relative text-[12px] font-semibold leading-snug text-white/60">{pourquoi ?? (b?.next_release_at && b.next_release_gnf ? `+ ${formatGnf(b.next_release_gnf)} disponibles ${quand(b.next_release_at)}` : '')}</Link>
+        )}
+        {children && <div className="relative flex flex-col gap-3 border-t border-white/10 pt-3.5">{children}</div>}
+      </section>
+      <Suite r={r} />
+    </>
+  );
+}
+
+/**
+ * Page Argent (§62) : présentée comme un réglage — l'essentiel en lignes claires, et le bouton « Retirer » en grand, comme action
+ * principale de la page. La carte noire est réservée à l'accueil.
+ */
+export function SoldeArgent({ shopId, onChange }: { shopId: string; onChange?: () => void }) {
+  const r = useRetrait(shopId, onChange);
+  const { b, open, busy, annuler, ouvrir, peut, pourquoi } = r;
+  const ligne = (label: ReactNode, valeur: ReactNode, sub?: ReactNode, last = false) => (
+    <div className={`flex items-center justify-between gap-3 px-4 py-3 ${last ? '' : 'border-b border-line-soft'}`}>
+      <span className="flex min-w-0 flex-col"><span className="text-[14px] font-bold">{label}</span>{sub && <span className="text-[12px] font-semibold text-muted">{sub}</span>}</span>
+      <span className="shrink-0 font-display text-[16px] font-semibold">{valeur}</span>
+    </div>
+  );
+  return (
+    <>
+      <section aria-label="Solde" className="flex flex-col gap-3">
+        <div className="flex flex-col gap-0.5 px-1">
+          <span className="text-[13px] font-bold text-muted">Solde</span>
+          <span className="font-display text-[34px] font-semibold leading-tight tracking-tight">{b ? formatGnf(b.balance_gnf, false) : '…'} <span className="text-[16px] text-muted">GNF</span></span>
+        </div>
+        <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
+          {ligne(<span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-ok" />Disponible</span>, b ? formatGnf(b.withdrawable_gnf) : '…', 'Retirable maintenant')}
+          {ligne(<span className="flex items-center gap-2"><span aria-hidden="true" className="h-2 w-2 rounded-full bg-[#c9c4b6]" />En attente</span>, b ? formatGnf(b.waiting_gnf) : '…',
+            b?.next_release_at && b.next_release_gnf ? `+ ${formatGnf(b.next_release_gnf)} ${quand(b.next_release_at)}` : '48 h après la remise de chaque colis', !open)}
+          {open && ligne(<span className="text-ok">Retrait en cours</span>, formatGnf(open.amount_gnf), <>Vers {payoutMethodLabel(open.method)} {maskAccount(open.method, open.account_number)} · {quand(open.created_at)} · <button type="button" disabled={busy} onClick={annuler} className="font-bold text-blue-ink underline">Annuler</button></>, true)}
+        </div>
+        {!open && <button type="button" disabled={!peut} onClick={ouvrir} className="flex h-[54px] items-center justify-center gap-2 rounded-2xl bg-ink text-[15.5px] font-extrabold text-white disabled:opacity-40"><Icon name="wallet" size={19} stroke={2} />Retirer</button>}
+        {pourquoi && <p className="px-1 text-[12.5px] font-semibold leading-snug text-muted">{pourquoi}</p>}
+      </section>
+      <Suite r={r} />
     </>
   );
 }
