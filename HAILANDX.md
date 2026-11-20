@@ -602,6 +602,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-18 | §62, retour du fondateur : carte du solde au dessin de la carte HailandPay (pastille « SOLDE » comme « TEST », GNF en vert lime), aussi sur l'accueil du vendeur ; plus aucune mention des frais d'envoi pour le vendeur ; retenue de 48 h à expliquer dans le contrat **vendeur**. Migration autorisée par le fondateur ; première tentative d'application interrompue (question de confirmation du serveur Supabase sans réponse) — rien appliqué. |
 | 2026-11-19 | §62, 2ᵉ retour : accueil du vendeur réorganisé — une seule carte (solde + ventes) au dessin HailandPay, urgence en tête, gestes, reste à faire, installation en bas ; page Argent en style réglage (lignes + grand bouton « Retirer »). Migration `2026-11-18_retraits.sql` toujours à appliquer (confirmation Supabase à valider par le fondateur). |
 | 2026-11-19 | §62, 3ᵉ retour : gestes au-dessus de la carte ; aperçu de la dernière notification non lue sous l'en-tête (cloche inchangée en haut à droite). |
+| 2026-11-20 | Migration `2026-11-18_retraits.sql` **appliquée en production** (accord du fondateur ; la PR avait été fusionnée avant : l'écran Argent a été sans solde quelques heures). Vérifié : table `payout_requests` (0 ligne, RLS active), 6 fonctions, exécutables par les comptes connectés et pas par les visiteurs, 0 versement et 2 moyens de versement inchangés. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1423,7 +1424,7 @@ Rappel des réglages prévus :
 - ✅ Disposition : carte « Photos » avec compteur « n / 5 », grille de 3 vignettes carrées (la première marquée « Principale »), puis deux boutons pleine largeur « Prendre une photo » (appareil photo intégré) et « Galerie » ; plus de défilement de côté.
 - Vérifié dans un navigateur : une vraie photo HEIC (exemple public libheif, `ftypmif1`, 718 Ko) + un JPEG choisis ensemble → convertie (≈ 300 Ko), aperçu correct, 2 envois, aucun échec ; appareil photo intégré toujours bon (3 photos).
 
-## 62. Solde et retraits à la demande pour les vendeurs (2026-11-18) — ✅ code et tests ; ⏳ migration à appliquer
+## 62. Solde et retraits à la demande pour les vendeurs (2026-11-18) — ✅ code et tests ; ✅ migration appliquée en production (2026-11-20)
 
 **Demande du fondateur** : remplacer « Hailand vous doit » par un **solde** professionnel, avec ce qui est **disponible** et un bouton **« Retirer »** ; l'argent reste sur le compte **Chap Chap Pay** de Hailand jusqu'au retrait. **Décisions (2026-11-18)** : **étape 1 manuelle** (plus sûre pour le début) ; étape 2 (envoi automatique par la **PUSH API** de Chap Chap Pay) plus tard, quand l'automatisation sera nécessaire ; **minimum 10 000 GNF** ; frais d'envoi payés par Hailand (décision du §48) ; la retenue de 48 h sera expliquée dans le **contrat que le vendeur accepte** à son inscription (motif : protéger l'acheteur contre un vendeur qui livre « n'importe quoi ») ; les frais d'envoi ne sont **pas évoqués** au vendeur (précisions du fondateur).
 
