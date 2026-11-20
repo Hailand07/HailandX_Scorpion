@@ -7,7 +7,6 @@ import { browserClient } from '@/lib/supabase';
 import { useSession } from '@/lib/useSession';
 import { Stat, WARN } from '@/components/Frame';
 import { Ico } from '@/components/Icons';
-import { CourierWallet } from '@/components/CourierWallet';
 import { CourierPayout } from '@/components/CourierPayout';
 import { Chargement } from '@hailandx/ui';
 
@@ -72,7 +71,6 @@ export default function Livraisons() {
 
       <CourierPayout />
 
-      <CourierWallet />
 
       {rows === null && <Chargement />}
       {rows?.length === 0 && <p className="text-[14px] font-medium text-night-muted">Aucune livraison terminée pour l’instant.</p>}

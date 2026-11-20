@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatGnf } from '@hailandx/commerce';
 import { browserClient, errText, HAILANDX_URL, Icon } from '@hailandx/kit';
 
@@ -33,28 +33,39 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
   const label = target.name ?? target.shopName;
   const text = target.productSlug ? `${label}${target.priceGnf ? ` — ${formatGnf(target.priceGnf)}` : ''}\nLivré à votre porte avec HailandX :` : `Ma boutique ${target.shopName} sur HailandX :`;
 
-  const tracked = (net: Net) => trackedLink(target, net, direct);
+  // iPhone (§63) : Safari n'ouvre WhatsApp, ne copie et n'ouvre le menu de partage QUE pendant le toucher lui-même ; une attente
+  // réseau entre le toucher et l'action annule tout (ça marchait sur Android, pas sur iPhone). Les liens suivis sont donc
+  // préparés dès l'ouverture de la fenêtre ; au toucher, on utilise le lien prêt (ou le lien direct s'il ne l'est pas encore).
+  const [links, setLinks] = useState<Partial<Record<Net, string>>>({});
+  useEffect(() => {
+    let live = true;
+    (['whatsapp', 'tiktok', 'facebook', 'autre'] as Net[]).forEach((net) => {
+      trackedLink(target, net, direct).then((url) => { if (live) setLinks((l) => ({ ...l, [net]: url })); }).catch(() => { /* lien direct en secours */ });
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.shopId, target.offerId]);
+  const url = (net: Net) => links[net] ?? direct;
 
-  async function share(net: Net) {
-    setBusy(net); setNote(null);
-    try {
-      const url = await tracked(net);
-      if (net === 'whatsapp') {
-        window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank', 'noopener');
-      } else if (net === 'facebook') {
-        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`, '_blank', 'noopener');
-      } else {
-        await navigator.clipboard.writeText(url);
-        setNote({ ok: true, text: net === 'tiktok' ? 'Lien copié : collez-le dans votre bio TikTok ou en commentaire épinglé de votre vidéo.' : 'Lien copié : collez-le où vous voulez (bio Instagram, statut, SMS…).' });
-      }
-    } catch (e) {
-      setNote({ ok: false, text: e instanceof Error && e.message ? e.message : 'Copie refusée : appuyez longuement sur le lien pour le copier.' });
+  function share(net: Net) {
+    setNote(null);
+    const u = url(net);
+    if (net === 'whatsapp') {
+      // Ouverture directe, dans le geste : sur iPhone, WhatsApp s'ouvre ; dans l'application installée aussi.
+      window.location.href = `https://wa.me/?text=${encodeURIComponent(`${text} ${u}`)}`;
+    } else if (net === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(u)}`, '_blank', 'noopener');
+    } else {
+      setBusy(net);
+      navigator.clipboard.writeText(u)
+        .then(() => setNote({ ok: true, text: net === 'tiktok' ? 'Lien copié : collez-le dans votre bio TikTok ou en commentaire épinglé de votre vidéo.' : 'Lien copié : collez-le où vous voulez (bio Instagram, statut, SMS…).' }))
+        .catch(() => setNote({ ok: false, text: 'Copie refusée par le téléphone : appuyez longuement sur le lien ci-dessous pour le copier.' }))
+        .finally(() => setBusy(null));
     }
-    setBusy(null);
   }
 
-  async function native() {
-    try { await navigator.share({ title: label, text, url: await tracked('autre') }); } catch { /* partage annulé */ }
+  function native() {
+    navigator.share({ title: label, text, url: url('autre') }).catch(() => { /* partage annulé */ });
   }
 
   const btn = 'flex h-[54px] items-center justify-center gap-2 rounded-2xl text-[14px] font-extrabold disabled:opacity-50';
@@ -76,7 +87,8 @@ export function ShareSheet({ target, onClose }: { target: ShareTarget; onClose: 
           <button type="button" disabled={!!busy} onClick={() => void share('autre')} className={`${btn} border border-line`}>Copier le lien</button>
         </div>
         {typeof navigator !== 'undefined' && 'share' in navigator && <button type="button" onClick={() => void native()} className="h-11 rounded-2xl bg-bg text-[14px] font-extrabold">Autres applications…</button>}
-        <p className="truncate rounded-xl bg-bg px-3 py-2 text-[12px] font-semibold text-muted" title={direct}>Lien direct : {direct.replace(/^https?:\/\//, '')}</p>
+        {/* Lien sélectionnable : copie à la main si le téléphone refuse la copie automatique. */}
+        <p className="select-all break-all rounded-xl bg-bg px-3 py-2 text-[12px] font-semibold text-muted">{url('autre')}</p>
         {note && <p role="status" className={`text-[13px] font-bold ${note.ok ? 'text-ok' : 'text-danger'}`}>{note.text}</p>}
       </div>
     </div>

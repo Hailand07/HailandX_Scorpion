@@ -11,13 +11,17 @@ export interface MyShop {
   /** Rôle du compte connecté : le propriétaire voit tout ; un employé ne voit ni l'argent, ni les réglages, ni l'équipe. */
   role: 'proprietaire' | 'employe';
 }
-export interface MyDecl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number; certification_status: string | null; level: number }
+export interface MyDecl { id: string; declared_label: string | null; hailand_code: string | null; detected_level: number; certification_status: string | null; level: number; quartier_nom?: string | null; commune_nom?: string | null }
 
 /** Demande de certification de la boutique, vue de la console : à vérifier par l'équipe, transmise à HailandMap ou refusée (avec motif). */
 export interface MyCert { declaration_id: string; status: 'a_verifier' | 'transmise' | 'refusee'; console_note: string | null }
 
 /** Le code Hailand d'abord : le libellé enregistré (« Travail ») ne dit rien au vendeur. */
-export const declLabel = (d: Pick<MyDecl, 'declared_label' | 'hailand_code'>) => d.hailand_code || d.declared_label || 'Mon adresse';
+/** Nom affiché d'une adresse (§63) : « Kipé · Ratoma — GN-CKY-… » ; le quartier d'abord, le code Hailand ensuite. */
+export const declLabel = (d: Pick<MyDecl, 'declared_label' | 'hailand_code'> & Partial<Pick<MyDecl, 'quartier_nom' | 'commune_nom'>>) => {
+  const lieu = [d.quartier_nom, d.commune_nom].filter(Boolean).join(' · ');
+  return [lieu, d.hailand_code].filter(Boolean).join(' — ') || d.declared_label || 'Mon adresse';
+};
 
 /**
  * Boutique du compte connecté et ses adresses (avec leur niveau réel, 3 = certifié par Hailand).
@@ -45,9 +49,10 @@ export function useMyShop() {
     const [s, d] = await Promise.all([
       // Boutique dont le compte est membre (propriétaire d'abord, sinon employé).
       shopOf(sb, uid),
-      sb.from('declarations').select('id,declared_label,hailand_code,detected_level,certification_status').eq('user_id', uid).order('created_at', { ascending: false }),
+      sb.from('declarations').select('id,declared_label,hailand_code,detected_level,certification_status,quartiers(nom),communes(nom)').eq('user_id', uid).order('created_at', { ascending: false }),
     ]);
-    const list = (d.data as Omit<MyDecl, 'level'>[]) ?? [];
+    const list = ((d.data as unknown as (Omit<MyDecl, 'level' | 'quartier_nom' | 'commune_nom'> & { quartiers?: { nom: string } | null; communes?: { nom: string } | null })[]) ?? [])
+      .map(({ quartiers, communes, ...x }) => ({ ...x, quartier_nom: quartiers?.nom ?? null, commune_nom: communes?.nom ?? null }));
     const withLevel = await Promise.all(list.map(async (x) => {
       const r = await sb.rpc('fn_declaration_level', { p_declaration: x.id });
       return { ...x, level: typeof r.data === 'number' ? r.data : x.detected_level };

@@ -3,14 +3,13 @@ import { myAddresses } from '@/lib/addresses';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, useWallet, signOutHailand } from '@hailandx/kit';
-import { formatSyli, maskPhone } from '@hailandx/commerce';
+import { browserClient, GroupTitle, Icon, ListRow, Screen, unreadNotifications, useSession, signOutHailand } from '@hailandx/kit';
+import { maskPhone } from '@hailandx/commerce';
 import { Chargement } from '@hailandx/ui';
 
 /** Compte de l'acheteur : moi, et rien d'autre. La vente se fait dans HailandX Vendeur ; l'équipe a sa console à part. */
 export default function AccountPage() {
   const session = useSession();
-  const { wallet } = useWallet();
   const [counts, setCounts] = useState<{ addr: number; unread: number } | null>(null);
 
   useEffect(() => {
@@ -43,18 +42,19 @@ export default function AccountPage() {
     <Screen className="gap-[18px] pt-6">
       <h1 className="font-display text-[26px] font-semibold tracking-tight">Compte</h1>
 
-      <section aria-label="Mon profil" className="flex items-center gap-3.5 rounded-[22px] border border-line-soft bg-card p-4">
+      {/* §63 : le profil mène à « Mes informations » (identité, adresses, quartiers). */}
+      <Link href="/compte/informations" aria-label="Mes informations" className="flex items-center gap-3.5 rounded-[22px] border border-line-soft bg-card p-4">
         <span className="flex h-[52px] w-[52px] items-center justify-center rounded-[18px] bg-blue-soft text-blue"><Icon name="user" size={24} /></span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="font-display text-[17px] font-semibold">{maskPhone(session.user.phone)}</span>
-          <span className="text-[12.5px] font-semibold text-muted">Client depuis {since}</span>
+          <span className="text-[12.5px] font-semibold text-muted">Client depuis {since} · Mes informations</span>
         </span>
-      </section>
+        <Icon name="chevron" size={16} stroke={2} className="ml-auto text-faint" />
+      </Link>
 
       <section aria-label="Mes achats" className="flex flex-col gap-2">
         <GroupTitle>Mes achats</GroupTitle>
         <div className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
-          <ListRow href="/compte/hailandpay" icon="wallet" label="HailandPay" value={wallet ? <span className="text-[13px] font-bold text-muted">{formatSyli(wallet.balance)} · TEST</span> : null} />
           <ListRow href="/adresse" icon="pin" label="Adresses de livraison" value={counts ? <span className="text-[13px] font-bold text-muted">{counts.addr}</span> : null} last />
         </div>
       </section>

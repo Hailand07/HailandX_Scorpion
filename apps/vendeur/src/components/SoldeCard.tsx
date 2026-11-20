@@ -24,7 +24,7 @@ const chiffres = (s: string) => Number(s.replace(/\D/g, '')) || 0;
 
 /**
  * Solde et retraits du vendeur (§62). Une seule logique (`useRetrait`) et deux présentations :
- * - `SoldeAccueil` : la carte de l'accueil, au dessin de la carte HailandPay, qui porte aussi les ventes (une seule carte) ;
+ * - `SoldeAccueil` : la carte sombre de l'accueil, qui porte aussi les ventes (une seule carte) ;
  * - `SoldeArgent` : la page Argent, présentée comme un réglage (lignes claires, grand bouton « Retirer »).
  * Étape 1 : un retrait crée une demande que l'équipe envoie depuis le compte Chap Chap Pay de Hailand ; les frais ne sont pas évoqués.
  */
@@ -127,7 +127,7 @@ function Suite({ r }: { r: Retrait }) {
 }
 
 /**
- * Carte de l'accueil (§62, dessin de la carte HailandPay) : le solde en haut (pastille « SOLDE », GNF en vert lime, disponible,
+ * Carte de l'accueil (§62, carte sombre) : le solde en haut (pastille « SOLDE », GNF en vert lime, disponible,
  * en attente, « Retirer »), puis les ventes en bas (`children`) — une seule carte, pas deux.
  */
 export function SoldeAccueil({ shopId, nom, children }: { shopId: string; nom: string; children?: ReactNode }) {
@@ -138,7 +138,7 @@ export function SoldeAccueil({ shopId, nom, children }: { shopId: string; nom: s
       <section aria-label="Solde et ventes" className="relative flex flex-col gap-3 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">
         <span aria-hidden="true" className="absolute -right-10 -top-10 h-[170px] w-[170px] rounded-full bg-[radial-gradient(circle,rgba(200,242,90,.22),rgba(200,242,90,0)_70%)]" />
         <span className="relative flex items-center justify-between gap-3">
-          {/* Marque comme « HailandPay » ; le nom de la boutique est déjà dans l'en-tête de l'accueil. */}
+          {/* Marque « SOLDE » ; le nom de la boutique est déjà dans l'en-tête de l'accueil. */}
           <span aria-label={`Argent de ${nom}`} className="font-display text-[17px] font-semibold tracking-tight">Hailand<span className="text-lime">X</span></span>
           <span className="shrink-0 rounded-full bg-lime/15 px-2.5 py-1 text-[11px] font-extrabold tracking-[0.04em] text-lime">SOLDE</span>
         </span>
