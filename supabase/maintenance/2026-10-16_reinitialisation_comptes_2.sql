@@ -80,6 +80,10 @@ do $q$ begin
     execute 'create table sauvegarde_20261016.payouts as table public.payouts';
     execute 'create table sauvegarde_20261016.payout_methods as table public.payout_methods';
   end if;
+  -- Demandes de retrait (§62) : sauvegardées puis vidées avec les versements.
+  if to_regclass('public.payout_requests') is not null then
+    execute 'create table sauvegarde_20261016.payout_requests as table public.payout_requests';
+  end if;
 end $q$;
 create table sauvegarde_20261016.courier_invitations as table public.courier_invitations;
 create table sauvegarde_20261016.account_passages as table public.account_passages;
@@ -94,6 +98,7 @@ begin
   if to_regclass('public.promo_uses') is not null then t := 'public.promo_uses, public.promo_codes, ' || t; end if;
   if to_regclass('public.wallet_movements') is not null then t := 'public.wallet_movements, public.wallets, ' || t; end if;
   -- Versements (migration 2026-11-07) : liés aux boutiques et aux livreurs, vidés dans la même instruction.
+  if to_regclass('public.payout_requests') is not null then t := 'public.payout_requests, ' || t; end if;
   if to_regclass('public.payouts') is not null then t := 'public.payouts, public.payout_methods, ' || t; end if;
   execute 'truncate table ' || t;
 end $q$;

@@ -8,10 +8,10 @@ interface Payout { id: string; amount_gnf: number; method: string; account_numbe
 const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
 /**
- * Versements (§48) : moyen de versement de la boutique (Orange Money, MTN, Kulu, Soutra, PayCard, banque), argent
- * disponible (48 h après la remise) et versements reçus. Hailand verse chaque semaine et paie les frais.
+ * Où recevoir son argent (§48, §62) : moyen de versement de la boutique (Orange Money, MTN, Kulu, Soutra, PayCard, banque) et
+ * retraits reçus. Le solde et le bouton « Retirer » sont dans `SoldeCard`.
  */
-export function PayoutCard({ shopId }: { shopId: string }) {
+export function PayoutCard({ shopId, onSaved }: { shopId: string; onSaved?: () => void }) {
   const sb = browserClient();
   const [s, setS] = useState<Summary | null>(null);
   const [list, setList] = useState<Payout[]>([]);
@@ -37,18 +37,13 @@ export function PayoutCard({ shopId }: { shopId: string }) {
     if (error) { setMsg(error.message.replace(/^.*?:\s*/, '')); return; }
     const later = new Date(String(data)).getTime() > Date.now() + 60_000;
     setMsg(later ? `Enregistré. Par sécurité, ce nouveau moyen sera utilisé à partir du ${when(String(data))}.` : 'Moyen de versement enregistré.');
-    setEdit(false); setAccount(''); await load();
+    setEdit(false); setAccount(''); await load(); onSaved?.();
   }
   const pendingChange = s?.usable_from && new Date(s.usable_from).getTime() > Date.now();
 
   return (
-    <section aria-label="Versements" className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-4">
-      <h2 className="font-display text-[16px] font-semibold">Versements</h2>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="flex flex-col rounded-[14px] bg-ok-soft px-3 py-2.5"><span className="text-[12px] font-bold text-ok">Disponible</span><span className="font-display text-[18px] font-semibold">{s ? formatGnf(s.payable_gnf) : '…'}</span></div>
-        <div className="flex flex-col rounded-[14px] bg-sand px-3 py-2.5"><span className="text-[12px] font-bold text-muted">En attente (48 h)</span><span className="font-display text-[18px] font-semibold">{s ? formatGnf(s.waiting_gnf) : '…'}</span></div>
-      </div>
-      <p className="text-[12px] font-semibold leading-snug text-muted">Une vente devient disponible 48 h après la remise du colis (le temps d’un éventuel litige). Hailand verse chaque semaine et paie les frais d’envoi.</p>
+    <section aria-label="Où recevoir votre argent" className="flex flex-col gap-3 rounded-[20px] border border-line-soft bg-card p-4">
+      <h2 className="font-display text-[16px] font-semibold">Où recevoir votre argent</h2>
       {s?.method && !edit && (
         <div className="flex items-center gap-3 rounded-[14px] border border-line px-3 py-2.5">
           <span className="flex min-w-0 flex-1 flex-col"><span className="text-[14px] font-extrabold">{payoutMethodLabel(s.method)} · {maskAccount(s.method, s.account_number)}</span><span className="truncate text-[12px] font-semibold text-muted">{s.holder_name}{pendingChange ? ` · utilisé à partir du ${when(s.usable_from!)}` : ''}</span></span>
@@ -74,7 +69,8 @@ export function PayoutCard({ shopId }: { shopId: string }) {
       )}
       {msg && <p role="status" className="text-[13px] font-bold">{msg}</p>}
       {list.length > 0 && (
-        <ul className="flex flex-col gap-1 border-t border-line-soft pt-2">
+        <ul aria-label="Retraits reçus" className="flex flex-col gap-1 border-t border-line-soft pt-2">
+          <li className="text-[12px] font-extrabold text-muted">Retraits reçus</li>
           {list.map((p) => <li key={p.id} className="flex justify-between gap-3 text-[13px] font-semibold"><span>{when(p.created_at)} · {payoutMethodLabel(p.method)} {maskAccount(p.method, p.account_number)}</span><span className="font-extrabold">{formatGnf(p.amount_gnf)}</span></li>)}
         </ul>
       )}

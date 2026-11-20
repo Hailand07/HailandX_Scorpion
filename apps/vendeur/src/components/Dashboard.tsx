@@ -3,9 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ago, barHeights, formatGnf, onVacation, periodStats, type SalesDay } from '@hailandx/commerce';
 import { AppMark } from '@hailandx/ui';
-import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, Segmented } from '@hailandx/kit';
+import { BandeauInstaller, browserClient, HAILANDX_URL, Icon, LienHailand, mediaUrl, NotificationBell, Screen, unreadLatest, unreadNotifications } from '@hailandx/kit';
 import type { MyShop } from '@/lib/useMyShop';
 import { ShareSheet } from './ShareSheet';
+import { SoldeAccueil } from './SoldeCard';
 import { btn } from './ui';
 
 interface Review { rating: number; comment: string | null; created_at: string }
@@ -13,13 +14,16 @@ interface OfferStock { id: string; active: boolean; photo_paths: string[] | null
 interface Data {
   series: SalesDay[]; prep: { created_at: string }[]; disputes: number; recent: Review[];
   offers: OfferStock[]; balance: number; questions: number; shares: number;
+  notifs: { list: Awaited<ReturnType<typeof unreadLatest>>; count: number };
 }
 type Period = 'jour' | 'semaine' | 'mois';
 const DAYS: Record<Period, number> = { jour: 1, semaine: 7, mois: 30 };
 
 /**
- * Accueil (design §52), dans l'ordre de ce qui compte : ce qu'il faut faire maintenant (colis à préparer d'abord), les deux gestes
- * qui font vendre (ajouter un produit, partager), puis les ventes et l'argent. Le reste est dans l'onglet Boutique.
+ * Accueil (§52, réorganisé au §62) : notifications non lues (la plus récente), 1. l'urgence (colis à préparer) ; 2. les deux gestes
+ * qui font vendre ; 3. UNE carte, au dessin de HailandPay, qui marie le solde (« Retirer ») et les ventes ; 4. le reste à faire et
+ * « Bien démarrer » (disparaît une fois tout fait) ; 5. l'installation (disparaît une fois installée, ou 14 jours après « Plus tard »).
+ * Le reste est dans l'onglet Boutique.
  */
 export function Dashboard({ shop }: { shop: MyShop }) {
   const [d, setD] = useState<Data | null>(null);
@@ -29,7 +33,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   const load = useCallback(async () => {
     const sb = browserClient(); if (!sb) return;
     const week = new Date(Date.now() - 7 * 86_400_000).toISOString();
-    const [sales, prep, disputes, recent, offers, ledger, questions, shares] = await Promise.all([
+    const [sales, prep, disputes, recent, offers, ledger, questions, shares, nList, nCount] = await Promise.all([
       sb.rpc('fn_shop_sales', { p_shop: shop.id, p_days: 60 }),
       sb.from('parcels').select('created_at').eq('shop_id', shop.id).eq('status', 'attente_vendeur').order('created_at'),
       sb.from('parcels').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id).eq('status', 'litige'),
@@ -38,6 +42,8 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       sb.from('ledger_entries').select('amount_gnf').eq('account', 'shop').eq('account_id', shop.id),
       sb.rpc('fn_shop_questions', { p_shop: shop.id }),
       sb.from('share_links').select('id', { count: 'exact', head: true }).eq('shop_id', shop.id),
+      unreadLatest(sb, 'vendeur', 1),
+      unreadNotifications(sb, 'vendeur'),
     ]);
     setD({
       series: ((sales.data as SalesDay[]) ?? []).map((x) => ({ ...x, revenue_gnf: Number(x.revenue_gnf), delivered_gnf: Number(x.delivered_gnf ?? 0) })),
@@ -48,6 +54,7 @@ export function Dashboard({ shop }: { shop: MyShop }) {
       balance: ((ledger.data as { amount_gnf: number }[]) ?? []).reduce((n, e) => n + e.amount_gnf, 0),
       questions: ((questions.data as { answer: string | null }[]) ?? []).filter((q) => !q.answer).length,
       shares: shares.count ?? 0,
+      notifs: { list: nList, count: nCount },
     });
   }, [shop.id]);
 
@@ -81,6 +88,33 @@ export function Dashboard({ shop }: { shop: MyShop }) {
   ].filter((x) => owner || x.href !== '/reglages') : [];
   const doneCount = steps.filter((x) => x.done).length;
 
+  // Les ventes, dans la même carte que le solde : période en petits onglets, chiffre du jour, barres des 7 derniers jours.
+  const ventes = (
+    <>
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[12.5px] font-bold text-white/65">Ventes</span>
+        <span role="tablist" aria-label="Période" className="flex gap-0.5 rounded-full bg-white/[0.07] p-0.5">
+          {([['jour', 'Auj.'], ['semaine', '7 j'], ['mois', '30 j']] as const).map(([id, label]) => (
+            <button key={id} type="button" role="tab" aria-selected={period === id} onClick={() => setPeriod(id)} className={`h-7 rounded-full px-2.5 text-[11.5px] font-extrabold ${period === id ? 'bg-white text-ink' : 'text-white/70'}`}>{label}</button>
+          ))}
+        </span>
+      </div>
+      <div className="flex items-end justify-between gap-3">
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="font-display text-[22px] font-semibold leading-tight">{stats ? formatGnf(stats.revenue, false) : '…'} <span className="text-[13px] text-white/60">GNF commandés</span></span>
+          <span className="truncate text-[12px] font-bold text-white/60">{stats ? `${stats.parcels} commande${stats.parcels > 1 ? 's' : ''} · ${formatGnf(stats.delivered)} encaissés` : ' '}</span>
+        </span>
+        {stats?.trendPct != null && stats.revenue > 0 && <span className="shrink-0 whitespace-nowrap rounded-full bg-lime/15 px-2 py-0.5 text-[11.5px] font-extrabold text-lime">{stats.trendPct > 0 ? '+' : ''}{stats.trendPct} %</span>}
+      </div>
+      <Link href="/statistiques" aria-label="Détail des ventes" className="flex items-end gap-3">
+        <span role="img" aria-label="Ventes des 7 derniers jours" className="grid h-[38px] flex-1 grid-cols-7 items-end gap-1.5">
+          {last7.map((x, i) => <span key={x.day} className={`block rounded-[5px] ${i === last7.length - 1 ? 'bg-lime' : 'bg-white/20'}`} style={{ height: `${Math.max(8, heights[i] ?? 0)}%` }} />)}
+        </span>
+        <span className="flex shrink-0 items-center gap-0.5 text-[12px] font-extrabold text-white/75">Détail<Icon name="chevron" size={14} stroke={2.4} /></span>
+      </Link>
+    </>
+  );
+
   return (
     <Screen className="gap-3.5">
       <header className="flex items-center gap-3 pt-1">
@@ -91,16 +125,27 @@ export function Dashboard({ shop }: { shop: MyShop }) {
           <span className="truncate font-display text-[20px] font-semibold tracking-tight">{shop.name}</span>
           {onVacation(shop.vacation_until)
             ? <Link href={owner ? '/boutique' : '/'} className="flex items-center gap-1.5 text-[12px] font-bold text-warn"><span className="h-[7px] w-[7px] rounded-full bg-warn" />En congé · commandes fermées</Link>
-            : <span className="flex items-center gap-1.5 text-[12px] font-bold text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok" />Ouverte{owner ? '' : ' · employé'}</span>}
+            : <span className="flex items-center gap-1.5 text-[12px] font-bold text-ok"><span className="h-[7px] w-[7px] rounded-full bg-ok" />Ouverte{owner ? '' : ' · employé'}{d && todo.length === 0 ? <span className="font-semibold text-muted"> · tout est à jour</span> : null}</span>}
         </span>
         <NotificationBell scope="vendeur" />
         <LienHailand app="hailandx" href={`${HAILANDX_URL}/b/${shop.slug}`} target="_blank" aria-label="Voir ma boutique sur HailandX" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-card"><Icon name="eye" /></LienHailand>
       </header>
 
-      {/* §60 : l'icône sur l'écran d'accueil, pour ne manquer aucune commande. */}
-      <BandeauInstaller nom="HailandX Vendeur" cle="vendeur" texte="Ouvrez votre boutique en un geste et voyez vos commandes dès qu’elles arrivent." icone={<AppMark app="vendeur" size={44} />} />
+      {/* Notifications non lues (§62) : la plus récente, sous l'en-tête ; la cloche en haut à droite garde la liste complète. */}
+      {d && d.notifs.count > 0 && d.notifs.list[0] && (
+        <div className="flex items-center gap-3 rounded-[20px] border border-blue/20 bg-blue-soft px-3.5 py-3">
+          <Link href={d.notifs.list[0].link ?? '/notifications'} className="flex min-w-0 flex-1 items-center gap-3">
+          <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-card text-blue"><Icon name="bell" size={19} stroke={2} /><span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-blue px-1 text-[10.5px] font-extrabold text-white">{d.notifs.count > 9 ? '9+' : d.notifs.count}</span></span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="truncate text-[14px] font-extrabold">{d.notifs.list[0].title}</span>
+            <span className="truncate text-[12px] font-semibold text-muted">{[d.notifs.list[0].body, ago(d.notifs.list[0].created_at)].filter(Boolean).join(' · ')}</span>
+          </span>
+          </Link>
+          {d.notifs.count > 1 && <Link href="/notifications" aria-label={`Voir les ${d.notifs.count} notifications`} className="shrink-0 rounded-full bg-card px-2.5 py-1 text-[12px] font-extrabold text-blue-ink">+ {d.notifs.count - 1}</Link>}
+        </div>
+      )}
 
-      {/* 1. Ce qui attend le vendeur. Un colis à préparer passe avant tout : carte pleine, en tête. */}
+      {/* 1. L'urgence : un colis à préparer (ou un litige) passe avant tout. */}
       {urgent && (
         <Link href={urgent.href} className="flex items-center gap-3.5 rounded-[20px] bg-lime p-4">
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-ink font-display text-[20px] font-bold text-lime">{urgent.badge}</span>
@@ -108,6 +153,20 @@ export function Dashboard({ shop }: { shop: MyShop }) {
           <Icon name="chevron" size={18} stroke={2.4} />
         </Link>
       )}
+
+      {/* 2. Les deux gestes qui font vendre, sous le pouce (au-dessus de la carte, demande du fondateur). */}
+      <div className="grid grid-cols-2 gap-2.5">
+        <Link href="/produits/nouveau" className={`${btn('primary', 'lg')} whitespace-nowrap !px-3`}><Icon name="plus" size={18} stroke={2.4} />Nouveau produit</Link>
+        <button type="button" onClick={() => setSharing(true)} className={btn('secondary', 'lg')}><Icon name="share" size={18} stroke={2} />Partager</button>
+      </div>
+      {sharing && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name }} onClose={() => setSharing(false)} />}
+
+      {/* 3. Une seule carte : le solde et les ventes (§62). L'employé ne voit que les ventes. */}
+      {owner ? <SoldeAccueil shopId={shop.id} nom={shop.name}>{ventes}</SoldeAccueil> : (
+        <section aria-label="Ventes" className="relative flex flex-col gap-3 overflow-hidden rounded-[26px] bg-ink p-[18px] text-white">{ventes}</section>
+      )}
+
+      {/* 4. Le reste à faire, puis « Bien démarrer » tant qu'il reste des étapes. */}
       {rest.length > 0 && (
         <section aria-label="À faire" className="overflow-hidden rounded-[20px] border border-line-soft bg-card">
           {rest.map((t, i) => (
@@ -119,15 +178,6 @@ export function Dashboard({ shop }: { shop: MyShop }) {
           ))}
         </section>
       )}
-      {d && todo.length === 0 && <p className="flex items-center gap-2.5 rounded-[20px] border border-line-soft bg-card px-4 py-3.5 text-[14px] font-bold text-ok"><Icon name="check" size={18} stroke={2.6} />Tout est à jour : aucune commande n’attend.</p>}
-
-      {/* 2. Les deux gestes qui font vendre, sous le pouce. */}
-      <div className="grid grid-cols-2 gap-2.5">
-        <Link href="/produits/nouveau" className={`${btn('primary', 'lg')} whitespace-nowrap !px-3`}><Icon name="plus" size={18} stroke={2.4} />Nouveau produit</Link>
-        <button type="button" onClick={() => setSharing(true)} className={btn('secondary', 'lg')}><Icon name="share" size={18} stroke={2} />Partager</button>
-      </div>
-      {sharing && <ShareSheet target={{ shopId: shop.id, shopSlug: shop.slug, shopName: shop.name }} onClose={() => setSharing(false)} />}
-
       {d && doneCount < steps.length && (
         <section aria-label="Bien démarrer" className="flex flex-col gap-1 rounded-[20px] border border-line-soft bg-card px-4 pb-2 pt-3.5">
           <div className="flex items-baseline justify-between"><h2 className="text-[15px] font-extrabold">Bien démarrer</h2><span className="text-[12px] font-extrabold text-ok">{doneCount} sur {steps.length}</span></div>
@@ -138,29 +188,8 @@ export function Dashboard({ shop }: { shop: MyShop }) {
         </section>
       )}
 
-      {/* 3. Les chiffres : ventes, puis l'argent dû. */}
-      <section aria-label="Mes ventes" className="flex flex-col gap-3.5 rounded-[24px] bg-ink p-4 text-white">
-        <Segmented dark label="Période" value={period} onChange={setPeriod} items={[{ id: 'jour', label: 'Aujourd’hui' }, { id: 'semaine', label: '7 jours' }, { id: 'mois', label: '30 jours' }]} />
-        <div className="flex items-end justify-between gap-3">
-          <span className="flex flex-col gap-0.5">
-            <span className="text-[12px] font-bold text-white/65">Commandé</span>
-            <span className="font-display text-[30px] font-semibold tracking-tight">{stats ? formatGnf(stats.revenue, false) : '…'} <span className="text-[14px] text-white/65">GNF</span></span>
-            <span className="text-[13px] font-bold text-white/75">{stats ? `${stats.parcels} commande${stats.parcels > 1 ? 's' : ''} · dont ${formatGnf(stats.delivered)} encaissés` : ' '}</span>
-          </span>
-          {stats?.trendPct != null && stats.revenue > 0 && <span className="whitespace-nowrap rounded-full bg-lime/15 px-2.5 py-1 text-[12px] font-extrabold text-lime">{stats.trendPct > 0 ? '+' : ''}{stats.trendPct} % {period === 'jour' ? 'vs hier' : 'vs avant'}</span>}
-        </div>
-        <div role="img" aria-label="Ventes des 7 derniers jours" className="grid h-[54px] grid-cols-7 items-end gap-1.5">
-          {last7.map((x, i) => <span key={x.day} className={`block rounded-md ${i === last7.length - 1 ? 'bg-lime' : 'bg-white/20'}`} style={{ height: `${heights[i]}%` }} />)}
-        </div>
-        <Link href="/statistiques" className="flex h-10 items-center justify-center rounded-full bg-white/10 text-[13px] font-extrabold">Voir le détail des ventes</Link>
-      </section>
-
-      {owner && (
-        <Link href="/argent" className="flex items-center justify-between gap-3 rounded-[20px] border border-line-soft bg-card p-4">
-          <span className="flex flex-col gap-0.5"><span className="text-[12px] font-bold text-muted">Hailand vous doit</span><span className="font-display text-[20px] font-semibold">{d ? formatGnf(d.balance, false) : '…'} <span className="text-[12px] text-muted">GNF</span></span></span>
-          <span className="flex items-center gap-1 text-[13px] font-extrabold text-blue-ink">Voir<Icon name="chevron" size={15} stroke={2.2} /></span>
-        </Link>
-      )}
+      {/* 5. L'installation (§60), discrète, en bas. */}
+      <BandeauInstaller nom="HailandX Vendeur" cle="vendeur" texte="Ouvrez votre boutique en un geste et voyez vos commandes dès qu’elles arrivent." icone={<AppMark app="vendeur" size={44} />} />
     </Screen>
   );
 }

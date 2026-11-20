@@ -5,11 +5,12 @@ import { btn, Flash, PageHead, Panel, useAction, useConsole } from '@/components
 import { phoneText } from '@/lib/format';
 
 interface Due { kind: 'boutique' | 'livreur'; target_id: string; name: string; phone: string | null; balance_gnf: number; payable_gnf: number; method: string | null; account_number: string | null; holder_name: string | null; usable_from: string | null }
+interface Withdraw { id: string; kind: 'boutique' | 'livreur'; target_id: string; name: string; amount_gnf: number; payable_gnf: number; method: string; account_number: string; holder_name: string; created_at: string }
 interface Refund { buyer_id: string; amount_gnf: number; buyer_phone: string | null }
 interface Totals { platform: number; escrow: number; courier: number; cash: number }
 
 /**
- * Argent : versements de la semaine aux boutiques et aux livreurs (§48 : disponible 48 h après la remise, sur le moyen de
+ * Argent : demandes de retrait des vendeurs (§62 : à envoyer depuis le compte Chap Chap Pay de Hailand, puis « Envoyé »), versements de la semaine aux boutiques et aux livreurs (§48 : disponible 48 h après la remise, sur le moyen de
  * versement de chacun, frais payés par Hailand), remboursements aux acheteurs, soldes globaux. Chaque versement est journalisé.
  */
 export default function MoneyPage() {
@@ -18,15 +19,19 @@ export default function MoneyPage() {
   const [owed, setOwed] = useState<Due[] | null>(null);
   const [ref, setRef] = useState('');
   const [refunds, setRefunds] = useState<Refund[] | null>(null);
+  const [withdraws, setWithdraws] = useState<Withdraw[] | null>(null);
+  const [reason, setReason] = useState('');
   const [totals, setTotals] = useState<Totals | null>(null);
   const [confirm, setConfirm] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [led, payouts, due] = await Promise.all([
+    const [led, payouts, due, wd] = await Promise.all([
       sb.from('ledger_entries').select('account,account_id,amount_gnf').limit(20000),
       sb.rpc('fn_payouts_due'),
       sb.rpc('fn_refunds_due'),
+      sb.rpc('fn_withdraw_requests'),
     ]);
+    setWithdraws((wd.data as Withdraw[]) ?? []);
     const t: Totals = { platform: 0, escrow: 0, courier: 0, cash: 0 };
     for (const r of (led.data as { account: string; account_id: string | null; amount_gnf: number }[]) ?? []) {
       if (r.account === 'platform') t.platform += r.amount_gnf;
@@ -39,7 +44,8 @@ export default function MoneyPage() {
     setTotals(t);
   }, [sb]);
   useEffect(() => { void load(); }, [load]);
-  const after = async () => { setConfirm(null); setRef(''); await load(); };
+  const after = async () => { setConfirm(null); setRef(''); setReason(''); await load(); };
+  const when = (iso: string) => new Date(iso).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
   const owedTotal = (owed ?? []).reduce((n, o) => n + o.balance_gnf, 0);
   const readyTotal = (owed ?? []).reduce((n, o) => n + o.payable_gnf, 0);
@@ -56,6 +62,47 @@ export default function MoneyPage() {
         <Tile label="À rembourser" value={refunds ? formatGnf(refundTotal) : '…'} sub={refunds ? `${refunds.length} acheteur${refunds.length > 1 ? 's' : ''}` : ''} />
       </section>
       <Flash msg={msg} />
+      {/* §62 : les vendeurs retirent quand ils veulent (dès 10 000 GNF). L'équipe envoie l'argent, puis marque « Envoyé ». */}
+      <Panel title={`Demandes de retrait${withdraws && withdraws.length ? ` · ${withdraws.length}` : ''}`} className="overflow-hidden">
+        {withdraws?.length === 0 && <p className="border-t border-[#f0ede6] px-[18px] py-4 text-[14px] font-semibold text-muted">Aucune demande en attente.</p>}
+        <ul>
+          {withdraws?.map((w) => {
+            const key = `w${w.id}`;
+            const trop = w.amount_gnf > w.payable_gnf;
+            return (
+              <li key={w.id} className="flex flex-col gap-2 border-t border-[#f0ede6] px-[18px] py-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="truncate text-[14.5px] font-extrabold">{formatGnf(w.amount_gnf)} · {w.name} <span className="text-[11.5px] font-bold text-muted">· {w.kind}</span></span>
+                    <span className="text-[12.5px] font-semibold text-muted">{payoutMethodLabel(w.method)} {w.method === 'banque' ? w.account_number : phoneText(w.account_number)} · {w.holder_name} · demandé le {when(w.created_at)}</span>
+                    {trop && <span className="text-[12px] font-bold text-[#a3321f]">Le disponible n’est plus que de {formatGnf(w.payable_gnf)} (litige ou versement entre-temps) : refusez la demande.</span>}
+                  </span>
+                  {confirm !== key && confirm !== `x${w.id}` && (
+                    <span className="flex gap-2">
+                      {!trop && <button type="button" onClick={() => { setConfirm(key); setRef(''); }} className={`${btn.small} bg-ink text-white`}>Envoyé</button>}
+                      <button type="button" onClick={() => { setConfirm(`x${w.id}`); setReason(''); }} className={btn.small}>Refuser</button>
+                    </span>
+                  )}
+                </div>
+                {confirm === key && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Référence de l’envoi Chap Chap Pay / Orange Money (facultatif)" aria-label="Référence de l’envoi" className="h-10 min-w-0 flex-1 rounded-[10px] border border-line px-3 text-[13px] font-semibold outline-none focus:border-blue" />
+                    <button type="button" disabled={busy} onClick={() => run(sb.rpc('fn_withdraw_done', { p_request: w.id, p_ref: ref }), `Retrait de ${formatGnf(w.amount_gnf)} pour « ${w.name} » marqué envoyé.`, after)} className={`${btn.small} bg-ink text-white`}>Confirmer l’envoi de {formatGnf(w.amount_gnf)}</button>
+                    <button type="button" onClick={() => setConfirm(null)} className={btn.small}>Annuler</button>
+                  </div>
+                )}
+                {confirm === `x${w.id}` && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Motif (montré au vendeur)" aria-label="Motif du refus" className="h-10 min-w-0 flex-1 rounded-[10px] border border-line px-3 text-[13px] font-semibold outline-none focus:border-blue" />
+                    <button type="button" disabled={busy || reason.trim().length < 3} onClick={() => run(sb.rpc('fn_withdraw_refuse', { p_request: w.id, p_reason: reason }), 'Demande refusée ; le vendeur est prévenu.', after)} className={`${btn.small} bg-[#a3321f] text-white`}>Refuser la demande</button>
+                    <button type="button" onClick={() => setConfirm(null)} className={btn.small}>Annuler</button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </Panel>
       <div className="grid gap-4 xl:grid-cols-2">
         <Panel title="Versements de la semaine" className="overflow-hidden">
           {owed?.length === 0 && <p className="border-t border-[#f0ede6] px-[18px] py-4 text-[14px] font-semibold text-muted">Rien à verser.</p>}
@@ -106,7 +153,7 @@ export default function MoneyPage() {
           </ul>
         </Panel>
       </div>
-      <p className="text-[12.5px] font-semibold text-muted">« Versé » et « Remboursé » enregistrent un envoi déjà fait (Orange Money, MTN, Kulu… frais à la charge de Hailand) : la console ne déplace pas d’argent elle-même. Rappel automatique chaque lundi matin.</p>
+      <p className="text-[12.5px] font-semibold text-muted">« Envoyé », « Versé » et « Remboursé » enregistrent un envoi déjà fait (Orange Money, MTN, Kulu… frais à la charge de Hailand) : la console ne déplace pas d’argent elle-même. Rappel automatique chaque lundi matin.</p>
     </>
   );
 }
