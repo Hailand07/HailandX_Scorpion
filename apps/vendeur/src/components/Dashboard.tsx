@@ -21,7 +21,7 @@ const DAYS: Record<Period, number> = { jour: 1, semaine: 7, mois: 30 };
 
 /**
  * Accueil (§52, réorganisé au §62) : notifications non lues (la plus récente), 1. l'urgence (colis à préparer) ; 2. les deux gestes
- * qui font vendre ; 3. UNE carte, au dessin de HailandPay, qui marie le solde (« Retirer ») et les ventes ; 4. le reste à faire et
+ * qui font vendre ; 3. UNE carte sombre qui marie le solde (« Retirer ») et les ventes ; 4. le reste à faire et
  * « Bien démarrer » (disparaît une fois tout fait) ; 5. l'installation (disparaît une fois installée, ou 14 jours après « Plus tard »).
  * Le reste est dans l'onglet Boutique.
  */

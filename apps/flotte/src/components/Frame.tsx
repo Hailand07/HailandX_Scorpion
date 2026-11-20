@@ -79,7 +79,7 @@ export function Menu({ courier, onClose, onSignOut }: { courier: MenuCourier; on
           <span className="flex min-w-0 flex-1 flex-col"><span className="truncate font-display text-[17px] font-semibold">{courier.full_name}</span><span className="text-[12.5px] font-bold text-night-muted">Livreur Hailand · {VEHICULE[courier.vehicle] ?? courier.vehicle}</span></span>
           <button type="button" onClick={onClose} aria-label="Fermer" className="flex h-10 w-10 items-center justify-center rounded-xl text-night-muted">{Ico.close(20)}</button>
         </div>
-        <Link href="/livraisons" className={item} onClick={onClose}><Line icon={Ico.route(20)} label="Mes livraisons" sub="Historique, gains et HailandPay" /></Link>
+        <Link href="/livraisons" className={item} onClick={onClose}><Line icon={Ico.route(20)} label="Mes livraisons" sub="Historique, gains et retraits" /></Link>
         <Link href="/livraisons#especes" className={item} onClick={onClose}><Line icon={Ico.wallet(20)} label="Espèces à reverser" sub={formatGnf(courier.cash_balance_gnf)} /></Link>
         <Link href="/aide" className={item} onClick={onClose}><Line icon={Ico.help(20)} label="Aide" sub="Client absent, colis refusé, problème de code…" /></Link>
         <Installer nom="Hailand Flotte" tone="nuit" render={(ouvrir) => <button type="button" onClick={ouvrir} className={item}><Line icon={<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>} label="Installer l’application" sub="Une icône sur votre écran d’accueil" /></button>} />

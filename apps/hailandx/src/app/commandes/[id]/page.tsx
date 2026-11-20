@@ -102,7 +102,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                 {p.shops?.whatsapp && !['remis', 'annule'].includes(p.status) && (
                   <a href={`https://wa.me/${p.shops.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Bonjour ${p.shops.name}, j’ai passé une commande sur HailandX.`)}`} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center rounded-2xl border border-line text-[13.5px] font-extrabold">Écrire au vendeur sur WhatsApp</a>
                 )}
-                {p.status === 'annule' && p.cancel_reason && <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé {p.cancelled_by === 'vendeur' ? 'par la boutique' : p.cancelled_by === 'equipe' ? 'par l’équipe Hailand' : ''} : « {p.cancel_reason} »{order.payment_method === 'orange_money' ? ' — vous êtes remboursé.' : order.payment_method === 'hailandpay' ? ' — vos Syli sont rendus dans votre portefeuille HailandPay.' : ''}</p>}
+                {p.status === 'annule' && p.cancel_reason && <p className="rounded-2xl bg-sand px-3 py-2.5 text-[12.5px] font-bold">Annulé {p.cancelled_by === 'vendeur' ? 'par la boutique' : p.cancelled_by === 'equipe' ? 'par l’équipe Hailand' : ''} : « {p.cancel_reason} »{order.payment_method === 'orange_money' ? ' — vous êtes remboursé.': ''}</p>}
                 {codes[p.id] && (p.status === 'accepte' || p.status === 'retire') && (
                   <div className="flex flex-col items-center gap-1 rounded-2xl bg-lime px-4 py-3">
                     <span className="text-[12px] font-extrabold">Code de remise — à donner au livreur à la porte</span>
@@ -124,7 +124,6 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
             <div className="flex justify-between"><span className="text-muted">Articles{parcels.some((x) => x.discount_gnf > 0) ? ' (après réduction)' : ''}</span><span>{formatGnf(order.subtotal_gnf)}</span></div>
             <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{formatGnf(order.delivery_fee_gnf)}</span></div>
             <div className="flex justify-between text-[15px] font-extrabold"><span>Total {parcels.length && parcels.every((x) => x.status === 'annule') ? '— commande annulée' : order.payment_method === 'livraison' ? 'à payer en espèces' : ''}</span><span>{formatGnf(order.total_gnf)}</span></div>
-            {order.payment_method === 'hailandpay' && <div className="flex justify-between text-[12.5px] font-bold text-muted"><span>Payé avec HailandPay (Syli, argent de test)</span><span>{({ bloque: 'bloqué jusqu’à la remise', libere: 'versé au vendeur', rembourse: 'rendu' } as Record<string, string>)[order.payment_status] ?? order.payment_status}</span></div>}
           </div>
           {parcels.some((x) => !['remis', 'annule'].includes(x.status)) && <GarderSuivi orderId={id} />}
           {/* Discret, tout en bas (§57) : l'action reste trouvable sans attirer l'œil. */}

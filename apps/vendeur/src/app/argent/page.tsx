@@ -4,12 +4,11 @@ import { useEffect, useState } from 'react';
 import { formatGnf } from '@hailandx/commerce';
 import { BackHeader, browserClient, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
-import { ShopWallet } from '@/components/ShopWallet';
 import { PayoutCard } from '@/components/PayoutCard';
 import { SoldeArgent } from '@/components/SoldeCard';
 
 interface Entry { id: number; kind: string; amount_gnf: number; created_at: string; parcel_id: string | null }
-const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Retrait envoyé sur votre compte', reversement_portefeuille: 'Versé dans le portefeuille HailandPay', reprise_portefeuille: 'Repris au portefeuille HailandPay' };
+const LABEL: Record<string, string> = { reglement_vendeur: 'Vente remise', annulation_vendeur: 'Vente reprise (litige)', reversement_vendeur: 'Retrait envoyé sur votre compte' };
 
 /** Argent (§62) : le solde (disponible, en attente) et le bouton « Retirer », où recevoir l'argent, les colis payés pas encore remis, les mouvements. */
 export default function MoneyPage() {
@@ -58,7 +57,6 @@ function Money({ shopId }: { shopId: string }) {
           </div>
         )}
       </section>
-      <ShopWallet shopId={shopId} />
       <p className="mx-1 text-[12px] font-semibold leading-snug text-muted">La commission Hailand{commission !== null ? ` (${String(commission).replace('.', ',')} %)` : ''} est déduite du prix des articles. Les frais de livraison sont payés par l’acheteur et ne vous concernent pas.</p>
     </Screen>
   );

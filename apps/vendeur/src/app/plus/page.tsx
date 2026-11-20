@@ -79,9 +79,11 @@ export default function PlusPage() {
       <section aria-label="Mon compte" className="flex flex-col gap-2">
         <GroupTitle>Mon compte</GroupTitle>
         <div className={group}>
-          <div className="flex min-h-[58px] items-center gap-3 border-b border-line-soft px-4">
-            <Icon name="user" /><span className="flex flex-col"><span className="text-[15px] font-bold">{maskPhone(session.user.phone)}</span><span className="text-[12px] font-semibold text-muted">Compte Hailand depuis {since}</span></span>
-          </div>
+          {/* §63 : toutes les informations du compte (identité, adresses et quartiers) au même endroit. */}
+          <Link href="/informations" className="flex min-h-[58px] items-center gap-3 border-b border-line-soft px-4">
+            <Icon name="user" /><span className="flex min-w-0 flex-1 flex-col"><span className="text-[15px] font-bold">Mes informations</span><span className="truncate text-[12px] font-semibold text-muted">{maskPhone(session.user.phone)} · compte depuis {since}</span></span>
+            <Icon name="chevron" size={16} stroke={2} className="text-faint" />
+          </Link>
           <ListRow href="/securite" icon="shield" label="Mot de passe et e-mail" />
           <Installer nom="HailandX Vendeur" render={(ouvrir) => <ListRow onClick={ouvrir} icon="download" label="Installer l’application" />} />
           <ListRow href="/notifications" icon="bell" label="Notifications" value={unread ? <span className="rounded-full bg-blue-soft px-2 py-0.5 text-[12px] font-extrabold text-blue">{unread} nouvelle{unread > 1 ? 's' : ''}</span> : null} />

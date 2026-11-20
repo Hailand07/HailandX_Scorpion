@@ -4,8 +4,8 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Chargement } from '@hailandx/ui';
-import { formatGnf, formatSyli, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
-import { aUnNom, browserClient, HAILANDX_URL, Icon, PhoneLoginInline, useSession, useWallet } from '@hailandx/kit';
+import { formatGnf, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
+import { aUnNom, browserClient, HAILANDX_URL, Icon, PhoneLoginInline, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { OrderSteps } from '@/components/OrderSteps';
 import { AdresseClient } from '@/components/AdresseClient';
@@ -47,13 +47,10 @@ function Checkout() {
   const [linking, setLinking] = useState(false);
   const [names, setNames] = useState<Record<string, string>>({});
   const [added, setAdded] = useState<string | null>(null);
-  const [pay, setPay] = useState<'livraison' | 'orange_money' | 'hailandpay'>('livraison');
-  const { wallet } = useWallet();
+  const [pay, setPay] = useState<'livraison' | 'orange_money'>('livraison');
   const [promo, setPromo] = useState('');
   const [promoCheck, setPromoCheck] = useState<{ code: string; discount: number; lines: { shop_name: string; discount_gnf: number; reason: string | null }[] } | null>(null);
   const [omAvailable, setOmAvailable] = useState<{ ok: boolean; trial: boolean }>({ ok: false, trial: false });
-  // HailandPay (Syli, argent de test) : réservé à l'équipe pendant la phase de lancement (§49) — les clients ne le voient pas.
-  const [team, setTeam] = useState(false);
   // Frais de livraison connus AVANT de commander (A9) : un colis par boutique, chacun avec ses frais (comme Jumia ou Amazon).
   const [quote, setQuote] = useState<{ shop_id: string; shop_name: string; distance_km: number; fee_gnf: number }[] | null>(null);
   const offerKey = lines.map((l) => l.offerId).sort().join(',');
@@ -77,7 +74,6 @@ function Checkout() {
       const mode = (m.data as { value: string } | null)?.value ?? 'simulation';
       const open = mode === 'chapchappay' || mode === 'djomy';
       setOmAvailable({ ok: open || a.data === true, trial: !open });
-      setTeam(a.data === true);
       const list: Decl[] = await myAddresses(sb, uid);
       const lv: Record<string, number> = {};
       await Promise.all(list.map(async (d) => { const r = await sb.rpc('fn_declaration_level', { p_declaration: d.id }); lv[d.id] = typeof r.data === 'number' ? r.data : d.detected_level; }));
@@ -95,7 +91,6 @@ function Checkout() {
     setError(null);
     const n = normalizeGnPhone(phone);
     if (!n) return setError('Entrez un numéro guinéen valide pour que le livreur puisse vous joindre.');
-    if (pay === 'hailandpay' && (!wallet || wallet.balance < toPay)) return setError('Solde HailandPay insuffisant : rechargez votre portefeuille (argent de test) ou choisissez un autre moyen.');
     if (!decl) return setError('Choisissez une adresse de livraison.');
     setBusy(true);
     const items = lines.map((l) => ({ offer_id: l.offerId, variant_id: l.variantId, qty: l.qty }));
@@ -216,15 +211,6 @@ function Checkout() {
             <input type="radio" name="pay" disabled={!omAvailable.ok} checked={pay === 'orange_money'} onChange={() => setPay('orange_money')} /> <span className="flex flex-col">Mobile Money ou carte<span className="text-[11.5px] font-semibold text-muted">Orange Money, MTN MoMo, PayCard, Visa…</span></span>
             <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px]">{omAvailable.ok ? (omAvailable.trial ? 'essai équipe' : 'argent bloqué jusqu’à la remise') : 'bientôt'}</span>
           </label>
-          {team && (
-          <label className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-[14px] font-bold ${pay === 'hailandpay' ? 'border-2 border-ink' : 'border border-line'}`}>
-            <input type="radio" name="pay" disabled={!wallet} checked={pay === 'hailandpay'} onChange={() => setPay('hailandpay')} /> <span>Hailand<span className="text-blue">Pay</span></span>
-            <span className="ml-auto shrink-0 whitespace-nowrap text-[11.5px]">{wallet ? `${formatSyli(wallet.balance)} · TEST` : '…'}</span>
-          </label>
-          )}
-          {pay === 'hailandpay' && wallet && (wallet.balance >= toPay
-            ? <p className="text-[12.5px] font-medium text-muted">Payé tout de suite en Syli (argent de test, 1 Syli = 1 GNF). L’argent reste bloqué par Hailand jusqu’à la remise du colis, et vous est rendu si la commande est annulée. Solde après paiement : <b className="text-ink">{formatSyli(wallet.balance - toPay)}</b>.</p>
-            : <p className="text-[12.5px] font-bold text-[#a3321f]">Solde insuffisant ({formatSyli(wallet.balance)} pour {formatSyli(toPay)}). <Link href="/compte/hailandpay/recharger" className="text-blue-ink underline">Recharger</Link></p>)}
           {pay === 'orange_money' && <p className="text-[12.5px] font-medium text-muted">Vous payez juste après, sur la page sécurisée de Chap Chap Pay. L’argent reste bloqué par Hailand et n’est versé au vendeur qu’une fois le colis remis ; il vous est rendu si la commande est annulée.</p>}
         </section>
         <section className="flex flex-col gap-2 rounded-[22px] border border-line-soft bg-card p-4">
