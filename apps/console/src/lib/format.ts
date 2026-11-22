@@ -1,4 +1,4 @@
-import { formatGnf } from '@hailandx/commerce';
+import { formatGnf, heureTexte, joursTexte } from '@hailandx/commerce';
 
 /** Une ligne du journal des actions, telle que la renvoie fn_console_journal. */
 export interface JournalEntry {
@@ -22,7 +22,18 @@ export const SETTING_LABEL: Record<string, string> = {
   delivery_min_gnf: 'Livraison : minimum',
   cancel_fee_accepte_bps: 'Annulation : livreur parti',
   cancel_fee_retire_bps: 'Annulation : colis en route',
+  livraison_jours: 'Flotte : jours de livraison',
+  livraison_debut: 'Flotte : début du créneau',
+  livraison_fin: 'Flotte : fin du créneau',
+  livraison_heure_limite: 'Flotte : heure limite pour le jour même',
+  livraison_communes: 'Flotte : communes servies',
 };
+
+/** Communes proposées pour la zone de livraison (§64) : les cinq communes de Conakry, Coyah et Dubréka. */
+export const ZONE_COMMUNES: [string, string][] = [
+  ['com-kaloum', 'Kaloum'], ['com-dixinn', 'Dixinn'], ['com-matam', 'Matam'], ['com-ratoma', 'Ratoma'], ['com-matoto', 'Matoto'],
+  ['com-gn00500101', 'Coyah'], ['com-gn00500202', 'Dubréka'],
+];
 
 const SHOP_STATUS: Record<string, string> = { preparation: 'en préparation', bientot: 'bientôt', ouverte: 'ouverte', suspendue: 'suspendue' };
 const COURIER_STATUS: Record<string, string> = { candidat: 'candidat', valide: 'validé', suspendu: 'suspendu' };
@@ -47,6 +58,9 @@ export const pctToBps = (input: string): string | null => {
 export const settingText = (key: string, value: unknown): string => {
   const v = value === null || value === undefined ? '' : String(value);
   if (key === 'payment_mode') return PAYMENT_MODE[v] ?? v;
+  if (key === 'livraison_jours') return joursTexte(v) || '—';
+  if (key === 'livraison_debut' || key === 'livraison_fin' || key === 'livraison_heure_limite') return v ? heureTexte(v) : '—';
+  if (key === 'livraison_communes') return v ? v.split(',').map((id) => ZONE_COMMUNES.find(([c]) => c === id)?.[1] ?? id).join(', ') : 'partout';
   if (key.endsWith('_bps')) return bpsToPct(v);
   if (key === 'delivery_per_km_gnf') return `${Number(v).toLocaleString('fr-FR')} GNF/km`;
   if (key.endsWith('_gnf')) return `${Number(v).toLocaleString('fr-FR')} GNF`;

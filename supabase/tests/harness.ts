@@ -34,7 +34,7 @@ create table public.buildings (id text primary key, status text, is_validated bo
 create function public.st_asgeojson(g text) returns text language sql immutable as $$ select g $$;
 -- Point intérieur d'un contour : le banc n'a pas de vraie géométrie ; on revient au point d'ancrage de la déclaration.
 create function public.st_pointonsurface(g text) returns public.geometry language sql immutable as $$ select null::public.geometry $$;
-create table public.quartiers (id text primary key, nom text);
+create table public.quartiers (id text primary key, nom text, commune_id text);
 create table public.declarations (
   id uuid primary key default gen_random_uuid(), user_id uuid not null, gps_point public.geometry not null, anchor_point public.geometry,
   gps_accuracy_m real, detected_level smallint not null default 1, certified_building_id text, quartier_id text, commune_id text, declared_label text check (declared_label in ('Domicile', 'Travail', 'Autre')), hailand_code text, location_floor text, location_door text, declared_landmark text, certification_status text, certification_requested_at timestamptz, osm_polygon_geom text, osm_polygon_id text, status text not null default 'active');
@@ -100,6 +100,9 @@ export async function freshDb(): Promise<PGlite> {
   await db.exec(readFileSync(new URL('../migrations/2026-11-12_categories_multiples.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-17_montants_annulation_lisibles.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../migrations/2026-11-18_retraits.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../migrations/2026-11-22_creneau_zone_livraison.sql', import.meta.url), 'utf8'));
+  // Banc : zone de livraison ouverte partout (les décors n'ont pas de commune) ; creneau.test.ts la referme pour l'essayer.
+  await db.exec("update public.settings set value = '' where key = 'livraison_communes'");
   return db;
 }
 

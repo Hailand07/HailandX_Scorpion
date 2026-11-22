@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Badge, QrScanner, Chargement } from '@hailandx/ui';
 import { BackHeader, browserClient, DisputeThread, mediaUrl, ProofPhoto, useSession } from '@hailandx/kit';
 import { groupLines } from '@/lib/orderLines';
-import { buyerStep, formatGnf, type ParcelStatus } from '@hailandx/commerce';
+import { buyerStep, creneauTexte, formatGnf, type DeliveryWindow, type ParcelStatus } from '@hailandx/commerce';
 import { TrackingMap } from '@/components/TrackingMap';
 
 interface Order { id: string; total_gnf: number; subtotal_gnf: number; delivery_fee_gnf: number; payment_method: string; payment_status: string; created_at: string }
@@ -31,6 +31,17 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
   const [msg, setMsg] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
   const [scanFor, setScanFor] = useState<string | null>(null);
+  // Jour de livraison promis à la commande (§64), lu à part : sans la colonne (base pas encore à jour), la page reste entière.
+  const [slot, setSlot] = useState<string | null>(null);
+  useEffect(() => {
+    if (!sb || !session) return;
+    void (async () => {
+      const [o, w] = await Promise.all([sb.from('orders').select('delivery_date').eq('id', id).maybeSingle(), sb.rpc('fn_delivery_window')]);
+      const day = (o.data as { delivery_date: string | null } | null)?.delivery_date;
+      const win = w.data as DeliveryWindow | null;
+      setSlot(day && win && !w.error ? creneauTexte(day, win.debut, win.fin) : null);
+    })();
+  }, [sb, session, id]);
 
   const load = useCallback(async () => {
     if (!sb) return;
@@ -81,6 +92,7 @@ export default function OrderPage({ params }: { params: Promise<{ id: string }> 
                   <ol className="flex gap-1.5" aria-label="Étapes">{STEPS.map((s, i) => <li key={s.key} className={`h-1.5 flex-1 rounded-full ${i <= idx ? 'bg-blue' : 'bg-line'}`} aria-current={i === idx ? 'step' : undefined} title={s.label} />)}</ol>
                 )}
                 {idx >= 0 && <p className="text-[13px] font-medium text-muted">{STEPS[idx]!.help}</p>}
+                {slot && (p.status === 'attente_vendeur' || p.status === 'prepare' || p.status === 'mission_proposee' || p.status === 'accepte') && <p className="rounded-2xl bg-ok-soft px-3.5 py-2.5 text-[13px] font-extrabold">Livraison prévue {slot}</p>}
                 {['accepte', 'retire'].includes(p.status) && <TrackingMap parcelId={p.id} />}
                 {['remis', 'litige'].includes(p.status) && <ProofPhoto parcelId={p.id} />}
                 {/* Chaque article une seule fois (§56) : photo, quantité × prix unitaire, total de la ligne. */}
