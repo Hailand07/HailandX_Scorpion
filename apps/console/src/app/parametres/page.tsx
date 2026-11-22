@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Icon } from '@hailandx/kit';
 import { btn, Flash, PageHead, Panel, useAction, useConsole } from '@/components/ConsoleShell';
-import { deliveryFee, gnfInput, pctToBps, SETTING_LABEL, settingText, when } from '@/lib/format';
+import { deliveryFee, gnfInput, pctToBps, SETTING_LABEL, settingText, when, ZONE_COMMUNES } from '@/lib/format';
 
 interface Setting { key: string; value: string; updated_at: string | null }
 const HELP: Record<string, string> = {
@@ -13,9 +13,20 @@ const HELP: Record<string, string> = {
   delivery_min_gnf: 'Aucune livraison ne coûte moins que ce montant',
   cancel_fee_accepte_bps: 'Part des frais de livraison retenue pour le livreur si le client annule après son acceptation (il est en route vers la boutique)',
   cancel_fee_retire_bps: 'Part des frais de livraison retenue pour le livreur si le client annule quand le colis est en route (course et retour à la boutique)',
+  livraison_jours: 'Jours où la Flotte livre ; le client voit le prochain jour de livraison',
+  livraison_debut: 'Heure à partir de laquelle les colis sont livrés (le vendeur prépare avant)',
+  livraison_fin: 'Heure de fin des livraisons de la journée',
+  livraison_heure_limite: 'Commande passée avant cette heure (un jour de livraison) : livrée le jour même ; après : le prochain jour',
+  livraison_communes: 'Adresses de livraison acceptées ; en dehors, la commande est refusée avec la liste des communes servies',
   payment_mode: 'Essai : bouton « Simuler » pour l’équipe. Chap Chap Pay ou Djomy « test » : vraie page de paiement, clés de test (sandbox), équipe seulement. « Ouvert à tous » : clés de production, compte validé',
 };
-const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'cancel_fee_accepte_bps', 'cancel_fee_retire_bps', 'payment_mode'];
+const ORDER = ['commission_bps', 'courier_share_bps', 'delivery_base_gnf', 'delivery_per_km_gnf', 'delivery_min_gnf', 'cancel_fee_accepte_bps', 'cancel_fee_retire_bps', 'payment_mode',
+  'livraison_jours', 'livraison_debut', 'livraison_fin', 'livraison_heure_limite', 'livraison_communes'];
+/** Réglages du créneau et de la zone de la Flotte (§64) : valeurs texte, saisies par des choix (jours, heures, communes). */
+const isSlot = (k: string) => k.startsWith('livraison_');
+const isHour = (k: string) => k === 'livraison_debut' || k === 'livraison_fin' || k === 'livraison_heure_limite';
+const JOURS: [number, string][] = [[1, 'Lun'], [2, 'Mar'], [3, 'Mer'], [4, 'Jeu'], [5, 'Ven'], [6, 'Sam'], [7, 'Dim']];
+const toggle = (list: string, id: string, order: string[]) => { const set = new Set(list.split(',').filter(Boolean)); if (set.has(id)) set.delete(id); else set.add(id); return order.filter((x) => set.has(x)).join(','); };
 const isGnf = (k: string) => k.startsWith('delivery_');
 /** Distances d'exemple : le repère du fondateur (rond-point T8 → Samatran Plateau, moto-taxi 7 000 GNF), puis 1, 5 et 10 km. */
 const EXAMPLES: [string, number][] = [['T8 → Samatran (2,9 km)', 2.88], ['1 km', 1], ['5 km', 5], ['10 km', 10]];
@@ -40,10 +51,10 @@ export default function SettingsPage() {
   useEffect(() => { void load(); }, [load]);
 
   const cur = rows?.find((r) => r.key === edit) ?? null;
-  const next = cur ? (cur.key === 'payment_mode' ? value : isGnf(cur.key) ? gnfInput(value) : pctToBps(value)) : null;
+  const next = cur ? (cur.key === 'payment_mode' ? value : isSlot(cur.key) ? (isHour(cur.key) ? (/^\d{2}:\d{2}$/.test(value) ? value : null) : cur.key === 'livraison_jours' ? (value || null) : value) : isGnf(cur.key) ? gnfInput(value) : pctToBps(value)) : null;
   const val = (k: string) => Number(k === cur?.key && next ? next : rows?.find((r) => r.key === k)?.value ?? 0);
-  const open = (r: Setting) => { setEdit(r.key); setMotif(''); setMsg(null); setValue(r.key === 'payment_mode' || isGnf(r.key) ? r.value : String(Number(r.value) / 100).replace('.', ',')); };
-  const save = () => cur && next && run(
+  const open = (r: Setting) => { setEdit(r.key); setMotif(''); setMsg(null); setValue(r.key === 'payment_mode' || isGnf(r.key) || isSlot(r.key) ? r.value : String(Number(r.value) / 100).replace('.', ',')); };
+  const save = () => cur && next !== null && run(
     sb.rpc('fn_console_setting_update', { p_key: cur.key, p_value: next, p_motif: motif.trim() }),
     `${SETTING_LABEL[cur.key]} : ${settingText(cur.key, cur.value)} → ${settingText(cur.key, next)}. Inscrit au journal.`,
     async () => { setEdit(null); await load(); },
@@ -78,6 +89,21 @@ export default function SettingsPage() {
                   <button key={m} type="button" aria-pressed={value === m} onClick={() => setValue(m)} className={`min-h-11 rounded-[12px] px-2 text-[13.5px] font-extrabold ${value === m ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{settingText('payment_mode', m)}</button>
                 ))}
               </div>
+            ) : cur.key === 'livraison_jours' ? (
+              <div className="flex flex-wrap gap-2">
+                {JOURS.map(([n, l]) => { const on = value.split(',').includes(String(n)); return <button key={n} type="button" aria-pressed={on} onClick={() => setValue(toggle(value, String(n), JOURS.map(([x]) => String(x))))} className={`h-11 min-w-14 rounded-[12px] px-3 text-[13.5px] font-extrabold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{l}</button>; })}
+              </div>
+            ) : cur.key === 'livraison_communes' ? (
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {ZONE_COMMUNES.map(([id, nom]) => { const on = value.split(',').includes(id); return <button key={id} type="button" aria-pressed={on} onClick={() => setValue(toggle(value, id, ZONE_COMMUNES.map(([x]) => x)))} className={`h-11 rounded-[12px] px-3 text-[13.5px] font-extrabold ${on ? 'bg-ink text-white' : 'border border-line bg-card'}`}>{nom}</button>; })}
+                </div>
+                <span className="text-[12.5px] font-semibold text-muted">Aucune commune choisie = livraison partout.</span>
+              </div>
+            ) : isHour(cur.key) ? (
+              <label className="flex items-center gap-3 text-[13.5px] font-extrabold">Nouvelle heure
+                <input type="time" value={value} onChange={(e) => setValue(e.target.value)} className="h-11 w-36 rounded-[12px] border-2 border-blue px-3 text-[16px] font-extrabold outline-none" />
+              </label>
             ) : (
               <label className="flex items-center gap-3 text-[13.5px] font-extrabold">Nouvelle valeur
                 <span className="flex items-center gap-1.5"><input value={value} onChange={(e) => setValue(e.target.value)} inputMode="decimal" className={`h-11 ${isGnf(cur.key) ? 'w-32' : 'w-24'} rounded-[12px] border-2 border-blue px-3 text-[16px] font-extrabold outline-none`} />{isGnf(cur.key) ? (cur.key === 'delivery_per_km_gnf' ? 'GNF/km' : 'GNF') : '%'}</span>
@@ -85,7 +111,7 @@ export default function SettingsPage() {
             )}
             <div className="flex flex-wrap items-center gap-2.5 text-[14px] font-extrabold">
               <span className="rounded-[10px] bg-sand px-3 py-2">{settingText(cur.key, cur.value)}</span>→
-              <span className={`rounded-[10px] border-2 px-3 py-2 ${next ? 'border-blue' : 'border-[#a3321f] text-[#a3321f]'}`}>{next ? settingText(cur.key, next) : 'valeur invalide'}</span>
+              <span className={`rounded-[10px] border-2 px-3 py-2 ${next !== null ? 'border-blue' : 'border-[#a3321f] text-[#a3321f]'}`}>{next !== null ? settingText(cur.key, next) : 'valeur invalide'}</span>
               <span className="text-[12.5px] font-semibold text-muted">s’applique aux nouvelles commandes seulement</span>
             </div>
             {isGnf(cur.key) && (
@@ -105,7 +131,7 @@ export default function SettingsPage() {
               <p className="rounded-[12px] bg-amber-soft px-3 py-2.5 text-[12.5px] font-bold text-[#7a5500]">Vérifiez d’abord que le compte {value === 'djomy' ? 'Djomy (live)' : 'Chap Chap Pay'} est validé et que les clés de PRODUCTION sont posées dans HailandX (Vercel{value === 'djomy' ? ' : DJOMY_CLIENT_ID et DJOMY_CLIENT_SECRET du compte live' : ''}) : sinon les acheteurs ne pourront pas payer, ou paieraient en mode test.</p>
             )}
             <div className="flex gap-2.5">
-              <button type="button" disabled={busy || !next || next === cur.value || motif.trim().length < 3} onClick={save} className={`${btn.dark} h-12 flex-1`}>Confirmer la modification</button>
+              <button type="button" disabled={busy || next === null || next === cur.value || motif.trim().length < 3} onClick={save} className={`${btn.dark} h-12 flex-1`}>Confirmer la modification</button>
               <button type="button" onClick={() => setEdit(null)} className={`${btn.line} h-12`}>Annuler</button>
             </div>
           </Panel>

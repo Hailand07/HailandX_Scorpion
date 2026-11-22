@@ -10,3 +10,4 @@ export * from './promo';
 export * from './hours';
 export * from './market';
 export * from './payout';
+export * from './creneau';

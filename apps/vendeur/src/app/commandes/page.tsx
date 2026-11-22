@@ -2,7 +2,7 @@
 import { BtnLink, EmptyState, PageTitle } from '@/components/ui';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { formatGnf, type ParcelStatus, sellerTab, type SellerTab } from '@hailandx/commerce';
+import { formatGnf, heureTexte, jourTexte, type DeliveryWindow, type ParcelStatus, sellerTab, type SellerTab } from '@hailandx/commerce';
 import { browserClient, Chips, Icon, Screen } from '@hailandx/kit';
 import { SellerGate } from '@/components/SellerGate';
 import { orderCode, payLabel, statusPill } from '@/lib/orders';
@@ -29,7 +29,13 @@ function Orders({ shopId }: { shopId: string }) {
     if (!sb) return;
     const { data } = await sb.from('parcels').select('id,status,subtotal_gnf,discount_gnf,created_at,orders(payment_method,payment_status),order_items(id,name_snapshot,quantity)').eq('shop_id', shopId).order('created_at', { ascending: false }).limit(200);
     setParcels((data as unknown as Parcel[]) ?? []);
+    // Jour de livraison promis (§64), lu à part : sans la colonne (base pas encore à jour), la liste reste entière.
+    const d = await sb.from('parcels').select('id,orders(delivery_date)').eq('shop_id', shopId).in('status', ['attente_vendeur', 'prepare', 'mission_proposee']);
+    if (!d.error) setDays(Object.fromEntries(((d.data as unknown as { id: string; orders: { delivery_date: string | null } | null }[]) ?? []).filter((x) => x.orders?.delivery_date).map((x) => [x.id, x.orders!.delivery_date!])));
   }, [sb, shopId]);
+  const [days, setDays] = useState<Record<string, string>>({});
+  const [debut, setDebut] = useState<string | null>(null);
+  useEffect(() => { sb?.rpc('fn_delivery_window').then(({ data, error }) => { if (!error && data) setDebut((data as DeliveryWindow).debut); }); }, [sb]);
   useEffect(() => { void load(); const t = setInterval(load, 10_000); return () => clearInterval(t); }, [load]);
 
   const all = parcels ?? [];
@@ -72,6 +78,7 @@ function Orders({ shopId }: { shopId: string }) {
               <span className={`rounded-full px-2.5 py-1 text-[12px] font-extrabold ${pillClass}`}>{pillText}</span>
               <span className={`rounded-full px-2.5 py-1 text-[12px] font-extrabold ${pay.paid ? 'bg-ok-soft text-ok' : 'bg-sand'}`}>{pay.text}</span>
               {p.discount_gnf > 0 && <span className="rounded-full bg-blue-soft px-2.5 py-1 text-[12px] font-extrabold text-blue-ink">code promo</span>}
+              {days[p.id] && debut && <span className="rounded-full bg-amber-soft px-2.5 py-1 text-[12px] font-extrabold text-[#7a5500]">livraison {jourTexte(days[p.id]!)} · prêt avant {heureTexte(debut)}</span>}
             </span>
           </Link>
         );

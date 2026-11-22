@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button, Chargement } from '@hailandx/ui';
-import { formatGnf, formatGnPhone, normalizeGnPhone, normalizePromoCode } from '@hailandx/commerce';
+import { communesTexte, creneauTexte, formatGnf, formatGnPhone, heureTexte, joursTexte, normalizeGnPhone, normalizePromoCode, type DeliveryWindow } from '@hailandx/commerce';
 import { aUnNom, browserClient, HAILANDX_URL, Icon, PhoneLoginInline, useSession } from '@hailandx/kit';
 import { cartSubtotal, clearCart, useCart } from '@/lib/cart';
 import { OrderSteps } from '@/components/OrderSteps';
@@ -63,6 +63,15 @@ function Checkout() {
     return () => { live = false; };
   }, [sb, decl, offerKey]);
   const feeTotal = (quote ?? []).reduce((n, x) => n + x.fee_gnf, 0);
+  // Créneau et zone de la Flotte (§64) : jour promis, heures, communes servies. Sans réponse (base pas encore à jour), rien ne change.
+  const [win, setWin] = useState<DeliveryWindow | null>(null);
+  useEffect(() => {
+    if (!sb) return;
+    let live = true;
+    sb.rpc('fn_delivery_window', decl ? { p_declaration: decl } : {}).then(({ data, error }) => { if (live) setWin(error ? null : (data as DeliveryWindow)); });
+    return () => { live = false; };
+  }, [sb, decl]);
+  const horsZone = !!decl && win?.zone_ok === false;
 
   useEffect(() => {
     if (!sb || !session) return;
@@ -185,6 +194,7 @@ function Checkout() {
           )}
           {ready && (decls.length === 0 || choosing) && <ChezVous first={!decls.some((d) => !d.temporary_until)} onHome={() => setAdding('domicile')} onHere={() => setAdding('ici')} onLink={() => setLinking(true)} />}
           {ready && decls.length > 0 && !choosing && <button type="button" onClick={() => setChoosing(true)} className="self-start text-[13px] font-bold text-blue-ink">+ Livrer à une autre adresse</button>}
+          {win && decl && <Creneau win={win} />}
           {/* Le numéro où le livreur de la Flotte joindra le client : celui du compte par défaut, modifiable pour cette commande (§58). */}
           <div className="mt-1 flex items-center gap-3 border-t border-line-soft pt-3">
             <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sand"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2Z" /></svg></span>
@@ -236,13 +246,40 @@ function Checkout() {
           ) : <div className="flex justify-between"><span className="text-muted">Livraison</span><span>{decl ? 'calcul…' : 'choisissez une adresse'}</span></div>}
         </section>
         {error && <p role="alert" className="rounded-2xl bg-[#fde8e4] px-4 py-3 text-[13.5px] font-semibold text-[#8a2a1c]">{error}</p>}
-        <Button type="submit" disabled={busy || !decl}>{busy ? (pay === 'orange_money' ? 'Ouverture du paiement…' : 'Envoi…') : pay === 'orange_money' ? `Payer ${formatGnf(toPay)}` : 'Passer la commande'}</Button>
+        <Button type="submit" disabled={busy || !decl || horsZone}>{busy ? (pay === 'orange_money' ? 'Ouverture du paiement…' : 'Envoi…') : pay === 'orange_money' ? `Payer ${formatGnf(toPay)}` : 'Passer la commande'}</Button>
       </form>
     </main>
   );
 }
 
 export default function CheckoutPage() { return <Suspense><Checkout /></Suspense>; }
+
+/**
+ * Quand le colis arrive (§64) : « Livraison aujourd’hui entre 14 h et 18 h », avec l'heure limite pour le jour même ;
+ * ou, si l'adresse choisie est hors des communes servies, la raison et les communes où Hailand livre déjà.
+ */
+function Creneau({ win }: { win: DeliveryWindow }) {
+  if (win.zone_ok === false) {
+    return (
+      <div role="alert" className="flex items-start gap-3 rounded-2xl bg-[#fde8e4] px-3.5 py-3 text-[#8a2a1c]">
+        <Icon name="pin" size={18} stroke={2.2} />
+        <span className="flex flex-col gap-0.5 text-[13px] font-semibold leading-snug">
+          <span className="text-[14px] font-extrabold">Pas encore de livraison {win.commune ? `à ${win.commune}` : 'à cette adresse'}</span>
+          Pour l’instant, Hailand livre à {communesTexte(win.communes)}. Choisissez une adresse dans cette zone, ou revenez bientôt : la zone s’agrandit.
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-start gap-3 rounded-2xl bg-ok-soft px-3.5 py-3">
+      <span aria-hidden="true" className="mt-0.5 text-ok"><Icon name="clock" size={18} stroke={2.2} /></span>
+      <span className="flex flex-col gap-0.5">
+        <span className="text-[14px] font-extrabold">Livraison {creneauTexte(win.jour, win.debut, win.fin)}</span>
+        <span className="text-[12px] font-semibold leading-snug text-muted">Livraisons {joursTexte(win.jours)}, de {heureTexte(win.debut)} à {heureTexte(win.fin)}. Commandez avant {heureTexte(win.limite)} pour être livré le jour même.</span>
+      </span>
+    </div>
+  );
+}
 
 /**
  * « Êtes-vous chez vous ? » (§53). Une seule question, et l'adresse se repère TOUJOURS sur place (GPS, vue satellite) :
