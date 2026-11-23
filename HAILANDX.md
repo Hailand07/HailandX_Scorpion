@@ -607,6 +607,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-22 | §64 : **créneau et zone de livraison** de la Flotte (début : un livreur en scooter électrique, lundi–samedi 14 h–18 h, basé à Kobaya) — jour promis à la commande (« Livraison aujourd'hui entre 14 h et 18 h », commande avant 13 h), adresse hors des communes servies refusée (Ratoma au départ), pastille « livraison … · prêt avant 14 h » chez le vendeur, réglages dans Console → Paramètres. Migration `2026-11-22_creneau_zone_livraison.sql` (5 tests base, 3 tests règles) — ⏳ à appliquer avec l'accord du fondateur. |
 | 2026-11-22 | ÉCOSYSTÈME révision 145 : HailandMap — outils de l'Atelier simplifiés, GPS en suivi continu, recherche de quartiers / lieux / coordonnées (`HAILANDMAP.md` §11) — aucun changement pour ce dépôt. |
 | 2026-11-23 | §65 : vision « livreur de référence » (colis, repas, transport de personnes, Flotte électrique) notée ; détail dans `ECOSYSTEME_HAILAND.md` §20 (révision 146). Avis : une application client avec onglets, une par métier côté professionnels. |
+| 2026-11-23 | §65 : **règle de l'escalier** décidée par le fondateur — on passe à la marche suivante seulement si la précédente marche ; première marche : l'e-commerce (ÉCOSYSTÈME révision 147). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1467,4 +1468,4 @@ Le fondateur veut que Hailand soit **le livreur de référence** en Guinée, ave
 - **Vendeur** : « mode restaurant » (plats, options, temps de préparation, accepter / refuser, épuisé).
 - **Flotte** : une seule liste de missions (colis de boutique, course de colis, repas ; plus tard passagers), badges selon ce que le livreur a le droit de faire ; missions urgentes pour les repas.
 - **Base** : colis sans commande ni boutique (courses de colis), temps de préparation et acceptation (repas) — migrations à faire valider.
-**Prochaine étape** : plan détaillé d'« Envoyer un colis » (écrans, prix, paiement, base) à faire valider avant de coder.
+**Décidé (2026-11-23)** : **règle de l'escalier** — marche par marche ; **première marche : l'e-commerce**. Le plan d'« Envoyer un colis » attend que l'e-commerce marche (critères : `ECOSYSTEME_HAILAND.md` §20.4).
