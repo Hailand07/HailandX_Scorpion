@@ -606,6 +606,8 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-20 | §63 : partage d'un produit sur iPhone corrigé (liens préparés à l'ouverture, gestes immédiats) ; « Retirer » pour les livreurs (Flotte) ; pages « Mes informations » (Vendeur, HailandX) avec les adresses du compte, quartier et commune ; quartier affiché dans l'adresse de la boutique ; **HailandPay retiré des applications** (base inchangée). |
 | 2026-11-22 | §64 : **créneau et zone de livraison** de la Flotte (début : un livreur en scooter électrique, lundi–samedi 14 h–18 h, basé à Kobaya) — jour promis à la commande (« Livraison aujourd'hui entre 14 h et 18 h », commande avant 13 h), adresse hors des communes servies refusée (Ratoma au départ), pastille « livraison … · prêt avant 14 h » chez le vendeur, réglages dans Console → Paramètres. Migration `2026-11-22_creneau_zone_livraison.sql` (5 tests base, 3 tests règles) — ⏳ à appliquer avec l'accord du fondateur. |
 | 2026-11-22 | ÉCOSYSTÈME révision 145 : HailandMap — outils de l'Atelier simplifiés, GPS en suivi continu, recherche de quartiers / lieux / coordonnées (`HAILANDMAP.md` §11) — aucun changement pour ce dépôt. |
+| 2026-11-23 | §65 : vision « livreur de référence » (colis, repas, transport de personnes, Flotte électrique) notée ; détail dans `ECOSYSTEME_HAILAND.md` §20 (révision 146). Avis : une application client avec onglets, une par métier côté professionnels. |
+| 2026-11-23 | §65 : **règle de l'escalier** décidée par le fondateur — on passe à la marche suivante seulement si la précédente marche ; première marche : l'e-commerce (ÉCOSYSTÈME révision 147). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1458,3 +1460,12 @@ Rappel des réglages prévus :
 **Base** : `supabase/migrations/2026-11-22_creneau_zone_livraison.sql` — 5 réglages `livraison_*`, colonne `orders.delivery_date` (jour promis), `private.delivery_date`, `private.delivery_zone_ok` (commune de l'adresse, sinon celle de son quartier), `fn_delivery_window` (créneau pour tous ; zone seulement pour le titulaire de l'adresse), `fn_place_order` (refus hors zone, jour promis), `fn_console_setting_update` (vérifie les nouvelles valeurs). Ajouts seulement. Tests : `supabase/tests/creneau.test.ts` (5), `packages/commerce/src/creneau.test.ts` (3). Les écrans restent entiers tant que la migration n'est pas appliquée (lecture à part, sans bloquer).
 **Plus tard** 💡 : capacité par jour (nombre de livraisons), plusieurs créneaux, zone par rayon autour du livreur, scooters électriques de la Flotte (achat, recharge, batteries).
 
+## 65. Vision : colis, repas, transport de personnes (2026-11-23) — 📄💡 rien n'est codé
+
+Le fondateur veut que Hailand soit **le livreur de référence** en Guinée, avec une Flotte 100 % électrique : boutiques, **courses de colis**, **livraison de repas**, puis **transport de personnes**. Détail, risques, ordre conseillé et choix des applications : `ECOSYSTEME_HAILAND.md` **§20**.
+**Ce que ça donnera dans ce dépôt** 💡 (à valider) :
+- **HailandX** (client) : une seule application avec des onglets par service — Boutiques, Colis (« Envoyer un colis » : où récupérer, où livrer ou lien de localisation au destinataire, taille, prix, paiement), Repas (restaurants ouverts et proches, temps estimé), plus tard Trajets.
+- **Vendeur** : « mode restaurant » (plats, options, temps de préparation, accepter / refuser, épuisé).
+- **Flotte** : une seule liste de missions (colis de boutique, course de colis, repas ; plus tard passagers), badges selon ce que le livreur a le droit de faire ; missions urgentes pour les repas.
+- **Base** : colis sans commande ni boutique (courses de colis), temps de préparation et acceptation (repas) — migrations à faire valider.
+**Décidé (2026-11-23)** : **règle de l'escalier** — marche par marche ; **première marche : l'e-commerce**. Le plan d'« Envoyer un colis » attend que l'e-commerce marche (critères : `ECOSYSTEME_HAILAND.md` §20.4).
