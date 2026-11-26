@@ -9,7 +9,7 @@ import { RegistrationGuide } from './RegistrationGuide';
 import { GpsAcquisitionView } from './GpsAcquisitionView';
 import { BuildingScan, type PickedBuilding } from './BuildingScan';
 import { useGpsAcquisition } from './useGpsAcquisition';
-import { clearDraft, readDraft, writeDraft } from '../parcoursDraft';
+import { clearDraft, clearResume, markResume, peekResume, readDraft, writeDraft } from '../parcoursDraft';
 import { DeclarationError, effectiveLevelOf, myDeclarations, resolveAdminAddress, submitDeclaration, type AdminAddress, type DeclarationRecord, type DeclaredLevel, type LocatedBy, type SubmitInput, TEMPORARY_DAYS, temporaryUntil } from './declarations';
 import { Ico, LevelBadge } from './ui';
 
@@ -74,7 +74,10 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
   const [draft] = useState(() => (draftKey ? readDraft(draftKey) : null));
   const [homes, setHomes] = useState<DeclarationRecord[]>([]);
   useEffect(() => { void myDeclarations(sb).then(setHomes); }, [sb]);
-  const [step, setStep] = useState<Step>(draft ? 'info' : 'guide');
+  // Retour après rechargement pour autoriser la localisation (iPhone, §66) : la recherche de position reprend tout de suite.
+  const [resumed] = useState(() => (!draft && draftKey ? peekResume(draftKey) : null));
+  useEffect(() => { if (draftKey) clearResume(draftKey); }, [draftKey]);
+  const [step, setStep] = useState<Step>(draft ? 'info' : resumed ? 'acquire' : 'guide');
   const [attempt, setAttempt] = useState(0);
   // Tentatives GPS terminées (on les garde toutes : la meilleure est retenue, deux qui s'accordent se confirment).
   const [attempts, setAttempts] = useState<GpsSummary[]>([]);
@@ -214,7 +217,13 @@ export const AdresseSurPlace: React.FC<AdresseSurPlaceProps> = ({ sb, token, usa
     ];
     return <RegistrationGuide {...guide} guidance={guidanceFor(n, cause)} attempt={n} alternatives={alternatives} onStart={() => setStep('acquire')} onClose={close} />;
   }
-  if (step === 'acquire') return <GpsAcquisitionView acq={acq} attempt={n} onContinue={startDetection} onRetry={(why) => { const sm = acq.summary; if (sm) setAttempts((l) => [...l, sm]); retry(why); }} onClose={close} />;
+  // Localisation refusée puis autorisée dans les réglages : sur iPhone, Safari garde le refus tant que la page n'est pas rechargée.
+  // On recharge donc la page (la page hôte rouvre le parcours, déjà sur la recherche de position) — sur Android aussi, c'est sans risque.
+  const reloadForPermission = () => {
+    if (draftKey) markResume(draftKey, { temporary });
+    window.location.reload();
+  };
+  if (step === 'acquire') return <GpsAcquisitionView acq={acq} attempt={n} onContinue={startDetection} onRetry={(why) => { if (acq.help?.problem === 'refuse' && draftKey) { reloadForPermission(); return; } const sm = acq.summary; if (sm) setAttempts((l) => [...l, sm]); retry(why); }} onClose={close} />;
   if (step === 'detect' && gps) {
     return <BuildingScan sb={sb} token={token} position={gps.lngLat} accuracy={gps.accuracy} adminLine={adminLine(admin)} homes={homes}
       onDetected={applyDetection} onConfirm={() => setStep('info')} onPicked={applyPicked} onRetry={() => retry('choix')} onOutside={() => retry('hors_cercle')} onClose={close} onUseExisting={onDone} />;

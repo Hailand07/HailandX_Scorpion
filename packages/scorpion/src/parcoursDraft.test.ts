@@ -25,3 +25,16 @@ describe('brouillon du parcours d’adresse (§55)', () => {
     expect(hasDraft('boutique')).toBe(false);
   });
 });
+
+describe('reprise après rechargement (iPhone, §66)', () => {
+  it('note, lit puis efface la reprise ; expire après 10 minutes', async () => {
+    const { markResume, peekResume, clearResume, hasParcours } = await import('./parcoursDraft');
+    markResume('essai', { temporary: true });
+    expect(peekResume('essai')?.extra).toEqual({ temporary: true });
+    expect(hasParcours('essai')).toBe(true);
+    clearResume('essai');
+    expect(peekResume('essai')).toBeNull();
+    localStorage.setItem('hx.parcours.reprise.vieux', JSON.stringify({ at: Date.now() - 11 * 60_000 }));
+    expect(peekResume('vieux')).toBeNull();
+  });
+});

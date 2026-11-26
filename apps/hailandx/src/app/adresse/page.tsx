@@ -1,5 +1,5 @@
 'use client';
-import { hasDraft } from '@hailandx/scorpion/brouillon';
+import { hasParcours } from '@hailandx/scorpion/brouillon';
 import { addrDetails, addrName, addrPlace, myAddresses, type Addr } from '@/lib/addresses';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -21,7 +21,7 @@ function Page() {
   const sb = browserClient();
   const [list, setList] = useState<Decl[] | null>(null);
   const [adding, setAdding] = useState(false);
-  useEffect(() => { if (hasDraft('client-compte')) setAdding(true); }, []);
+  useEffect(() => { if (hasParcours('client-compte')) setAdding(true); }, []);
   const router = useRouter();
 
   const load = useCallback(async () => {

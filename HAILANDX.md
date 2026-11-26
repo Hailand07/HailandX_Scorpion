@@ -608,6 +608,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-22 | ÉCOSYSTÈME révision 145 : HailandMap — outils de l'Atelier simplifiés, GPS en suivi continu, recherche de quartiers / lieux / coordonnées (`HAILANDMAP.md` §11) — aucun changement pour ce dépôt. |
 | 2026-11-23 | §65 : vision « livreur de référence » (colis, repas, transport de personnes, Flotte électrique) notée ; détail dans `ECOSYSTEME_HAILAND.md` §20 (révision 146). Avis : une application client avec onglets, une par métier côté professionnels. |
 | 2026-11-23 | §65 : **règle de l'escalier** décidée par le fondateur — on passe à la marche suivante seulement si la précédente marche ; première marche : l'e-commerce (ÉCOSYSTÈME révision 147). |
+| 2026-11-26 | §66 : position à l'étape « adresse » — iPhone : « J'ai autorisé, réessayer » recharge la page et rouvre la recherche (Safari garde le refus jusqu'au rechargement) ; Android : le temps ne compte qu'après l'autorisation, 30 s pour le démarrage à froid, haute précision jamais abandonnée ; conseils si la position reste approximative. |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1469,3 +1470,17 @@ Le fondateur veut que Hailand soit **le livreur de référence** en Guinée, ave
 - **Flotte** : une seule liste de missions (colis de boutique, course de colis, repas ; plus tard passagers), badges selon ce que le livreur a le droit de faire ; missions urgentes pour les repas.
 - **Base** : colis sans commande ni boutique (courses de colis), temps de préparation et acceptation (repas) — migrations à faire valider.
 **Décidé (2026-11-23)** : **règle de l'escalier** — marche par marche ; **première marche : l'e-commerce**. Le plan d'« Envoyer un colis » attend que l'e-commerce marche (critères : `ECOSYSTEME_HAILAND.md` §20.4).
+
+## 66. Récupération de la position à l'étape « adresse » : iPhone bloqué, Android qui rate la 1re tentative (2026-11-26) — ✅ code et tests, ⚠️ à essayer sur téléphone
+
+**Retour du fondateur et d'Elhaj** : sur iPhone, même après avoir autorisé la localisation dans Safari, la position ne vient toujours pas au retour dans la page ; sur Android, la 1re tentative échoue, la 2de marche.
+**Causes** ✅ (code de `packages/scorpion`) :
+1. **iPhone** : quand la localisation est refusée, Safari garde ce refus **pour la page déjà ouverte** ; changer le réglage puis toucher « Réessayer » relançait la demande dans la même page, toujours refusée. Il faut **recharger la page**.
+2. **Android** : les 15 s de mesure étaient comptées **dès l'ouverture de l'écran**, y compris le temps passé à répondre à « Autoriser la localisation » et le **démarrage à froid du GPS** ; et la haute précision était **abandonnée après 8 s** pour une position réseau (imprécise). À la 1re tentative, le temps était écoulé ou la précision insuffisante ; à la 2de, l'autorisation était donnée et le GPS déjà chaud.
+**Corrections** :
+- **iPhone** : localisation refusée → bouton **« J'ai autorisé, réessayer »** : la page se recharge et rouvre toute seule le parcours d'adresse **directement sur la recherche de position** (`markResume` / `peekResume` / `hasParcours`, `parcoursDraft.ts` ; pages : commande, `/adresse`, ouverture de boutique, réglages de la boutique). Les consignes iPhone le disent.
+- **Horloge** (`acquisitionVerdict`, `gpsAcquisition.ts`) : le temps ne compte qu'à partir de la **première réponse du téléphone** (« Autorisez la localisation » affiché pendant l'attente, 60 s au plus) ; sans mesure, jusqu'à **30 s** (démarrage à froid) ; après la première mesure, 15 s de mesures, **25 s** si elles restent imprécises. Le décompte affiché part de la première mesure.
+- **Haute précision jamais abandonnée** (`useGpsAcquisition`) : si rien n'arrive en 10 s, une écoute en précision réduite **s'ajoute** ; les mesures se combinent, la meilleure l'emporte.
+- **Position très imprécise** (au-delà de 200 m) : l'écran explique le réglage à activer — iPhone « Position exacte », Android « Précision de la localisation Google » et « position exacte » pour Chrome (`describeImprecise`).
+Tests : `gpsAcquisition.test.ts` (horloge), `parcoursDraft.test.ts` (reprise).
+

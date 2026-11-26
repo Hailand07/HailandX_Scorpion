@@ -46,10 +46,13 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, weak]);
 
-  const progress = Math.min(acq.elapsed / MAX_DURATION_MS, 1);
-  const seconds = Math.max(0, Math.ceil((MAX_DURATION_MS - acq.elapsed) / 1000));
+  // Le décompte ne commence qu'avec les mesures (le temps passé sur la fenêtre d'autorisation ne compte plus, §66).
+  const sampling = acq.sampling;
+  const progress = s ? Math.min(sampling / MAX_DURATION_MS, 1) : 0;
+  const seconds = Math.max(0, Math.ceil((MAX_DURATION_MS - sampling) / 1000));
+  const refused = acq.status === 'error' && acq.help?.problem === 'refuse';
   const title =
-    acq.status === 'error' ? 'Position introuvable' : done ? (weak ? 'Précision insuffisante' : 'Position verrouillée') : s ? 'Mesures en cours…' : 'Recherche du signal GPS…';
+    acq.status === 'error' ? (refused ? 'Localisation non autorisée' : 'Position introuvable') : done ? (weak ? 'Précision insuffisante' : 'Position verrouillée') : acq.waitingPermission ? 'Autorisez la localisation' : s ? 'Mesures en cours…' : 'Recherche du signal GPS…';
 
   return (
     <div className="fixed inset-0 z-[60] overflow-hidden bg-[#0b1220] font-sans text-white">
@@ -72,6 +75,8 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
         </h1>
         {acq.status === 'error' ? (
           <p className="mt-2 text-[13.5px] font-medium leading-snug text-white/75">{acq.error}</p>
+        ) : acq.waitingPermission && !s ? (
+          <p className="mt-2 text-[13.5px] font-medium leading-snug text-white/75">Touchez « Autoriser » dans la fenêtre du navigateur. La recherche commence dès que la localisation est autorisée.</p>
         ) : (
           <div className="mt-3 flex flex-col gap-1.5">
             <Row label="MESURES GPS" value={s ? String(s.received) : '0'} sub={!s ? 'en attente…' : s.rejected > 0 ? `${s.rejected} écartée${s.rejected > 1 ? 's' : ''}` : 'aucune écartée'} />
@@ -86,7 +91,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
       </div>
 
       <div className="absolute inset-x-0 bottom-0 px-5 pb-[max(20px,env(safe-area-inset-bottom))]">
-        {acq.status === 'error' && acq.help && (
+        {acq.help && (acq.status === 'error' || weak) && (
           <div className="mb-3 max-h-[40dvh] overflow-y-auto rounded-2xl bg-white/10 px-4 py-3 backdrop-blur" role="note" aria-label="Comment activer la localisation">
             <div className="text-[14px] font-bold text-white">{acq.help.title}</div>
             <ol className="mt-2 flex list-none flex-col gap-2 p-0">
@@ -99,7 +104,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
             </ol>
           </div>
         )}
-        {weak && (
+        {weak && !acq.help && (
           <p className="mb-3 rounded-2xl bg-[#f5a524]/15 px-4 py-3 text-[14px] font-semibold leading-snug text-[#fcd38a]">
             Votre position n’est connue qu’à ±{Math.round(s.accuracy)} m. {attempt <= 1 ? 'Recommencez depuis un balcon ou le pas de la porte.' : 'Recommencez dehors, à ciel ouvert.'}
           </p>
@@ -111,7 +116,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
               onClick={() => onRetry(acq.status === 'error' ? 'erreur' : 'faible')}
               className="flex h-[56px] w-full items-center justify-center rounded-[18px] bg-blue text-[16px] font-bold text-white active:opacity-80"
             >
-              {attempt <= 1 ? 'Réessayer autrement' : 'Réessayer dehors'}
+              {refused ? 'J’ai autorisé, réessayer' : attempt <= 1 ? 'Réessayer autrement' : 'Réessayer dehors'}
             </button>
             {weak ? (
               <button type="button" onClick={() => onContinue(s)} className="mt-1 flex h-12 w-full items-center justify-center text-[15px] font-bold text-white/70">
@@ -130,7 +135,7 @@ export const GpsAcquisitionView: React.FC<Props> = ({ acq, onContinue, onRetry, 
             </div>
             <div className="mt-2 flex justify-between text-[13px] font-semibold text-white/70">
               <span>{done ? 'Passage à la vue satellite…' : liveHint(attempt)}</span>
-              {!done && <span className="tabular-nums">{seconds} s</span>}
+              {!done && s && <span className="tabular-nums">{seconds} s</span>}
             </div>
           </div>
         )}

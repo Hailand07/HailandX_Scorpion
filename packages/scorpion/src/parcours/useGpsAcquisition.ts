@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { MAX_DURATION_MS, shouldStop, summarize, type GpsSample, type GpsSummary } from '../gpsAcquisition';
-import { describeGeoError, type GeoHelp } from '../geoDiagnostic';
+import { acquisitionVerdict, summarize, type GpsSample, type GpsSummary } from '../gpsAcquisition';
+import { describeGeoError, describeImprecise, type GeoHelp } from '../geoDiagnostic';
 
 export type AcquisitionStatus = 'running' | 'done' | 'error';
 
@@ -12,37 +12,50 @@ export interface Acquisition {
   /** Temps écoulé depuis le début (ms). */
   elapsed: number;
   error: string;
-  /** Cause probable et gestes à faire (réglages iPhone, navigateur intégré…) quand la position n'arrive pas. */
+  /** Cause probable et gestes à faire (réglages iPhone, navigateur intégré…) quand la position n'arrive pas ou reste très imprécise. */
   help: GeoHelp | null;
+  /** Le téléphone n'a encore rien répondu : la fenêtre « Autoriser la localisation » attend sans doute une réponse. */
+  waitingPermission: boolean;
+  /** Temps de mesure depuis la première position reçue (ms) : c'est lui que montre le décompte. */
+  sampling: number;
 }
 
 const NO_FIX = 'Impossible d’obtenir votre position GPS. Rapprochez-vous d’une fenêtre ou sortez un instant, puis réessayez.';
 
 /**
- * Recueille des mesures GPS pendant 15 s au plus (arrêt anticipé quand la précision est atteinte).
+ * Recueille des mesures GPS (règles d'arrêt : `acquisitionVerdict`). La haute précision n'est jamais abandonnée ; si rien n'arrive après 10 s,
+ * une écoute en précision réduite s'y ajoute (les deux se combinent, la meilleure précision l'emporte).
  * `attempt` relance une récupération complète. Jamais de position inventée : sans mesure, on le dit.
  */
 export function useGpsAcquisition(active: boolean, attempt: number): Acquisition {
-  const [state, setState] = useState<Acquisition>({ status: 'running', samples: [], summary: null, elapsed: 0, error: '', help: null });
+  const [state, setState] = useState<Acquisition>({ status: 'running', samples: [], summary: null, elapsed: 0, error: '', help: null, waitingPermission: false, sampling: 0 });
 
   useEffect(() => {
     if (!active) return;
     const start = Date.now();
     const samples: GpsSample[] = [];
     let finished = false;
-    setState({ status: 'running', samples: [], summary: null, elapsed: 0, error: '', help: null });
+    let respondedAt: number | null = null;
+    let firstSampleAt: number | null = null;
+    setState({ status: 'running', samples: [], summary: null, elapsed: 0, error: '', help: null, waitingPermission: false, sampling: 0 });
 
     if (!navigator.geolocation) {
       setState((s) => ({ ...s, status: 'error', error: 'La géolocalisation n’est pas disponible sur cet appareil.', help: describeGeoError(2) }));
       return;
     }
 
-    let watchId = 0;
+    // Autorisation déjà accordée (Android, Chrome) : le temps compte tout de suite. Sinon, il compte à la première réponse.
+    try {
+      void navigator.permissions?.query({ name: 'geolocation' as PermissionName }).then((p) => { if (p.state === 'granted' && respondedAt === null) respondedAt = start; }).catch(() => {});
+    } catch { /* Safari ancien : pas de permissions.query */ }
+
+    const watchIds: number[] = [];
+    let lowStarted = false;
     let lastErrorCode = 0;
     const stop = (status: AcquisitionStatus, error = '', code = 0) => {
       if (finished) return;
       finished = true;
-      navigator.geolocation.clearWatch(watchId);
+      watchIds.forEach((id) => navigator.geolocation.clearWatch(id));
       clearInterval(tick);
       const summary = summarize(samples);
       const failed = status === 'error' || (status === 'done' && !summary);
@@ -52,47 +65,51 @@ export function useGpsAcquisition(active: boolean, attempt: number): Acquisition
         summary,
         elapsed: Date.now() - start,
         error: status === 'done' && !summary ? NO_FIX : error,
-        help: failed ? describeGeoError(code || lastErrorCode || 3) : null,
+        help: failed ? describeGeoError(code || lastErrorCode || 3) : summary && summary.bestAccuracy > 200 ? describeImprecise(summary.bestAccuracy) : null,
+        waitingPermission: false,
+        sampling: firstSampleAt === null ? 0 : Date.now() - firstSampleAt,
       });
     };
 
-    // Horloge : met à jour le temps écoulé et décide de l'arrêt, même si le téléphone n'envoie plus de mesure.
+    const onSample = (pos: GeolocationPosition) => {
+      if (finished) return;
+      const now = Date.now();
+      if (respondedAt === null) respondedAt = now;
+      if (firstSampleAt === null) firstSampleAt = now;
+      samples.push({ lng: pos.coords.longitude, lat: pos.coords.latitude, accuracy: pos.coords.accuracy || 9999, t: pos.timestamp || now });
+      setState((s) => ({ ...s, samples: [...samples], summary: summarize(samples), elapsed: now - start, waitingPermission: false }));
+    };
+    const onError = (err: GeolocationPositionError) => {
+      if (finished) return;
+      lastErrorCode = err.code;
+      if (err.code === err.PERMISSION_DENIED) { stop('error', 'L’accès à votre position est refusé.', err.code); return; }
+      if (respondedAt === null) respondedAt = Date.now();
+      // Délai ou signal absent : la haute précision continue ; on ajoute l'écoute en précision réduite.
+      startLow();
+    };
+    const startLow = () => {
+      if (lowStarted || finished) return;
+      lowStarted = true;
+      watchIds.push(navigator.geolocation.watchPosition(onSample, () => {}, { enableHighAccuracy: false, timeout: 30000, maximumAge: 20000 }));
+    };
+
+    // Horloge : temps écoulé, attente de l'autorisation, arrêt, même si le téléphone n'envoie plus de mesure.
     const tick = setInterval(() => {
-      const elapsed = Date.now() - start;
+      const now = Date.now();
       const summary = summarize(samples);
-      if (shouldStop(summary, elapsed)) stop('done');
-      else setState((s) => (finished ? s : { ...s, elapsed }));
+      if (respondedAt !== null && firstSampleAt === null && now - respondedAt > 10000) startLow();
+      const v = acquisitionVerdict({ now, start, respondedAt, firstSampleAt, summary });
+      if (v === 'done') stop('done');
+      else if (v === 'no-fix') stop('done');
+      else if (v === 'no-answer') stop('error', 'Le téléphone n’a pas répondu : la localisation n’a pas été autorisée.', 1);
+      else setState((s) => (finished ? s : { ...s, elapsed: now - start, waitingPermission: respondedAt === null && now - start > 2500, sampling: firstSampleAt === null ? 0 : now - firstSampleAt }));
     }, 250);
 
-    // Précision maximale d'abord ; si le téléphone ne répond pas (signal absent ou délai, fréquent à l'intérieur sur iPhone), repli UNE fois sur une
-    // précision réduite (réseau, Wi-Fi) : mieux vaut une mesure grossière, honnêtement signalée, qu'aucune.
-    let lowAccuracy = false;
-    const watch = (highAccuracy: boolean) =>
-      navigator.geolocation.watchPosition(
-        (pos) => {
-          if (finished) return;
-          samples.push({ lng: pos.coords.longitude, lat: pos.coords.latitude, accuracy: pos.coords.accuracy || 9999, t: pos.timestamp || Date.now() });
-          setState((s) => ({ ...s, samples: [...samples], summary: summarize(samples), elapsed: Date.now() - start }));
-        },
-        (err) => {
-          if (finished) return;
-          lastErrorCode = err.code;
-          if (err.code === err.PERMISSION_DENIED) {
-            stop('error', 'L’accès à votre position est refusé.', err.code);
-          } else if (highAccuracy && !lowAccuracy && samples.length === 0) {
-            lowAccuracy = true;
-            navigator.geolocation.clearWatch(watchId);
-            watchId = watch(false);
-          }
-          // Sinon : délai pour une mesure, on continue d'attendre jusqu'à la fin.
-        },
-        { enableHighAccuracy: highAccuracy, timeout: highAccuracy ? 8000 : MAX_DURATION_MS, maximumAge: highAccuracy ? 0 : 20000 }
-      );
-    watchId = watch(true);
+    watchIds.push(navigator.geolocation.watchPosition(onSample, onError, { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }));
 
     return () => {
       finished = true;
-      navigator.geolocation.clearWatch(watchId);
+      watchIds.forEach((id) => navigator.geolocation.clearWatch(id));
       clearInterval(tick);
     };
   }, [active, attempt]);

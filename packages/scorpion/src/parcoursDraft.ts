@@ -44,3 +44,29 @@ export function clearDraft(key: string): void {
   try { localStorage.removeItem(PREFIX + key); } catch { /* rien */ }
 }
 export const hasDraft = (key: string) => readDraft(key) !== null;
+
+/**
+ * Reprise après rechargement (2026-11-26). Sur iPhone, Safari garde le refus de localisation pour la page déjà ouverte :
+ * même après « Autoriser » dans les Réglages, une nouvelle demande reste refusée tant que la page n'est pas rechargée.
+ * Le parcours note donc qu'il faut rouvrir la récupération GPS, puis recharge la page ; la page qui l'héberge le rouvre.
+ */
+const RESUME = 'hx.parcours.reprise.';
+const RESUME_MAX_MS = 10 * 60_000;
+export interface ParcoursResume { at: number; extra?: Record<string, unknown> }
+export function markResume(key: string, extra?: Record<string, unknown>): void {
+  try { localStorage.setItem(RESUME + key, JSON.stringify({ at: Date.now(), extra })); } catch { /* stockage refusé */ }
+}
+export function peekResume(key: string): ParcoursResume | null {
+  try {
+    const raw = localStorage.getItem(RESUME + key);
+    if (!raw) return null;
+    const r = JSON.parse(raw) as ParcoursResume;
+    if (!r || typeof r.at !== 'number' || Date.now() - r.at > RESUME_MAX_MS) { localStorage.removeItem(RESUME + key); return null; }
+    return r;
+  } catch { return null; }
+}
+export function clearResume(key: string): void {
+  try { localStorage.removeItem(RESUME + key); } catch { /* rien */ }
+}
+/** Un parcours interrompu attend d'être rouvert (étape « infos » gardée, ou récupération GPS à relancer après rechargement). */
+export const hasParcours = (key: string) => hasDraft(key) || peekResume(key) !== null;
