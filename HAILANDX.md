@@ -609,6 +609,7 @@ Retour du fondateur après avoir essayé la création de boutique avec son numé
 | 2026-11-23 | §65 : vision « livreur de référence » (colis, repas, transport de personnes, Flotte électrique) notée ; détail dans `ECOSYSTEME_HAILAND.md` §20 (révision 146). Avis : une application client avec onglets, une par métier côté professionnels. |
 | 2026-11-23 | §65 : **règle de l'escalier** décidée par le fondateur — on passe à la marche suivante seulement si la précédente marche ; première marche : l'e-commerce (ÉCOSYSTÈME révision 147). |
 | 2026-11-26 | §66 : position à l'étape « adresse » — iPhone : « J'ai autorisé, réessayer » recharge la page et rouvre la recherche (Safari garde le refus jusqu'au rechargement) ; Android : le temps ne compte qu'après l'autorisation, 30 s pour le démarrage à froid, haute précision jamais abandonnée ; conseils si la position reste approximative. |
+| 2026-11-26 | §67 : piste « services d'IA pour les vendeurs » notée (idée d'Elhaj) ; détail dans `ECOSYSTEME_HAILAND.md` §21 (révision 148). |
 
 ## 14. Phase 1 — état (2026-10-13) ✅ squelette, ✅ migration appliquée à la base de production
 
@@ -1483,4 +1484,9 @@ Le fondateur veut que Hailand soit **le livreur de référence** en Guinée, ave
 - **Haute précision jamais abandonnée** (`useGpsAcquisition`) : si rien n'arrive en 10 s, une écoute en précision réduite **s'ajoute** ; les mesures se combinent, la meilleure l'emporte.
 - **Position très imprécise** (au-delà de 200 m) : l'écran explique le réglage à activer — iPhone « Position exacte », Android « Précision de la localisation Google » et « position exacte » pour Chrome (`describeImprecise`).
 Tests : `gpsAcquisition.test.ts` (horloge), `parcoursDraft.test.ts` (reprise).
+
+## 67. Piste : services d'IA pour les vendeurs (2026-11-26) — 📄💡 rien n'est codé
+
+Idée d'Elhaj, notée à la demande du fondateur : proposer aux vendeurs HailandX des services d'IA (fiche produit écrite depuis une photo, photo propre, textes de vente, traductions, assistant client, mise en situation, essayage virtuel), avec une formule gratuite et des formules payantes. Détail (fonctionnement, coûts estimés, formules, ordre) : `ECOSYSTEME_HAILAND.md` **§21**. Pas pour maintenant (règle de l'escalier, §20.4).
+Dans ce dépôt, le moment venu 💡 : boutons dans **Vendeur** (éditeur de produit : « Écrire la fiche avec l'IA », « Nettoyer la photo ») ; appels aux fournisseurs **côté serveur** seulement (route Next.js ou fonction Supabase, clé secrète jamais dans le téléphone) ; table d'usage et de crédits (migration) ; suivi des coûts dans la **Console**.
 
