@@ -1,5 +1,5 @@
 'use client';
-import { hasDraft } from '@hailandx/scorpion/brouillon';
+import { hasParcours } from '@hailandx/scorpion/brouillon';
 import { CategoryPicker, catsSummary, type Cat } from '@/components/CategoryPicker';
 import { useEffect, useState } from 'react';
 import { formatGnPhone, normalizeGnPhone } from '@hailandx/commerce';
@@ -25,7 +25,7 @@ function Settings({ shop, decls, decl, uid, reload }: SellerCtx) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
   const [locating, setLocating] = useState(false);
-  useEffect(() => { if (hasDraft('boutique-reglages')) setLocating(true); }, []);
+  useEffect(() => { if (hasParcours('boutique-reglages')) setLocating(true); }, []);
   useEffect(() => { sb?.from('categories').select('id,name').order('position').then(({ data }) => setCats((data as Cat[]) ?? [])); }, [sb]);
 
   const edit = (f: Field, v: string) => { setOpen(open === f ? null : f); setValue(v); setMsg(null); };

@@ -1,5 +1,5 @@
 'use client';
-import { readDraft } from '@hailandx/scorpion/brouillon';
+import { peekResume, readDraft } from '@hailandx/scorpion/brouillon';
 import { Suspense, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -39,9 +39,9 @@ function Checkout() {
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
   /** Parcours d'adresse ouvert, toujours sur place : le domicile, ou une adresse temporaire (client hors de chez lui, §53). */
-  // Parcours interrompu (appareil photo, rechargement) : on le rouvre tel quel (§55).
+  // Parcours interrompu (appareil photo, rechargement, retour après avoir autorisé la localisation sur iPhone) : on le rouvre tel quel (§55, §66).
   const [adding, setAdding] = useState<null | 'domicile' | 'ici'>(null);
-  useEffect(() => { const d = readDraft('client'); if (d) setAdding(d.extra?.temporary ? 'ici' : 'domicile'); }, []);
+  useEffect(() => { const d = readDraft('client') ?? peekResume('client'); if (d) setAdding(d.extra?.temporary ? 'ici' : 'domicile'); }, []);
   /** Choix « où livrer ? » déplié (adresse supplémentaire quand le compte en a déjà). */
   const [choosing, setChoosing] = useState(false);
   const [linking, setLinking] = useState(false);

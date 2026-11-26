@@ -142,3 +142,22 @@ export const fmtM = (v: number, digits = 1) => v.toLocaleString('fr-FR', { minim
 
 /** Coordonnée formatée en degrés décimaux (6 décimales ≈ 11 cm). */
 export const fmtCoord = (v: number) => v.toFixed(6);
+
+/**
+ * Horloge de la récupération (2026-11-26, `HAILANDX.md` §66). Avant : 15 s comptées dès l'ouverture de l'écran, y compris le temps
+ * passé à répondre à la fenêtre « Autoriser la localisation » et le démarrage à froid du GPS ; la haute précision était abandonnée après 8 s
+ * pour une position réseau. Résultat sur Android : la 1re tentative échouait presque toujours, la 2de (GPS chaud) réussissait.
+ * Maintenant : on ne compte qu'à partir de la première réponse du téléphone ; sans aucune mesure, on attend jusqu'à 30 s
+ * (démarrage à froid) ; après la première mesure, 15 s de mesures (25 s si elles restent imprécises, le temps que le GPS prenne le relais).
+ */
+export const PERMISSION_WAIT_MS = 60000;
+export const COLD_START_MS = 30000;
+export const WEAK_WINDOW_MS = 25000;
+
+export function acquisitionVerdict(p: { now: number; start: number; respondedAt: number | null; firstSampleAt: number | null; summary: GpsSummary | null }): 'continue' | 'done' | 'no-fix' | 'no-answer' {
+  if (p.respondedAt === null) return p.now - p.start >= PERMISSION_WAIT_MS ? 'no-answer' : 'continue';
+  if (p.firstSampleAt === null || !p.summary) return p.now - p.respondedAt >= COLD_START_MS ? 'no-fix' : 'continue';
+  const sampling = p.now - p.firstSampleAt;
+  if (sampling < MAX_DURATION_MS) return shouldStop(p.summary, sampling) ? 'done' : 'continue';
+  return p.summary.accuracy > 25 && sampling < WEAK_WINDOW_MS ? 'continue' : 'done';
+}

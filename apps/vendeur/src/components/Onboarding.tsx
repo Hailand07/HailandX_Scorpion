@@ -1,5 +1,5 @@
 'use client';
-import { hasDraft } from '@hailandx/scorpion/brouillon';
+import { hasParcours } from '@hailandx/scorpion/brouillon';
 import { catsSummary } from './CategoryPicker';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -29,7 +29,7 @@ export function Onboarding({ shop, decls, decl, cert, uid, reload, back, recue =
   // Parcours d'adresse sur place (§49 étape 4) : plus de détour par NavigationX.
   // Parcours interrompu (appareil photo, rechargement) : on le rouvre tel quel (§55).
   const [locating, setLocating] = useState(false);
-  useEffect(() => { if (hasDraft('boutique-ouverture')) setLocating(true); }, []);
+  useEffect(() => { if (hasParcours('boutique-ouverture')) setLocating(true); }, []);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
 

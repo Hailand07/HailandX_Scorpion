@@ -48,9 +48,9 @@ export function describeGeoError(code: number, ua: string = navigator.userAgent,
               'Réglages > Confidentialité et sécurité > Service de localisation : activé.',
               'Dans la même liste, « Safari – Sites web » : choisissez « Lors de l’utilisation de l’app » et activez « Position précise ».',
               'Dans Safari, touchez « aA » à gauche de l’adresse > « Réglages du site web » > Position > « Autoriser ».',
+              'Revenez ici et touchez « J’ai autorisé, réessayer » : la page se recharge (sur iPhone, Safari garde le refus tant que la page n’est pas rechargée) et la recherche de position reprend.',
             ]
-          : ['Dans les réglages du site (cadenas à côté de l’adresse), autorisez « Position ».', 'Vérifiez que la localisation de l’appareil est activée.']),
-        'Revenez ici et touchez « Réessayer ».',
+          : ['Dans les réglages du site (cadenas à côté de l’adresse), autorisez « Position ».', 'Vérifiez que la localisation de l’appareil est activée.', 'Revenez ici et touchez « J’ai autorisé, réessayer » : la page se recharge et la recherche reprend.']),
       ],
     };
   }
@@ -98,4 +98,30 @@ export function getPositionWithFallback(): Promise<GeolocationPosition> {
       }, GEO_ATTEMPTS[i]);
     attempt(0);
   });
+}
+
+/**
+ * Mesures reçues mais très imprécises (au-delà de 200 m) : le GPS n'est pas transmis au navigateur — sur iPhone, « Position exacte »
+ * coupée ; sur Android, « Précision de la localisation Google » ou « position exacte » coupée pour Chrome (2026-11-26).
+ */
+export function describeImprecise(accuracyM: number, ua: string = navigator.userAgent): GeoHelp {
+  const ios = /iPhone|iPad|iPod/.test(ua) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const android = /Android/i.test(ua);
+  const inApp = isInAppBrowser(ua);
+  const dist = accuracyM >= 1000 ? `${(accuracyM / 1000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} km` : `${Math.round(accuracyM)} m`;
+  return {
+    problem: 'signal',
+    inAppBrowser: inApp,
+    title: `Position approximative (± ${dist})`,
+    message: 'Le téléphone ne donne pas sa position GPS précise au navigateur : on ne peut pas trouver votre bâtiment ainsi.',
+    steps: [
+      ...(inApp ? ['Ouvrez ce lien dans Safari ou Chrome, pas dans WhatsApp ou Facebook.'] : []),
+      ...(ios
+        ? ['Réglages > Confidentialité et sécurité > Service de localisation > Safari – Sites web (ou Chrome) : « Lors de l’utilisation de l’app » et activez « Position exacte ».']
+        : android
+          ? ['Paramètres > Localisation : activée, puis « Services de localisation » > « Précision de la localisation Google » : activée.', 'Paramètres > Applications > Chrome > Autorisations > Position : autorisée, avec « Utiliser la position exacte ».']
+          : ['Utilisez un téléphone : un ordinateur n’a pas de GPS.']),
+      'Revenez ici, sortez à découvert un instant et touchez « Réessayer ».',
+    ],
+  };
 }

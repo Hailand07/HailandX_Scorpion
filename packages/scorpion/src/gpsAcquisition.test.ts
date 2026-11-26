@@ -73,3 +73,18 @@ describe('shouldStop', () => {
   it('continue si la précision est insuffisante', () => expect(shouldStop(summarize([at(0, 0, 30)]), 8000)).toBe(false));
   it('s’arrête au bout du temps maximal', () => expect(shouldStop(null, MAX_DURATION_MS)).toBe(true));
 });
+
+describe('horloge de la récupération (§66)', () => {
+  it('le temps passé sur la fenêtre d’autorisation ne compte pas ; démarrage à froid 30 s ; mesures imprécises 25 s', async () => {
+    const { acquisitionVerdict, summarize } = await import('./gpsAcquisition');
+    const fine = summarize([1, 2, 3, 4, 5].map((i) => ({ lng: -13.6, lat: 9.6, accuracy: 6, t: i })));
+    const weak = summarize([{ lng: -13.6, lat: 9.6, accuracy: 900, t: 1 }]);
+    expect(acquisitionVerdict({ now: 20000, start: 0, respondedAt: null, firstSampleAt: null, summary: null })).toBe('continue');
+    expect(acquisitionVerdict({ now: 61000, start: 0, respondedAt: null, firstSampleAt: null, summary: null })).toBe('no-answer');
+    expect(acquisitionVerdict({ now: 25000, start: 0, respondedAt: 10000, firstSampleAt: null, summary: null })).toBe('continue');
+    expect(acquisitionVerdict({ now: 41000, start: 0, respondedAt: 10000, firstSampleAt: null, summary: null })).toBe('no-fix');
+    expect(acquisitionVerdict({ now: 15000, start: 0, respondedAt: 10000, firstSampleAt: 10000, summary: fine })).toBe('done');
+    expect(acquisitionVerdict({ now: 30000, start: 0, respondedAt: 10000, firstSampleAt: 10000, summary: weak })).toBe('continue');
+    expect(acquisitionVerdict({ now: 36000, start: 0, respondedAt: 10000, firstSampleAt: 10000, summary: weak })).toBe('done');
+  });
+});
